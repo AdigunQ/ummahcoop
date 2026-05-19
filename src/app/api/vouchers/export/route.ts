@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { buildVoucherDataset, resolveVoucherPeriod } from '@/lib/vouchers'
+import { getCurrentMemberReportDataset } from '@/lib/current-member-data'
 
 function escapeCsv(value: unknown): string {
   const raw = String(value ?? '')
@@ -32,8 +33,10 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const periodInput = searchParams.get('period') || undefined
   const resolved = resolveVoucherPeriod(periodInput)
-
-  const dataset = await buildVoucherDataset(resolved.period)
+  const currentPeriod = resolveVoucherPeriod().period
+  const dataset = resolved.period >= currentPeriod
+    ? await getCurrentMemberReportDataset(resolved.period)
+    : await buildVoucherDataset(resolved.period)
   const csv = buildThreeColumnCsv(
     dataset.rows.map((row) => ({
       staffId: row.staffId,

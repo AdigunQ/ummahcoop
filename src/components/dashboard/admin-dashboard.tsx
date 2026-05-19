@@ -35,12 +35,12 @@ export function AdminDashboard({ stats, recentTransactions }: AdminDashboardProp
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Operations Console</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Admin Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600">Portfolio visibility, approvals, and risk controls in one view.</p>
+          <p className="mt-1 text-sm text-slate-600">Workbook-backed member visibility, approvals, and risk controls in one view.</p>
         </div>
 
         <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm">
           <Clock3 className="h-4 w-4 text-cyan-700" />
-          Live operational snapshot
+          Current workbook snapshot
         </div>
       </div>
 

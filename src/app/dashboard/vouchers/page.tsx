@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { buildVoucherDataset, resolveVoucherPeriod } from '@/lib/vouchers'
+import { getCurrentMemberReportDataset } from '@/lib/current-member-data'
 
 type SearchParams = {
   period?: string
@@ -21,7 +22,11 @@ export default async function VouchersPage({
   if (session.user.role !== 'ADMIN') redirect('/dashboard')
 
   const resolved = resolveVoucherPeriod(searchParams?.period)
-  const dataset = await buildVoucherDataset(resolved.period)
+  const currentPeriod = resolveVoucherPeriod().period
+  const isLivePeriod = resolved.period >= currentPeriod
+  const dataset = isLivePeriod
+    ? await getCurrentMemberReportDataset(resolved.period)
+    : await buildVoucherDataset(resolved.period)
 
   const uploadedMonth = await prisma.memberDataMonth.findUnique({
     where: { period: resolved.period },
@@ -38,7 +43,7 @@ export default async function VouchersPage({
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Generate Report</h1>
         <p className="mt-1 text-gray-500">
-          Monthly salary deduction report generated from live member records, including newly added members.
+          Monthly salary deduction report generated from uploaded monthly data when available, otherwise from live member records.
         </p>
       </div>
 
@@ -74,11 +79,20 @@ export default async function VouchersPage({
         </form>
       </div>
 
+      {isLivePeriod && !uploadedMonth && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <p className="font-semibold">Using current live member data for {formatPeriodLabel(resolved.period)}</p>
+          <p className="mt-1 text-sm">
+            This period carries April forward until fresh members are added, so the report stays in step with the current live workbook.
+          </p>
+        </div>
+      )}
+
       {uploadedMonth && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900">
           <p className="font-semibold">Uploaded snapshot found for {uploadedMonth.label}</p>
           <p className="mt-1 text-sm">
-            Report output still uses live records so newly added members are included. Snapshot rows:{' '}
+            Report output for this period uses the uploaded snapshot. Snapshot rows:{' '}
             {uploadedMonth.rowCount.toLocaleString()} • Uploaded {new Date(uploadedMonth.uploadedAt).toLocaleString()}
           </p>
         </div>
@@ -101,7 +115,7 @@ export default async function VouchersPage({
           <div className="px-6 py-10 text-center text-gray-500">No active members available for report generation.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px] text-sm">
+            <table className="w-full min-w-[1280px] text-sm">
               <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-6 py-3">S/N</th>
@@ -109,6 +123,8 @@ export default async function VouchersPage({
                   <th className="px-6 py-3">Name</th>
                   <th className="px-6 py-3">Savings</th>
                   <th className="px-6 py-3">Special Savings</th>
+                  <th className="px-6 py-3">Monthly Charges</th>
+                  <th className="px-6 py-3">New Member FEE</th>
                   <th className="px-6 py-3">Member Fee</th>
                   <th className="px-6 py-3">Member Type</th>
                   <th className="px-6 py-3">Total Savings</th>
@@ -122,6 +138,8 @@ export default async function VouchersPage({
                     <td className="px-6 py-3 text-gray-900">{row.name}</td>
                     <td className="px-6 py-3 text-gray-800">{formatCurrency(row.monthlySavings)}</td>
                     <td className="px-6 py-3 text-gray-800">{formatCurrency(row.specialSavings)}</td>
+                    <td className="px-6 py-3 text-gray-800">{formatMaybeCurrency(row.monthlyCharges)}</td>
+                    <td className="px-6 py-3 text-gray-800">{formatMaybeCurrency(row.newMemberFee)}</td>
                     <td className="px-6 py-3 text-gray-800">{formatCurrency(row.memberFee)}</td>
                     <td className="px-6 py-3">
                       <span
@@ -144,6 +162,25 @@ export default async function VouchersPage({
       </div>
     </div>
   )
+}
+
+function formatPeriodLabel(period: string): string {
+  const match = period.trim().match(/^(20\d{2})-(0?[1-9]|1[0-2])$/)
+  if (!match) return period
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return period
+
+  return new Date(year, month - 1, 1).toLocaleDateString('en-NG', {
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function formatMaybeCurrency(value: number): string {
+  if (!value) return '—'
+  return formatCurrency(value)
 }
 
 function MetricCard({

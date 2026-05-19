@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { AdminDashboard } from '@/components/dashboard/admin-dashboard'
+import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
 import { MemberDashboard } from '@/components/dashboard/member-dashboard'
 import { LOAN_POLICY } from '@/lib/constants'
 
@@ -14,7 +14,11 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Get user data
+  if (session.user?.role === 'ADMIN') {
+    return <AdminAnalytics />
+  }
+
+  // Get member data
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
@@ -33,55 +37,45 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  if (session.user?.role === 'ADMIN') {
-    // Get admin stats
-    const [
-      totalMembers,
-      totalSavings,
-      activeLoans,
-      pendingMembers,
-      pendingPayments,
-      pendingLoans,
-      recentTransactions,
-    ] = await Promise.all([
-      prisma.user.count({ where: { role: 'MEMBER' } }),
-      prisma.user.aggregate({
-        where: { role: 'MEMBER' },
-        _sum: { balance: true },
-      }),
-      prisma.loan.count({
-        where: { status: 'APPROVED', balance: { gt: 0 } },
-      }),
-      prisma.user.count({ where: { role: 'MEMBER', status: 'PENDING' } }),
-      prisma.payment.count({ where: { status: 'PENDING' } }),
-      prisma.loan.count({ where: { status: 'PENDING' } }),
-      prisma.transaction.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: { user: { select: { name: true, email: true } } },
-      }),
-    ])
-
-    const stats = {
-      totalMembers,
-      totalSavings: totalSavings._sum.balance || 0,
-      activeLoans,
-      pendingApprovals: pendingMembers + pendingPayments + pendingLoans,
-      pendingMembers,
-      pendingPayments,
-      pendingLoans,
-    }
-
-    return <AdminDashboard stats={stats} recentTransactions={recentTransactions} />
-  }
+  const approvedLoanSummary = await prisma.loan.aggregate({
+    where: {
+      userId: user.id,
+      status: 'APPROVED',
+    },
+    _count: {
+      _all: true,
+    },
+    _sum: {
+      amount: true,
+    },
+  })
 
   // Member dashboard data
   const loanEligibility = user.balance * LOAN_POLICY.maxSavingsMultiplier
+  const memberProfile = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    status: user.status,
+    staffId: user.staffId,
+    department: user.department,
+    createdAt: user.createdAt.toISOString(),
+    balance: user.balance,
+    specialBalance: user.specialBalance,
+    totalContributions: user.totalContributions,
+    loanBalance: user.loanBalance,
+    monthlyContribution: user.monthlyContribution,
+    specialContribution: user.specialContribution,
+  }
 
   return (
     <MemberDashboard
-      user={user}
+      user={memberProfile}
       loanEligibility={loanEligibility}
+      loanSummary={{
+        approvedCount: approvedLoanSummary._count._all || 0,
+        approvedAmount: approvedLoanSummary._sum.amount || 0,
+      }}
       recentPayments={user.payments}
       recentLoans={user.loans}
     />

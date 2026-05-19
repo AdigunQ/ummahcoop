@@ -25,21 +25,36 @@ export default async function ProfilePage() {
       bankName: true,
       bankAccountNumber: true,
       bankAccountName: true,
+      createdAt: true,
+      totalContributions: true,
     },
   })
 
   if (!member) redirect('/login')
+
+  const loanRequestSummary = await prisma.loan.aggregate({
+    where: { userId: session.user.id },
+    _count: { _all: true },
+    _sum: { amount: true },
+  })
 
   return (
     <div className="animate-fadeIn space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Manage your personal information and banking details.
+          Your joined date, savings, and loan activity at a glance.
         </p>
       </div>
 
-      <ProfileView member={member} />
+      <ProfileView
+        member={{
+          ...member,
+          createdAt: member.createdAt.toISOString(),
+          loanRequestedAmount: loanRequestSummary._sum.amount ?? 0,
+          loanRequestedCount: loanRequestSummary._count._all ?? 0,
+        }}
+      />
     </div>
   )
 }

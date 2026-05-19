@@ -31,14 +31,38 @@ export async function GET(req: Request) {
     
     await prisma.user.upsert({
       where: { email: 'member@example.com' },
-      update: {},
-      create: {
-        email: 'member@example.com',
+      update: {
         name: 'Sample Member',
+        staffId: 'OPS-1042',
         password: memberPassword,
         role: 'MEMBER',
         status: 'ACTIVE',
+        phone: '+2348012345678',
+        department: 'Operations',
         monthlyContribution: 10000,
+        specialContribution: 0,
+        balance: 120000,
+        specialBalance: 0,
+        totalContributions: 120000,
+        loanBalance: 0,
+        voucherEnabled: true,
+      },
+      create: {
+        email: 'member@example.com',
+        name: 'Sample Member',
+        staffId: 'OPS-1042',
+        password: memberPassword,
+        role: 'MEMBER',
+        status: 'ACTIVE',
+        phone: '+2348012345678',
+        department: 'Operations',
+        monthlyContribution: 10000,
+        specialContribution: 0,
+        balance: 120000,
+        specialBalance: 0,
+        totalContributions: 120000,
+        loanBalance: 0,
+        voucherEnabled: true,
       },
     })
     

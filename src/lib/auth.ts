@@ -4,6 +4,27 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 
+function normalizeAuthErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim()
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error.trim()
+  }
+
+  return 'Unable to sign in right now. Please try again.'
+}
+
+function normalizeStaffId(value: string): string {
+  return value.trim().replace(/\s+/g, '').toUpperCase()
+}
+
+function buildMemberEmail(staffId: string): string {
+  const domain = (process.env.MEMBER_EMAIL_DOMAIN || 'faan-ummah.coop').trim().replace(/^@/, '')
+  return `${staffId.toLowerCase()}@${domain.toLowerCase()}`
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
   session: {
@@ -17,57 +38,87 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        identifier: { label: 'Staff ID or Email', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Please enter email and password')
-        }
+        try {
+          if (!credentials?.identifier || !credentials?.password) {
+            return null
+          }
 
-        const email = credentials.email.trim().toLowerCase()
-        const password = credentials.password
+          const identifier = credentials.identifier.trim()
+          const normalizedIdentifier = identifier.replace(/\s+/g, '')
+          const password = credentials.password
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-        })
+          let user = null as Awaited<ReturnType<typeof prisma.user.findFirst>> | null
 
-        if (!user || !user.password) {
-          throw new Error('Invalid email or password')
-        }
+          if (normalizedIdentifier.includes('@')) {
+            user = await prisma.user.findUnique({
+              where: { email: normalizedIdentifier.toLowerCase() },
+            })
+          } else {
+            const staffId = normalizeStaffId(normalizedIdentifier)
+            user = await prisma.user.findUnique({
+              where: { staffId },
+            })
 
-        const isPasswordValid = await bcrypt.compare(
-          password,
-          user.password
-        )
+            if (!user) {
+              user = await prisma.user.findUnique({
+                where: { email: buildMemberEmail(staffId) },
+              })
+            }
+          }
 
-        if (!isPasswordValid) {
-          throw new Error('Invalid email or password')
-        }
+          if (!user && normalizedIdentifier.includes('@')) {
+            const localPart = normalizedIdentifier.split('@')[0]
+            const staffId = normalizeStaffId(localPart)
+            if (staffId) {
+              user = await prisma.user.findUnique({
+                where: { staffId },
+              })
+            }
+          }
 
-        if (user.status === 'PENDING') {
-          throw new Error('Account pending approval. Please wait for admin verification.')
-        }
+          if (!user || !user.password) {
+            return null
+          }
 
-        if (user.status === 'REJECTED') {
-          throw new Error('Account has been rejected. Contact admin for assistance.')
-        }
+          const isPasswordValid = await bcrypt.compare(
+            password,
+            user.password
+          )
 
-        if (user.status === 'SUSPENDED') {
-          throw new Error('Account has been suspended. Contact admin.')
-        }
+          if (!isPasswordValid) {
+            return null
+          }
 
-        if (user.status === 'CLOSED') {
-          throw new Error('Account is closed. Contact admin for reactivation.')
-        }
+          if (user.status === 'PENDING') {
+            throw new Error('Account pending approval. Please wait for admin verification.')
+          }
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          status: user.status,
-          image: user.image,
+          if (user.status === 'REJECTED') {
+            throw new Error('Account has been rejected. Contact admin for assistance.')
+          }
+
+          if (user.status === 'SUSPENDED') {
+            throw new Error('Account has been suspended. Contact admin.')
+          }
+
+          if (user.status === 'CLOSED') {
+            throw new Error('Account is closed. Contact admin for reactivation.')
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            status: user.status,
+            image: user.image,
+          }
+        } catch (error) {
+          throw new Error(normalizeAuthErrorMessage(error))
         }
       },
     }),

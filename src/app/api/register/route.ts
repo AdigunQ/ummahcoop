@@ -7,15 +7,20 @@ import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
 const registerPayloadSchema = z.object({
   name: z.string().trim().min(1),
   staffId: z.string().trim().min(1).regex(/^[a-zA-Z0-9-]+$/),
-  email: z.string().trim().min(1).email(),
   phone: z.string().trim().min(1),
-  department: z.string().trim().min(1),
-  bankName: z.string().trim().min(1),
-  bankAccountNumber: z.string().trim().min(10).max(20),
-  bankAccountName: z.string().trim().min(2),
-  monthlyContribution: z.number().gt(0),
-  password: z.string().min(6),
+  department: z.string().trim().optional(),
+  bankName: z.string().trim().optional(),
+  bankAccountNumber: z.string().trim().optional(),
+  bankAccountName: z.string().trim().optional(),
+  monthlyContribution: z.coerce.number().min(0).optional(),
+  specialContribution: z.coerce.number().min(0).optional(),
+  password: z.string().min(6).optional(),
 })
+
+function buildMemberEmail(staffId: string): string {
+  const domain = (process.env.MEMBER_EMAIL_DOMAIN || 'faan-ummah.coop').trim().replace(/^@/, '')
+  return `${staffId.toLowerCase()}@${domain.toLowerCase()}`
+}
 
 export async function POST(req: Request) {
   try {
@@ -43,18 +48,34 @@ export async function POST(req: Request) {
     const {
       name,
       staffId,
-      email,
       phone,
       department,
       bankName,
       bankAccountNumber,
       bankAccountName,
       monthlyContribution,
+      specialContribution,
       password,
     } = parsed.data
 
-    const normalizedEmail = email.trim().toLowerCase()
     const normalizedStaffId = staffId.trim().toUpperCase()
+    const normalizedEmail = buildMemberEmail(normalizedStaffId)
+    const normalizedDepartment = department?.trim() || 'N/A'
+    const normalizedBankName = bankName?.trim() || null
+    const normalizedBankAccountNumber = bankAccountNumber?.trim() || null
+    const normalizedBankAccountName = bankAccountName?.trim() || null
+    const normalizedMonthlyContribution = monthlyContribution ?? 0
+    const normalizedSpecialContribution = specialContribution ?? 0
+
+    if (normalizedMonthlyContribution <= 0 && normalizedSpecialContribution <= 0) {
+      return NextResponse.json(
+        { error: 'Choose Thrift saving, Special saving, or both with at least one monthly amount.' },
+        { status: 400 }
+      )
+    }
+
+    const defaultPassword = (process.env.DEFAULT_MEMBER_PASSWORD || 'member123').trim() || 'member123'
+    const passwordValue = (password || defaultPassword).trim()
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -80,7 +101,7 @@ export async function POST(req: Request) {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const hashedPassword = await bcrypt.hash(passwordValue, 10)
 
     const now = new Date()
     const effectiveStartDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
@@ -92,11 +113,12 @@ export async function POST(req: Request) {
         email: normalizedEmail,
         staffId: normalizedStaffId,
         phone,
-        department,
-        bankName,
-        bankAccountNumber,
-        bankAccountName,
-        monthlyContribution,
+        department: normalizedDepartment,
+        bankName: normalizedBankName,
+        bankAccountNumber: normalizedBankAccountNumber,
+        bankAccountName: normalizedBankAccountName,
+        monthlyContribution: normalizedMonthlyContribution,
+        specialContribution: normalizedSpecialContribution,
         password: hashedPassword,
         role: 'MEMBER',
         status: 'PENDING',
@@ -107,16 +129,16 @@ export async function POST(req: Request) {
     })
 
     await prisma.voucher.create({
-      data: {
-        userId: user.id,
-        fullName: user.name || 'Unnamed Member',
-        staffId: normalizedStaffId,
-        department,
-        monthlyDeduction: monthlyContribution,
-        effectiveStartDate,
-        status: 'GENERATED',
-        notes: 'Auto-generated at member registration. Queued for Finance inbox.',
-      },
+        data: {
+          userId: user.id,
+          fullName: user.name || 'Unnamed Member',
+          staffId: normalizedStaffId,
+          department: normalizedDepartment,
+          monthlyDeduction: normalizedMonthlyContribution + normalizedSpecialContribution,
+          effectiveStartDate,
+          status: 'GENERATED',
+          notes: 'Auto-generated at member registration. Queued for Finance inbox.',
+        },
     })
 
     return NextResponse.json(

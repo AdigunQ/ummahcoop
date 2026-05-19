@@ -14,15 +14,15 @@ export default async function ImportMembersPage() {
     <div className="animate-fadeIn space-y-10">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Excel Imports</h1>
-        <p className="mt-1 text-gray-500">Upload monthly member data, or replace all members from a spreadsheet.</p>
+        <p className="mt-1 text-gray-500">Upload one workbook for monthly member snapshots, or replace all members from a spreadsheet.</p>
       </div>
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Monthly Member Data (Oct 2025 → Feb 2026)</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Monthly Member Data (Single Workbook Import)</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Upload each month separately. We keep the exact month-specific columns and store the data so you can view it in the
-            Member Data tab.
+            Upload one Excel file containing multiple sheets. The importer auto-detects month sheets, normalizes field variations
+            across sheets, applies member-fee logic, and saves each month in one import.
           </p>
         </div>
         <MonthlyMemberDataClient />

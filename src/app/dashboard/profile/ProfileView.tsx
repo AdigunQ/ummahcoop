@@ -1,11 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Save, X } from 'lucide-react'
+import { CalendarDays, HandCoins, Landmark, Pencil, Save, X } from 'lucide-react'
 import { updateProfile } from './actions'
 import toast from 'react-hot-toast'
+import { formatCurrency, formatDate } from '@/lib/utils'
 
-export default function ProfileView({ member }: { member: any }) {
+type MemberProfile = {
+  name: string | null
+  email: string
+  phone: string | null
+  staffId: string | null
+  department: string | null
+  bankName: string | null
+  bankAccountNumber: string | null
+  bankAccountName: string | null
+  createdAt: string
+  totalContributions: number
+  loanRequestedAmount: number
+  loanRequestedCount: number
+}
+
+export default function ProfileView({ member }: { member: MemberProfile }) {
   const [isEditingBank, setIsEditingBank] = useState(false)
   const [isEditingPhone, setIsEditingPhone] = useState(false)
 
@@ -21,7 +37,39 @@ export default function ProfileView({ member }: { member: any }) {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="space-y-6">
+      <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Member snapshot</p>
+          <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">Joined, contributions, and loans</h2>
+        </div>
+        <div className="grid gap-4 p-5 md:grid-cols-3">
+          <StatCard
+            icon={CalendarDays}
+            label="Joined date"
+            value={formatDate(member.createdAt)}
+            note="When membership started"
+          />
+          <StatCard
+            icon={Landmark}
+            label="Contributed so far"
+            value={formatCurrency(member.totalContributions)}
+            note="Thrift and special savings"
+          />
+          <StatCard
+            icon={HandCoins}
+            label="Loan requested"
+            value={formatCurrency(member.loanRequestedAmount)}
+            note={
+              member.loanRequestedCount > 0
+                ? `${member.loanRequestedCount} request${member.loanRequestedCount === 1 ? '' : 's'} so far`
+                : 'No loan requests yet'
+            }
+          />
+        </div>
+      </section>
+
+      <div className="grid gap-6 md:grid-cols-2">
       {/* Personal Info Card */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
@@ -153,6 +201,34 @@ export default function ProfileView({ member }: { member: any }) {
             </div>
           </div>
         )}
+      </div>
+    </div>
+    </div>
+  )
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  note,
+}: {
+  icon: any
+  label: string
+  value: string
+  note: string
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-950">{value}</p>
+          <p className="mt-2 text-xs leading-5 text-slate-500">{note}</p>
+        </div>
+        <div className="rounded-2xl bg-white p-3 shadow-sm">
+          <Icon className="h-5 w-5 text-slate-700" />
+        </div>
       </div>
     </div>
   )

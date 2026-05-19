@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
 import { Toaster } from 'react-hot-toast'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'FAAN STAFF UMMAH MULTIPURPOSE COOPERATIVE',
@@ -38,7 +35,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="theme-color" content="#1a5f2a" />
       </head>
-      <body className={inter.className}>
+      <body className="font-sans antialiased">
         <Providers>
           {children}
           <Toaster

@@ -1,25 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
 import { toast } from 'react-hot-toast'
 import { Loader2, Handshake } from 'lucide-react'
 
-const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-})
-
-type LoginForm = z.infer<typeof loginSchema>
-
 function getLoginErrorMessage(error?: string | null) {
   if (!error || error === 'undefined') {
-    return 'Login failed. Please check your email and password.'
+    return 'Login failed. Please check your Staff ID or email and password.'
   }
 
   const normalized = error.trim()
@@ -34,32 +24,61 @@ function getLoginErrorMessage(error?: string | null) {
 export default function LoginPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
+  const [identifierError, setIdentifierError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-  })
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const rawError = params.get('error')
+    if (!rawError) return
 
-  const onSubmit = async (data: LoginForm) => {
+    toast.error(getLoginErrorMessage(rawError))
+
+    params.delete('error')
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `/login?${nextQuery}` : '/login')
+  }, [router])
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIdentifierError(null)
+    setPasswordError(null)
+
+    const trimmedIdentifier = identifier.trim()
+    if (!trimmedIdentifier) {
+      setIdentifierError('Enter your Staff ID or email address.')
+      return
+    }
+
+    if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters.')
+      return
+    }
+
     setIsLoading(true)
-    
+
     try {
       const result = await signIn('credentials', {
-        email: data.email,
-        password: data.password,
+        identifier: trimmedIdentifier,
+        password,
         redirect: false,
+        callbackUrl: '/dashboard',
       })
 
-      if (result?.error || result?.ok === false) {
-        toast.error(getLoginErrorMessage(result?.error))
-      } else {
-        toast.success('Login successful!')
-        router.push('/dashboard')
-        router.refresh()
+      if (!result) {
+        toast.error('Login service is unavailable. Please refresh and try again.')
+        return
       }
+
+      if (result.error || result.ok === false) {
+        toast.error(getLoginErrorMessage(result?.error))
+        return
+      }
+
+      toast.success('Login successful!')
+      window.location.assign(result.url || '/dashboard')
     } catch (error) {
       toast.error('An error occurred during login')
     } finally {
@@ -78,19 +97,24 @@ export default function LoginPage() {
           <p className="text-gray-500 mt-2">Sign in to continue.</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={onSubmit} className="space-y-6" noValidate>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
+              Staff ID or Email
             </label>
             <input
-              {...register('email')}
-              type="email"
-              placeholder="Enter your email"
+              type="text"
+              name="identifier"
+              placeholder="Enter your Staff ID or email"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              autoComplete="username"
+              spellCheck={false}
+              required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
             />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+            {identifierError && (
+              <p className="mt-1 text-sm text-red-600">{identifierError}</p>
             )}
           </div>
 
@@ -99,13 +123,17 @@ export default function LoginPage() {
               Password
             </label>
             <input
-              {...register('password')}
               type="password"
+              name="password"
               placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
             />
-            {errors.password && (
-              <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+            {passwordError && (
+              <p className="mt-1 text-sm text-red-600">{passwordError}</p>
             )}
           </div>
 
@@ -133,7 +161,7 @@ export default function LoginPage() {
             </Link>
           </p>
           <p className="text-sm text-gray-400 mt-4">
-            Default Admin: admin@coop.com / admin123
+            Members can use Staff ID or email. Default Admin: admin@coop.com / admin123
           </p>
         </div>
       </div>
