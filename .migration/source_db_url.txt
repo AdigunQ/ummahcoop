@@ -1,1 +1,0 @@
-postgresql://postgres:cAujvrAZzPEwruKTTrJROPbjLsYTswOO@trolley.proxy.rlwy.net:53918/railway?sslmode=require
