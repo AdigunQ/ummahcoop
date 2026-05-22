@@ -1,0 +1,6 @@
+{
+  "name": "next-runner",
+  "scripts": {
+    "start": "cd /app && yarn dev -H 0.0.0.0 -p 3000"
+  }
+}

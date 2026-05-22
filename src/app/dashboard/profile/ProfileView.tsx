@@ -1,10 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarDays, HandCoins, Landmark, Pencil, Save, X } from 'lucide-react'
+import {
+  Building2,
+  CalendarDays,
+  Check,
+  CreditCard,
+  HandCoins,
+  Hash,
+  Landmark,
+  Mail,
+  Pencil,
+  PhoneCall,
+  Save,
+  User,
+  X,
+} from 'lucide-react'
 import { updateProfile } from './actions'
 import toast from 'react-hot-toast'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getInitials } from '@/lib/utils'
 
 type MemberProfile = {
   name: string | null
@@ -30,7 +44,7 @@ export default function ProfileView({ member }: { member: MemberProfile }) {
     if (res?.error) {
       toast.error(res.error)
     } else {
-      toast.success('Profile updated successfully')
+      toast.success('Profile updated')
       setIsEditingBank(false)
       setIsEditingPhone(false)
     }
@@ -38,172 +52,232 @@ export default function ProfileView({ member }: { member: MemberProfile }) {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Member snapshot</p>
-          <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">Joined, contributions, and loans</h2>
-        </div>
-        <div className="grid gap-4 p-5 md:grid-cols-3">
-          <StatCard
-            icon={CalendarDays}
-            label="Joined date"
-            value={formatDate(member.createdAt)}
-            note="When membership started"
-          />
-          <StatCard
-            icon={Landmark}
-            label="Contributed so far"
-            value={formatCurrency(member.totalContributions)}
-            note="Thrift and special savings"
-          />
-          <StatCard
-            icon={HandCoins}
-            label="Loan requested"
-            value={formatCurrency(member.loanRequestedAmount)}
-            note={
-              member.loanRequestedCount > 0
-                ? `${member.loanRequestedCount} request${member.loanRequestedCount === 1 ? '' : 's'} so far`
-                : 'No loan requests yet'
-            }
-          />
+      {/* Identity strip */}
+      <section className="card relative overflow-hidden p-6 sm:p-7">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.07] via-transparent to-transparent" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/15 text-xl font-semibold text-accent">
+              {getInitials(member.name)}
+            </div>
+            <div>
+              <p className="label-eyebrow">Profile</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight">{member.name || 'Member'}</h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">{member.email}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Chip icon={Hash} label={`ID · ${member.staffId || 'N/A'}`} />
+            <Chip icon={Building2} label={member.department || 'No dept.'} />
+            <Chip icon={CalendarDays} label={formatDate(member.createdAt)} />
+          </div>
         </div>
       </section>
 
+      {/* KPI cards */}
+      <section className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          icon={CalendarDays}
+          label="Joined"
+          value={formatDate(member.createdAt)}
+          note="Membership start date"
+          tone="slate"
+        />
+        <StatCard
+          icon={Landmark}
+          label="Total contributed"
+          value={formatCurrency(member.totalContributions)}
+          note="Thrift + special savings"
+          tone="emerald"
+        />
+        <StatCard
+          icon={HandCoins}
+          label="Loan requested"
+          value={formatCurrency(member.loanRequestedAmount)}
+          note={
+            member.loanRequestedCount > 0
+              ? `${member.loanRequestedCount} request${member.loanRequestedCount === 1 ? '' : 's'} so far`
+              : 'No loan requests yet'
+          }
+          tone="indigo"
+        />
+      </section>
+
       <div className="grid gap-6 md:grid-cols-2">
-      {/* Personal Info Card */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Personal Information</h2>
-        </div>
-        
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <span className="text-gray-500">Name</span>
-            <span className="col-span-2 font-medium text-gray-900">{member.name || 'N/A'}</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <span className="text-gray-500">Email</span>
-            <span className="col-span-2 font-medium text-gray-900">{member.email}</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <span className="text-gray-500">Staff ID</span>
-            <span className="col-span-2 font-medium text-gray-900">{member.staffId || 'N/A'}</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            <span className="text-gray-500">Department</span>
-            <span className="col-span-2 font-medium text-gray-900">{member.department || 'N/A'}</span>
-          </div>
-
-          {/* Editable Phone */}
-          <form action={handleSave} className="border-t border-gray-100 pt-4">
-            <div className="grid grid-cols-3 gap-2 text-sm items-center">
-              <span className="text-gray-500">Phone</span>
-              {isEditingPhone ? (
-                <div className="col-span-2 flex gap-2">
-                  <input
-                    name="phone"
-                    defaultValue={member.phone || ''}
-                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                    required
-                  />
-                  <button type="submit" className="text-green-600 hover:text-green-700">
-                    <Save size={16} />
-                  </button>
-                  <button type="button" onClick={() => setIsEditingPhone(false)} className="text-red-500 hover:text-red-600">
-                    <X size={16} />
-                  </button>
-                </div>
-              ) : (
-                <div className="col-span-2 flex items-center justify-between">
-                  <span className="font-medium text-gray-900">{member.phone || 'N/A'}</span>
-                  <button type="button" onClick={() => setIsEditingPhone(true)} className="text-primary-600 hover:text-primary-700">
-                    <Pencil size={14} />
-                  </button>
-                </div>
-              )}
+        {/* Personal */}
+        <section className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+            <div>
+              <p className="label-eyebrow">Identity</p>
+              <h2 className="mt-1 text-base font-semibold tracking-tight">Personal information</h2>
             </div>
-          </form>
-        </div>
-      </div>
+          </div>
 
-      {/* Bank Details Card */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Bank Details</h2>
-          {!isEditingBank && (
-            <button
-              onClick={() => setIsEditingBank(true)}
-              className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
-            >
-              <Pencil size={14} /> Edit
-            </button>
+          <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
+            <Row icon={User} label="Name" value={member.name || 'N/A'} />
+            <Row icon={Mail} label="Email" value={member.email} mono />
+            <Row icon={Hash} label="Staff ID" value={member.staffId || 'N/A'} />
+            <Row icon={Building2} label="Department" value={member.department || 'N/A'} />
+
+            <form action={handleSave}>
+              <div className="flex items-center gap-3 px-5 py-3.5">
+                <PhoneCall className="h-4 w-4 flex-none text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Phone</span>
+                <div className="ml-auto flex flex-1 items-center justify-end gap-2">
+                  {isEditingPhone ? (
+                    <>
+                      <input
+                        name="phone"
+                        data-testid="profile-phone-input"
+                        defaultValue={member.phone || ''}
+                        className="input-base !py-2 !text-sm sm:max-w-[200px]"
+                        required
+                      />
+                      <button
+                        type="submit"
+                        data-testid="profile-phone-save"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingPhone(false)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold">{member.phone || 'N/A'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingPhone(true)}
+                        data-testid="profile-phone-edit"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
+                        style={{ borderColor: 'rgb(var(--border))' }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        {/* Bank */}
+        <section className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+            <div>
+              <p className="label-eyebrow">Payout</p>
+              <h2 className="mt-1 text-base font-semibold tracking-tight">Bank details</h2>
+            </div>
+            {!isEditingBank && (
+              <button
+                onClick={() => setIsEditingBank(true)}
+                data-testid="profile-bank-edit"
+                className="btn-ghost !py-1.5 !px-3 !text-xs"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            )}
+          </div>
+
+          {isEditingBank ? (
+            <form action={handleSave} className="space-y-4 p-5 animate-fadeIn">
+              <Field label="Bank name">
+                <input
+                  name="bankName"
+                  data-testid="profile-bank-name-input"
+                  defaultValue={member.bankName || ''}
+                  className="input-base"
+                  required
+                />
+              </Field>
+              <Field label="Account number">
+                <input
+                  name="bankAccountNumber"
+                  data-testid="profile-bank-account-number-input"
+                  defaultValue={member.bankAccountNumber || ''}
+                  className="input-base font-mono"
+                  required
+                />
+              </Field>
+              <Field label="Account name">
+                <input
+                  name="bankAccountName"
+                  data-testid="profile-bank-account-name-input"
+                  defaultValue={member.bankAccountName || ''}
+                  className="input-base"
+                  required
+                />
+              </Field>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="submit"
+                  data-testid="profile-bank-save"
+                  className="btn-primary flex-1 !py-2.5 !text-sm"
+                >
+                  <Check className="h-4 w-4" />
+                  Save changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingBank(false)}
+                  className="btn-ghost !py-2.5 !px-4 !text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
+              <Row icon={Landmark} label="Bank" value={member.bankName || 'Not set'} />
+              <Row icon={CreditCard} label="Account no." value={member.bankAccountNumber || 'Not set'} mono />
+              <Row icon={User} label="Account name" value={member.bankAccountName || 'Not set'} />
+            </div>
           )}
-        </div>
-
-        {isEditingBank ? (
-          <form action={handleSave} className="space-y-4 animate-in fade-in slide-in-from-top-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">Bank Name</label>
-              <input
-                name="bankName"
-                defaultValue={member.bankName || ''}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">Account Number</label>
-              <input
-                name="bankAccountNumber"
-                defaultValue={member.bankAccountNumber || ''}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500">Account Name</label>
-              <input
-                name="bankAccountName"
-                defaultValue={member.bankAccountName || ''}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-                required
-              />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                className="flex-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
-              >
-                Save Changes
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsEditingBank(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <span className="text-gray-500">Bank</span>
-              <span className="col-span-2 font-medium text-gray-900">{member.bankName || 'Not Set'}</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <span className="text-gray-500">Account No</span>
-              <span className="col-span-2 font-medium text-gray-900 font-mono">{member.bankAccountNumber || 'Not Set'}</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <span className="text-gray-500">Acct Name</span>
-              <span className="col-span-2 font-medium text-gray-900">{member.bankAccountName || 'Not Set'}</span>
-            </div>
-          </div>
-        )}
+        </section>
       </div>
     </div>
+  )
+}
+
+function Row({ icon: Icon, label, value, mono }: { icon: any; label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center gap-3 px-5 py-3.5">
+      <Icon className="h-4 w-4 flex-none text-muted-foreground" />
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={`ml-auto truncate text-sm font-semibold ${mono ? 'font-mono' : ''}`}>{value}</span>
     </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </label>
+  )
+}
+
+function Chip({ icon: Icon, label }: { icon: any; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+      style={{ borderColor: 'rgb(var(--border))' }}
+    >
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
   )
 }
 
@@ -212,22 +286,30 @@ function StatCard({
   label,
   value,
   note,
+  tone,
 }: {
   icon: any
   label: string
   value: string
   note: string
+  tone: 'emerald' | 'indigo' | 'slate'
 }) {
+  const tones: Record<typeof tone, string> = {
+    emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    indigo: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+    slate: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
+  }
+
   return (
-    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+    <div className="card card-hover p-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-          <p className="mt-3 text-2xl font-bold tracking-tight text-slate-950">{value}</p>
-          <p className="mt-2 text-xs leading-5 text-slate-500">{note}</p>
+        <div className="min-w-0">
+          <p className="label-eyebrow">{label}</p>
+          <p className="mt-2 truncate text-xl font-semibold tracking-tight">{value}</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{note}</p>
         </div>
-        <div className="rounded-2xl bg-white p-3 shadow-sm">
-          <Icon className="h-5 w-5 text-slate-700" />
+        <div className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${tones[tone]}`}>
+          <Icon className="h-5 w-5" />
         </div>
       </div>
     </div>

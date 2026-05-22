@@ -7,12 +7,12 @@ import {
   BadgeCheck,
   Building2,
   CalendarDays,
-  CheckCircle,
+  CheckCircle2,
   Clock,
   HandCoins,
   Landmark,
   PiggyBank,
-  Sparkles,
+  TrendingUp,
   Wallet,
   AlertCircle,
 } from 'lucide-react'
@@ -55,19 +55,21 @@ export function MemberDashboard({
 
   if (isPending) {
     return (
-      <div className="relative overflow-hidden rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 p-8 shadow-sm">
-        <div className="pointer-events-none absolute -right-10 top-0 h-36 w-36 rounded-full bg-amber-200/40 blur-3xl" />
-        <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-orange-200/40 blur-3xl" />
-        <div className="relative mx-auto max-w-2xl text-center">
-          <Clock className="mx-auto mb-4 h-14 w-14 text-amber-700" />
-          <h1 className="text-3xl font-bold tracking-tight text-amber-950">Account Pending Approval</h1>
-          <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-amber-900/80">
-            Your membership request is in the admin queue. Once approved, your savings, loan history, and member
-            profile will appear here automatically.
+      <div className="card relative overflow-hidden p-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/[0.06] via-transparent to-transparent" />
+        <div className="relative mx-auto max-w-xl text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <Clock className="h-7 w-7" />
+          </div>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">Account pending approval</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+            Your membership request is being reviewed by an administrator.
+            Your dashboard will activate as soon as it's approved.
           </p>
-          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">
-            <BadgeCheck className="h-4 w-4" />
-            Private review in progress
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full border bg-surface-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+            style={{ borderColor: 'rgb(var(--border))' }}>
+            <BadgeCheck className="h-3.5 w-3.5 text-amber-500" />
+            Review in progress
           </div>
         </div>
       </div>
@@ -82,114 +84,142 @@ export function MemberDashboard({
   const approvedLoanAmount = loanSummary.approvedAmount || 0
   const staffId = user.staffId || 'N/A'
   const department = user.department || 'N/A'
+  const totalBalance = user.balance + user.specialBalance
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-emerald-900/15 bg-[#0f1c15] text-[#f6f2ea] shadow-[0_28px_90px_rgba(7,19,13,0.28)]">
-        <div className="pointer-events-none absolute -right-16 top-0 h-48 w-48 rounded-full bg-[#8bd49d]/15 blur-3xl" />
-        <div className="pointer-events-none absolute -left-16 bottom-0 h-56 w-56 rounded-full bg-[#ffd38a]/12 blur-3xl" />
-
-        <div className="relative grid gap-6 px-6 py-6 lg:grid-cols-[1.2fr_0.8fr] lg:px-7 lg:py-7">
+      {/* Hero / overview */}
+      <section className="card relative overflow-hidden p-6 sm:p-8">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.07] via-transparent to-transparent" />
+        <div className="relative grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#c6d7c7] backdrop-blur">
-              <Sparkles className="h-4 w-4 text-[#8bd49d]" />
-              Member portal
-            </div>
-
-            <h1 className="mt-5 max-w-xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            <p className="label-eyebrow">Member portal</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
               Welcome back, {firstName}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#ccd9cd] sm:text-base">
-              Your cooperative account is private, approved, and easy to follow. Savings, loans, and contribution plans
-              are summarized here in one clean view.
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+              Here's a clear snapshot of your savings, loans, and contribution plan.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Chip icon={CalendarDays} label={`Member since ${memberSince}`} tone="emerald" />
-              <Chip icon={BadgeCheck} label={user.status} tone="slate" />
-              <Chip icon={Building2} label={department} tone="gold" />
-              <Chip icon={Landmark} label={`Staff ID ${staffId}`} tone="forest" />
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Chip icon={CalendarDays} label={`Since ${memberSince}`} />
+              <Chip icon={BadgeCheck} label={user.status} tone="success" />
+              <Chip icon={Building2} label={department} />
+              <Chip icon={Landmark} label={`ID · ${staffId}`} />
             </div>
           </div>
 
-          <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-4 backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8bd49d]">Account snapshot</p>
-            <div className="mt-4 space-y-3">
-              <SnapshotRow label="Thrift savings" value={formatCurrency(user.balance)} />
-              <SnapshotRow label="Special savings" value={formatCurrency(user.specialBalance)} />
-              <SnapshotRow label="Total contributions" value={formatCurrency(user.totalContributions)} />
-              <SnapshotRow label="Outstanding loan" value={formatCurrency(user.loanBalance)} />
-              <SnapshotRow label="Approved loans" value={`${approvedLoanCount} · ${formatCurrency(approvedLoanAmount)}`} />
+          <div
+            className="rounded-2xl border bg-surface-2 p-5"
+            style={{ borderColor: 'rgb(var(--border))' }}
+          >
+            <div className="flex items-center justify-between">
+              <p className="label-eyebrow">Total balance</p>
+              <span className="pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <TrendingUp className="h-3 w-3" />
+                Active
+              </span>
+            </div>
+            <p className="mt-3 text-4xl font-semibold tracking-tight">{formatCurrency(totalBalance)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Across thrift and special savings</p>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div
+                className="rounded-xl border bg-surface px-3 py-2.5"
+                style={{ borderColor: 'rgb(var(--border))' }}
+              >
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Loan</p>
+                <p
+                  className={`mt-1 text-base font-semibold ${
+                    user.loanBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'
+                  }`}
+                >
+                  {formatCurrency(user.loanBalance)}
+                </p>
+              </div>
+              <div
+                className="rounded-xl border bg-surface px-3 py-2.5"
+                style={{ borderColor: 'rgb(var(--border))' }}
+              >
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Eligible</p>
+                <p className="mt-1 text-base font-semibold text-foreground">
+                  {formatCurrency(loanEligibility)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Thrift Savings" value={formatCurrency(user.balance)} icon={PiggyBank} tone="emerald" />
-        <MetricCard title="Special Savings" value={formatCurrency(user.specialBalance)} icon={Wallet} tone="violet" />
-        <MetricCard title="Total Contributions" value={formatCurrency(user.totalContributions)} icon={Landmark} tone="slate" />
-        <MetricCard title="Loan Balance" value={formatCurrency(user.loanBalance)} icon={HandCoins} tone="amber" />
+      {/* Metric cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Thrift savings" value={formatCurrency(user.balance)} icon={PiggyBank} tone="emerald" />
+        <MetricCard title="Special savings" value={formatCurrency(user.specialBalance)} icon={Wallet} tone="indigo" />
+        <MetricCard title="Total contributed" value={formatCurrency(user.totalContributions)} icon={Landmark} tone="slate" />
+        <MetricCard title="Loan balance" value={formatCurrency(user.loanBalance)} icon={HandCoins} tone="amber" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <PanelCard title="Savings plan" eyebrow="Contribution detail">
-          <div className="space-y-4">
-            <DetailLine label="Monthly thrift plan" value={formatCurrency(monthlyPlan)} />
-            <DetailLine label="Special savings plan" value={formatCurrency(specialPlan)} />
+      {/* 3-column detail */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <PanelCard title="Savings plan" eyebrow="Monthly schedule">
+          <div className="space-y-3">
+            <DetailLine label="Thrift contribution" value={formatCurrency(monthlyPlan)} />
+            <DetailLine label="Special contribution" value={formatCurrency(specialPlan)} />
             <DetailLine label="Loan eligibility" value={formatCurrency(loanEligibility)} />
-            <p className="text-xs leading-6 text-slate-500">
-              Your eligible loan limit is based on your current savings balance and the cooperative loan policy.
-            </p>
           </div>
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+            Loan limit is calculated as a multiple of your current savings balance,
+            per cooperative policy.
+          </p>
         </PanelCard>
 
-        <PanelCard title="Loan summary" eyebrow="Current borrowing">
-          <div className="space-y-4">
+        <PanelCard title="Loan summary" eyebrow="Borrowing">
+          <div className="space-y-3">
             <DetailLine label="Approved loans" value={`${approvedLoanCount}`} />
             <DetailLine label="Approved amount" value={formatCurrency(approvedLoanAmount)} />
-            <DetailLine label="Outstanding balance" value={formatCurrency(user.loanBalance)} />
-            <p className="text-xs leading-6 text-slate-500">
-              Loan requests are private and reviewed inside the admin portal before any disbursement.
-            </p>
+            <DetailLine label="Outstanding" value={formatCurrency(user.loanBalance)} />
           </div>
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+            Loan requests are reviewed inside the admin portal before disbursement.
+          </p>
         </PanelCard>
 
-        <PanelCard title="Quick actions" eyebrow="Member tools">
-          <div className="space-y-3">
+        <PanelCard title="Quick actions" eyebrow="Shortcuts">
+          <div className="space-y-2.5">
             <QuickActionCard
               href="/dashboard/apply-loan"
               title="Request loan"
-              description={`Eligible up to ${formatCurrency(loanEligibility)}`}
+              description={`Up to ${formatCurrency(loanEligibility)}`}
               icon={HandCoins}
               disabled={loanEligibility < LOAN_POLICY.minAmount || user.loanBalance > 0}
             />
             <QuickActionCard
               href="/dashboard/history"
               title="Transaction history"
-              description="Review your member activity"
+              description="See your activity"
               icon={ArrowUpRight}
             />
           </div>
         </PanelCard>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <PanelCard title="Recent payments" eyebrow="Latest activity" padded={false}>
-          <div className="divide-y divide-slate-200">
+      {/* Recent activity */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <PanelCard title="Recent payments" eyebrow="Activity" padded={false}>
+          <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
             {recentPayments.length === 0 ? (
               <EmptyState icon={AlertCircle} text="No payments yet" />
             ) : (
               recentPayments.slice(0, 5).map((payment) => (
-                <div key={payment.id} className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="text-sm font-semibold capitalize text-slate-900">
+                <div key={payment.id} className="flex items-center justify-between px-5 py-3.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold capitalize">
                       {String(payment.type).toLowerCase().replace('_', ' ')}
                     </p>
-                    <p className="text-xs text-slate-500">{formatDate(payment.date || payment.createdAt)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(payment.date || payment.createdAt)}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-slate-900">{formatCurrency(payment.amount)}</p>
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-sm font-semibold">{formatCurrency(payment.amount)}</p>
                     <StatusPill status={payment.status} />
                   </div>
                 </div>
@@ -199,18 +229,18 @@ export function MemberDashboard({
         </PanelCard>
 
         <PanelCard title="Recent loans" eyebrow="Borrowing history" padded={false}>
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
             {recentLoans.length === 0 ? (
-              <EmptyState icon={CheckCircle} text="No loans yet" />
+              <EmptyState icon={CheckCircle2} text="No loans yet" />
             ) : (
               recentLoans.slice(0, 5).map((loan) => (
-                <div key={loan.id} className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="text-sm font-semibold capitalize text-slate-900">{loan.purpose}</p>
-                    <p className="text-xs text-slate-500">{loan.duration} months</p>
+                <div key={loan.id} className="flex items-center justify-between px-5 py-3.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold capitalize">{loan.purpose}</p>
+                    <p className="text-xs text-muted-foreground">{loan.duration} months</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-slate-900">{formatCurrency(loan.amount)}</p>
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-sm font-semibold">{formatCurrency(loan.amount)}</p>
                     <StatusPill status={loan.status} />
                   </div>
                 </div>
@@ -225,14 +255,8 @@ export function MemberDashboard({
 
 function formatMonthYear(value: string): string {
   const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) {
-    return value
-  }
-
-  return date.toLocaleDateString('en-NG', {
-    month: 'short',
-    year: 'numeric',
-  })
+  if (Number.isNaN(date.valueOf())) return value
+  return date.toLocaleDateString('en-NG', { month: 'short', year: 'numeric' })
 }
 
 function PanelCard({
@@ -247,22 +271,13 @@ function PanelCard({
   padded?: boolean
 }) {
   return (
-    <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{eyebrow}</p>
-        <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">{title}</h2>
+    <section className="card overflow-hidden">
+      <div className="border-b px-5 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+        <p className="label-eyebrow">{eyebrow}</p>
+        <h2 className="mt-1 text-base font-semibold tracking-tight">{title}</h2>
       </div>
-      <div className={padded ? 'px-5 py-5' : ''}>{children}</div>
+      <div className={padded ? 'p-5' : ''}>{children}</div>
     </section>
-  )
-}
-
-function SnapshotRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#a7b7aa]">{label}</p>
-      <p className="text-sm font-semibold text-white">{value}</p>
-    </div>
   )
 }
 
@@ -275,23 +290,23 @@ function MetricCard({
   title: string
   value: string
   icon: any
-  tone: 'emerald' | 'amber' | 'violet' | 'slate'
+  tone: 'emerald' | 'amber' | 'indigo' | 'slate'
 }) {
-  const tones = {
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    amber: 'border-amber-200 bg-amber-50 text-amber-700',
-    violet: 'border-violet-200 bg-violet-50 text-violet-700',
-    slate: 'border-slate-200 bg-slate-50 text-slate-700',
+  const tones: Record<typeof tone, string> = {
+    emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    indigo: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+    slate: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
   }
 
   return (
-    <div className={`rounded-2xl border p-5 shadow-sm ${tones[tone]}`}>
+    <div className="card card-hover p-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{value}</p>
+        <div className="min-w-0">
+          <p className="label-eyebrow">{title}</p>
+          <p className="mt-2 truncate text-2xl font-semibold tracking-tight">{value}</p>
         </div>
-        <div className="rounded-xl bg-white/80 p-2.5 shadow-sm">
+        <div className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${tones[tone]}`}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -301,9 +316,12 @@ function MetricCard({
 
 function DetailLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-950">{value}</p>
+    <div
+      className="flex items-center justify-between gap-3 rounded-xl border bg-surface-2 px-4 py-3"
+      style={{ borderColor: 'rgb(var(--border))' }}
+    >
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="text-sm font-semibold">{value}</p>
     </div>
   )
 }
@@ -311,22 +329,20 @@ function DetailLine({ label, value }: { label: string; value: string }) {
 function Chip({
   icon: Icon,
   label,
-  tone,
+  tone = 'neutral',
 }: {
   icon: any
   label: string
-  tone: 'emerald' | 'slate' | 'gold' | 'forest'
+  tone?: 'neutral' | 'success'
 }) {
   const tones = {
-    emerald: 'border-emerald-400/30 bg-emerald-400/10 text-[#bff1c9]',
-    slate: 'border-white/10 bg-white/5 text-[#dbe7dc]',
-    gold: 'border-[#ffd38a]/30 bg-[#ffd38a]/10 text-[#ffe7b9]',
-    forest: 'border-[#8bd49d]/25 bg-[#8bd49d]/10 text-[#d7f6de]',
+    neutral: 'border-border bg-surface-2 text-muted-foreground',
+    success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   }
-
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold ${tones[tone]}`}>
-      <Icon className="h-3.5 w-3.5" />
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${tones[tone]}`}
+      style={{ borderColor: tone === 'success' ? undefined : 'rgb(var(--border))' }}>
+      <Icon className="h-3 w-3" />
       {label}
     </span>
   )
@@ -347,15 +363,16 @@ function QuickActionCard({
 }) {
   if (disabled) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-4 opacity-60">
-        <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-white p-2.5 shadow-sm">
-            <Icon className="h-5 w-5 text-slate-500" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-            <p className="mt-1 text-xs text-slate-500">Increase savings to unlock</p>
-          </div>
+      <div
+        className="flex items-start gap-3 rounded-xl border bg-surface-2 p-3.5 opacity-60"
+        style={{ borderColor: 'rgb(var(--border))' }}
+      >
+        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-surface text-muted-foreground">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-xs text-muted-foreground">Build savings to unlock</p>
         </div>
       </div>
     )
@@ -364,42 +381,43 @@ function QuickActionCard({
   return (
     <Link
       href={href}
-      className="group flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+      data-testid={`quick-action-${title.toLowerCase().replace(/\s+/g, '-')}`}
+      className="group flex items-start gap-3 rounded-xl border bg-surface p-3.5 transition-all hover:-translate-y-0.5 hover:border-ring/40"
+      style={{ borderColor: 'rgb(var(--border))' }}
     >
-      <div className="rounded-lg bg-slate-100 p-2.5">
-        <Icon className="h-5 w-5 text-slate-700" />
+      <div className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-accent/10 text-accent">
+        <Icon className="h-4 w-4" />
       </div>
-      <div className="flex-1">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        <p className="mt-1 text-xs text-slate-500">{description}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <ArrowUpRight className="h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-700" />
+      <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
     </Link>
   )
 }
 
 function EmptyState({ icon: Icon, text }: { icon: any; text: string }) {
   return (
-    <div className="px-5 py-8 text-center text-slate-500">
-      <Icon className="mx-auto mb-2 h-10 w-10 text-slate-300" />
-      <p className="text-sm">{text}</p>
+    <div className="px-5 py-10 text-center">
+      <Icon className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+      <p className="text-sm text-muted-foreground">{text}</p>
     </div>
   )
 }
 
 function StatusPill({ status }: { status: string }) {
   const styleMap: Record<string, string> = {
-    APPROVED: 'border-emerald-200 bg-emerald-100 text-emerald-900',
-    PENDING: 'border-amber-200 bg-amber-100 text-amber-900',
-    COMPLETED: 'border-blue-200 bg-blue-100 text-blue-900',
-    REJECTED: 'border-rose-200 bg-rose-100 text-rose-900',
-    FAILED: 'border-rose-200 bg-rose-100 text-rose-900',
+    APPROVED: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    COMPLETED: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    PENDING: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    REJECTED: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    FAILED: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
   }
-
   return (
     <span
-      className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
-        styleMap[status] || 'border-slate-200 bg-slate-100 text-slate-700'
+      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+        styleMap[status] || 'bg-surface-2 text-muted-foreground'
       }`}
     >
       {status}

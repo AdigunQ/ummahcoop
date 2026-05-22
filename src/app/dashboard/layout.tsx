@@ -53,11 +53,11 @@ export default async function DashboardLayout({
       : undefined
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <DashboardNav user={user} adminBadges={adminBadges} />
-      <main className="lg:ml-64 min-h-screen">
-        <div className="p-4 lg:p-8">
-          {children}
+      <main className="min-h-screen lg:ml-72">
+        <div className="px-4 pb-10 pt-20 lg:px-8 lg:pt-10">
+          <div className="mx-auto max-w-6xl animate-fadeIn">{children}</div>
         </div>
       </main>
     </div>

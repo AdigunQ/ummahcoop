@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { BellRing, CreditCard, Landmark, Users } from 'lucide-react'
+import { BellRing, CreditCard, Landmark, TrendingUp, Users, Wallet } from 'lucide-react'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
@@ -129,87 +129,97 @@ export async function AdminAnalytics() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      {/* Hero */}
+      <section className="card relative overflow-hidden p-6 sm:p-7">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.07] via-transparent to-transparent" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Admin Analytics</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Account Overview</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Clean snapshot of the cooperative with the current workbook month and fee revenue details side by side.
+            <p className="label-eyebrow">Admin · Overview</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em]">Cooperative analytics</h1>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              A focused snapshot of the cooperative's current workbook month, members,
+              fees, and loan exposure.
             </p>
           </div>
 
-          <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
-            Current workbook: {currentLabel}
+          <div
+            className="inline-flex items-center gap-2 self-start rounded-full border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted-foreground"
+            style={{ borderColor: 'rgb(var(--border))' }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Workbook · {currentLabel}
           </div>
         </div>
-      </div>
+      </section>
 
+      {/* Top metric grid */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           label="Members on record"
           value={currentRows.length.toLocaleString('en-NG')}
-          icon={<Users className="h-4 w-4" />}
-          accent="slate"
+          icon={<Users className="h-5 w-5" />}
+          tone="slate"
           caption={currentLabel}
         />
         <MetricCard
           label="Thrift savings"
           value={formatCurrency(currentThriftSavings)}
-          icon={<Landmark className="h-4 w-4" />}
-          accent="emerald"
+          icon={<Landmark className="h-5 w-5" />}
+          tone="emerald"
           caption={currentLabel}
         />
         <MetricCard
           label="Special savings"
           value={formatCurrency(currentSpecialSavings)}
-          icon={<Landmark className="h-4 w-4" />}
-          accent="violet"
+          icon={<Wallet className="h-5 w-5" />}
+          tone="indigo"
           caption={currentLabel}
         />
         <MetricCard
           label="Active loans"
           value={activeLoans.toLocaleString('en-NG')}
-          icon={<CreditCard className="h-4 w-4" />}
-          accent="violet"
+          icon={<CreditCard className="h-5 w-5" />}
+          tone="amber"
           caption={formatCurrency(outstandingLoanBalance)}
         />
         <MetricCard
           label="Pending approvals"
           value={pendingApprovals.toLocaleString('en-NG')}
-          icon={<BellRing className="h-4 w-4" />}
-          accent="amber"
-          caption="Members, payments, loans, withdrawals"
+          icon={<BellRing className="h-5 w-5" />}
+          tone="rose"
+          caption="Across all queues"
         />
       </div>
 
+      {/* Revenue group */}
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
           label="Charges revenue"
           value={formatCurrency(totalChargesRevenue)}
-          icon={<CreditCard className="h-4 w-4" />}
-          accent="slate"
+          icon={<TrendingUp className="h-5 w-5" />}
+          tone="slate"
           caption={`Up to ${currentLabel}`}
         />
         <MetricCard
-          label="New member fee revenue"
+          label="New member fees"
           value={formatCurrency(totalNewMemberFeeRevenue)}
-          icon={<Users className="h-4 w-4" />}
-          accent="emerald"
-          caption="1,000 per joining member"
+          icon={<Users className="h-5 w-5" />}
+          tone="emerald"
+          caption="₦1,000 per joining member"
         />
         <MetricCard
           label="Total fee revenue"
           value={formatCurrency(totalFeeRevenue)}
-          icon={<Landmark className="h-4 w-4" />}
-          accent="violet"
-          caption="Charges + new member fees"
+          icon={<Landmark className="h-5 w-5" />}
+          tone="indigo"
+          caption="Charges + new fees"
         />
       </div>
 
+      {/* Snapshots */}
       <div className="grid gap-4 lg:grid-cols-2">
         <SnapshotCard
-          title="Current Snapshot"
+          title="Current snapshot"
           subtitle={currentLabel}
           rows={currentRows.length}
           newMembers={currentNewMembers}
@@ -219,9 +229,8 @@ export async function AdminAnalytics() {
           specialSavings={currentSpecialSavings}
           footer="Derived from the current live workbook data."
         />
-
         <SnapshotCard
-          title="Upcoming Voucher Snapshot"
+          title="Upcoming voucher"
           subtitle={currentLabel}
           rows={currentRows.length}
           newMembers={currentNewMembers}
@@ -229,48 +238,51 @@ export async function AdminAnalytics() {
           fees={currentFees}
           thriftSavings={currentThriftSavings}
           specialSavings={currentSpecialSavings}
-          footer={`May stays at ${currentRows.length.toLocaleString('en-NG')} members until fresh registrations are added.`}
+          footer={`Stays at ${currentRows.length.toLocaleString('en-NG')} members until fresh registrations arrive.`}
         />
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-end justify-between gap-4 border-b border-slate-200 px-6 py-4">
+      {/* Trend table */}
+      <section className="card overflow-hidden">
+        <div className="flex items-end justify-between gap-4 border-b px-6 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Trend Detail</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Last 6 months of registrations, charges revenue, new member fees, and savings basis.
+            <p className="label-eyebrow">Trend</p>
+            <h2 className="mt-1 text-base font-semibold tracking-tight">Last 6 months</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Registrations, charges, new member fees, and savings basis.
             </p>
           </div>
-          <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Simple monthly pulse</span>
         </div>
 
-        <table className="w-full min-w-[860px] text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="px-6 py-3">Month</th>
-              <th className="px-6 py-3">Registrations</th>
-              <th className="px-6 py-3">New Member Fee</th>
-              <th className="px-6 py-3">Charges</th>
-              <th className="px-6 py-3">Fee Revenue</th>
-              <th className="px-6 py-3">Savings Basis</th>
-              <th className="px-6 py-3">Voucher Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {trends.map((row) => (
-              <tr key={row.period} className="hover:bg-slate-50">
-                <td className="px-6 py-3 font-medium text-slate-900">{row.label}</td>
-                <td className="px-6 py-3 text-slate-700">{row.registrations.toLocaleString('en-NG')}</td>
-                <td className="px-6 py-3 text-slate-900">{formatCurrency(row.newMemberFeeRevenue)}</td>
-                <td className="px-6 py-3 text-slate-900">{formatCurrency(row.chargeRevenue)}</td>
-                <td className="px-6 py-3 text-slate-900">{formatCurrency(row.voucherFees)}</td>
-                <td className="px-6 py-3 text-slate-900">{formatCurrency(row.savingsBasis)}</td>
-                <td className="px-6 py-3 font-semibold text-slate-900">{formatCurrency(row.voucherTotal)}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="border-b text-left text-[10px] uppercase tracking-[0.16em] text-muted-foreground" style={{ borderColor: 'rgb(var(--border))' }}>
+                <th className="px-6 py-3 font-semibold">Month</th>
+                <th className="px-6 py-3 font-semibold">Registrations</th>
+                <th className="px-6 py-3 font-semibold">New member</th>
+                <th className="px-6 py-3 font-semibold">Charges</th>
+                <th className="px-6 py-3 font-semibold">Fees</th>
+                <th className="px-6 py-3 font-semibold">Savings</th>
+                <th className="px-6 py-3 font-semibold">Voucher total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
+              {trends.map((row) => (
+                <tr key={row.period} className="transition-colors hover:bg-surface-2">
+                  <td className="px-6 py-3.5 font-medium">{row.label}</td>
+                  <td className="px-6 py-3.5 text-muted-foreground">{row.registrations.toLocaleString('en-NG')}</td>
+                  <td className="px-6 py-3.5">{formatCurrency(row.newMemberFeeRevenue)}</td>
+                  <td className="px-6 py-3.5">{formatCurrency(row.chargeRevenue)}</td>
+                  <td className="px-6 py-3.5">{formatCurrency(row.voucherFees)}</td>
+                  <td className="px-6 py-3.5 text-muted-foreground">{formatCurrency(row.savingsBasis)}</td>
+                  <td className="px-6 py-3.5 font-semibold">{formatCurrency(row.voucherTotal)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }
@@ -280,30 +292,31 @@ function MetricCard({
   value,
   caption,
   icon,
-  accent,
+  tone,
 }: {
   label: string
   value: string
   caption: string
   icon: ReactNode
-  accent: 'slate' | 'emerald' | 'violet' | 'amber'
+  tone: 'slate' | 'emerald' | 'indigo' | 'amber' | 'rose'
 }) {
-  const accentStyles = {
-    slate: 'border-slate-200 bg-slate-50 text-slate-700',
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    violet: 'border-violet-200 bg-violet-50 text-violet-700',
-    amber: 'border-amber-200 bg-amber-50 text-amber-700',
+  const tones: Record<typeof tone, string> = {
+    slate: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
+    emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    indigo: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+    amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
   }
 
   return (
-    <div className={`rounded-2xl border p-5 shadow-sm ${accentStyles[accent]}`}>
+    <div className="card card-hover p-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{value}</p>
-          <p className="mt-1 text-xs font-medium text-slate-500">{caption}</p>
+        <div className="min-w-0">
+          <p className="label-eyebrow">{label}</p>
+          <p className="mt-2 truncate text-2xl font-semibold tracking-tight">{value}</p>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{caption}</p>
         </div>
-        <div className="rounded-xl bg-white/80 p-2.5 shadow-sm">
+        <div className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${tones[tone]}`}>
           {icon}
         </div>
       </div>
@@ -333,34 +346,37 @@ function SnapshotCard({
   footer: string
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="card p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+          <p className="label-eyebrow">{subtitle}</p>
+          <h2 className="mt-1 text-base font-semibold tracking-tight">{title}</h2>
         </div>
         <div className="text-right">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Rows</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{rows.toLocaleString('en-NG')}</p>
+          <p className="label-eyebrow">Rows</p>
+          <p className="mt-1 text-xl font-semibold tracking-tight">{rows.toLocaleString('en-NG')}</p>
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid grid-cols-2 gap-3">
         <DetailStat label="New / Old" value={`${newMembers} / ${oldMembers}`} />
-        <DetailStat label="Thrift Savings" value={formatCurrency(thriftSavings)} />
-        <DetailStat label="Special Savings" value={formatCurrency(specialSavings)} />
         <DetailStat label="Fees" value={formatCurrency(fees)} />
+        <DetailStat label="Thrift" value={formatCurrency(thriftSavings)} />
+        <DetailStat label="Special" value={formatCurrency(specialSavings)} />
       </div>
-      <p className="mt-4 text-xs font-medium text-slate-500">{footer}</p>
+      <p className="mt-4 text-xs text-muted-foreground">{footer}</p>
     </section>
   )
 }
 
-function DetailStat({ label, value, subdued }: { label: string; value: string; subdued?: boolean }) {
+function DetailStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-      <p className={`mt-1 text-sm font-semibold ${subdued ? 'text-slate-500' : 'text-slate-900'}`}>{value}</p>
+    <div
+      className="rounded-xl border bg-surface-2 px-4 py-3"
+      style={{ borderColor: 'rgb(var(--border))' }}
+    >
+      <p className="label-eyebrow">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
     </div>
   )
 }
