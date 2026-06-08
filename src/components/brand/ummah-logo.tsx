@@ -23,31 +23,35 @@ export function UmmahLogo({
         role="img"
         aria-label="Ummah Coop logo"
       >
-        <rect width="64" height="64" rx="18" fill="#07130d" />
+        <defs>
+          <linearGradient id="ummahLogoBg" x1="12" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#60a5fa" />
+            <stop offset="0.54" stopColor="#2563eb" />
+            <stop offset="1" stopColor="#1e3a8a" />
+          </linearGradient>
+          <linearGradient id="ummahLogoStroke" x1="22" y1="14" x2="42" y2="54" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#ffffff" />
+            <stop offset="1" stopColor="#dbeafe" />
+          </linearGradient>
+        </defs>
+        <rect width="64" height="64" rx="16" fill="url(#ummahLogoBg)" />
+        <rect x="1.5" y="1.5" width="61" height="61" rx="14.5" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="3" />
         <path
-          d="M20 18v20.4C20 48 26.2 54 32 54s12-6 12-15.6V18"
+          d="M20.5 17.5v19.8C20.5 48 26.2 54 32 54s11.5-6 11.5-16.7V17.5"
           fill="none"
-          stroke="#8bd49d"
-          strokeWidth="8"
+          stroke="url(#ummahLogoStroke)"
+          strokeWidth="7"
           strokeLinecap="round"
         />
         <path
-          d="M25 18v19.2c0 5.9 3.1 9.1 7 9.1s7-3.2 7-9.1V18"
+          d="M27 18v18.6c0 5.5 2.1 8.2 5 8.2s5-2.7 5-8.2V18"
           fill="none"
-          stroke="#f4c96b"
-          strokeWidth="3.5"
+          stroke="#bfdbfe"
+          strokeWidth="3"
           strokeLinecap="round"
-          opacity="0.95"
+          opacity="0.85"
         />
-        <circle cx="45.5" cy="17.5" r="5.5" fill="#f4c96b" />
-        <path
-          d="M18 43c5.8 4.5 12.7 6.2 21 4.2"
-          fill="none"
-          stroke="#f7f3ea"
-          strokeWidth="2"
-          strokeLinecap="round"
-          opacity="0.75"
-        />
+        <circle cx="44" cy="18" r="4.5" fill="#eff6ff" opacity="0.96" />
       </svg>
 
       {showText ? (
