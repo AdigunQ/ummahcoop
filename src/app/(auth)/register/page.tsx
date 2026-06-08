@@ -5,9 +5,20 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
-import { ArrowRight, Check, Loader2 } from 'lucide-react'
+import {
+  ArrowRight,
+  Check,
+  Hash,
+  Loader2,
+  PhoneCall,
+  PiggyBank,
+  ShieldCheck,
+  User,
+  Wallet,
+} from 'lucide-react'
 import { UmmahLogo } from '@/components/brand/ummah-logo'
 import { formatCurrency } from '@/lib/utils'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 type FormState = {
   staffId: string
@@ -114,164 +125,218 @@ export default function RegisterPage() {
     }
   }
 
+  const total =
+    (form.thriftEnabled ? Number(form.thriftAmount || 0) : 0) +
+    (form.specialEnabled ? Number(form.specialAmount || 0) : 0)
+
   return (
-    <main className="min-h-screen bg-[#f4f7f3] px-4 py-8 text-slate-900">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-3xl items-center">
-        <div className="w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
-            <section className="border-b border-slate-200 bg-[#07130d] px-6 py-7 text-[#f7f3ea] lg:border-b-0 lg:border-r lg:px-7 lg:py-8">
-              <UmmahLogo textClassName="text-white" />
-              <h1 className="mt-5 text-3xl font-bold tracking-tight text-white">Join Ummah Coop</h1>
+    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
+      <div className="pointer-events-none absolute inset-0 grid-pattern opacity-[0.35] dark:opacity-[0.18]" />
+      <div className="pointer-events-none absolute inset-0 glow-radial" />
 
-              <p className="mt-6 text-sm text-[#c6d7c7]">
-                Already a Member?{' '}
-                <Link href="/login" className="inline-flex items-center gap-1 font-semibold text-[#8bd49d] hover:text-[#9ce3ad]">
-                  Sign in
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6 lg:px-10">
+        <Link href="/" className="flex items-center gap-3">
+          <UmmahLogo
+            markClassName="h-9 w-9"
+            textClassName="text-foreground"
+            compactText
+          />
+        </Link>
+        <ThemeToggle />
+      </header>
+
+      <section className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-12 lg:px-10">
+        <div className="mx-auto mb-8 max-w-2xl text-center">
+          <div
+            className="inline-flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground"
+            style={{ borderColor: 'rgb(var(--border))' }}
+          >
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+            Membership application
+          </div>
+          <h1 className="mt-5 text-4xl font-semibold tracking-[-0.02em] sm:text-5xl">
+            Open your cooperative account
+          </h1>
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Fill in your details and choose your monthly contribution plan.
+            An admin will review and approve your account.
+          </p>
+        </div>
+
+        <div className="card overflow-hidden">
+          <form onSubmit={onSubmit} className="grid gap-0 lg:grid-cols-[1fr_1.1fr]" noValidate>
+            {/* Left: Personal details */}
+            <div className="border-b p-6 sm:p-8 lg:border-b-0 lg:border-r" style={{ borderColor: 'rgb(var(--border))' }}>
+              <p className="label-eyebrow">Step 1</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-tight">Personal details</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Used to identify you across cooperative records.
               </p>
-            </section>
 
-            <section className="px-6 py-7 sm:px-7 sm:py-8">
-              <form onSubmit={onSubmit} className="space-y-4" noValidate>
-                <Field label="Staff ID" error={errors.staffId}>
+              <div className="mt-6 space-y-4">
+                <Field label="Staff ID" error={errors.staffId} icon={Hash}>
                   <input
+                    data-testid="register-staffid-input"
                     value={form.staffId}
                     onChange={onTextChange('staffId')}
                     type="text"
                     placeholder="e.g. OPS-1042"
-                    className={inputClassName}
+                    className="input-base pl-10"
                     autoComplete="off"
                     autoFocus
                   />
                 </Field>
 
-                <Field label="Full name" error={errors.name}>
+                <Field label="Full name" error={errors.name} icon={User}>
                   <input
+                    data-testid="register-name-input"
                     value={form.name}
                     onChange={onTextChange('name')}
                     type="text"
-                    placeholder="Your full name"
-                    className={inputClassName}
+                    placeholder="As it appears on records"
+                    className="input-base pl-10"
                     autoComplete="name"
                   />
                 </Field>
 
-                <Field label="Phone number" error={errors.phone}>
+                <Field label="Phone number" error={errors.phone} icon={PhoneCall}>
                   <input
+                    data-testid="register-phone-input"
                     value={form.phone}
                     onChange={onTextChange('phone')}
                     type="tel"
                     placeholder="08012345678"
-                    className={inputClassName}
+                    className="input-base pl-10"
                     autoComplete="tel"
                   />
                 </Field>
+              </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Savings plan</p>
-                      <h2 className="mt-2 text-sm font-semibold text-slate-950">Choose one or both</h2>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        Pick the savings type you want and set the amount for each month.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
-                      <Check className="h-5 w-5 text-emerald-600" />
-                    </div>
-                  </div>
+              <div className="mt-7 flex items-start gap-3 rounded-xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
+                <ShieldCheck className="mt-0.5 h-4 w-4 flex-none text-emerald-500" />
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Already a member?{' '}
+                  <Link href="/login" className="font-semibold text-accent hover:underline" data-testid="register-login-link">
+                    Sign in here
+                  </Link>
+                  . Your application status will be sent to the email tied to your Staff ID.
+                </p>
+              </div>
+            </div>
 
-                  <div className="mt-4 space-y-3">
-                  <SavingsPlanCard
-                    inputId="thrift-plan"
-                    title="Thrift saving"
-                    description="Regular monthly savings"
-                    enabled={form.thriftEnabled}
-                    onToggle={onTogglePlan('thriftEnabled')}
-                    amount={form.thriftAmount}
-                    onAmountChange={onAmountChange('thriftAmount')}
-                    error={errors.thriftAmount}
-                  />
-                  <SavingsPlanCard
-                    inputId="special-plan"
-                    title="Special savings"
-                    description="An extra savings bucket"
-                    enabled={form.specialEnabled}
-                    onToggle={onTogglePlan('specialEnabled')}
-                    amount={form.specialAmount}
-                    onAmountChange={onAmountChange('specialAmount')}
-                    error={errors.specialAmount}
-                  />
-                  </div>
+            {/* Right: Savings plan */}
+            <div className="p-6 sm:p-8">
+              <p className="label-eyebrow">Step 2</p>
+              <h2 className="mt-1 text-lg font-semibold tracking-tight">Choose your savings plan</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pick one or both. Amounts deduct monthly.
+              </p>
 
-                  {errors.plan ? <p className="mt-3 text-xs font-medium text-rose-600">{errors.plan}</p> : null}
+              <div className="mt-5 space-y-3">
+                <SavingsPlanCard
+                  inputId="thrift-plan"
+                  testIdPrefix="thrift"
+                  title="Thrift saving"
+                  description="Regular monthly contribution"
+                  icon={PiggyBank}
+                  enabled={form.thriftEnabled}
+                  onToggle={onTogglePlan('thriftEnabled')}
+                  amount={form.thriftAmount}
+                  onAmountChange={onAmountChange('thriftAmount')}
+                  error={errors.thriftAmount}
+                />
+                <SavingsPlanCard
+                  inputId="special-plan"
+                  testIdPrefix="special"
+                  title="Special savings"
+                  description="A separate goal-oriented bucket"
+                  icon={Wallet}
+                  enabled={form.specialEnabled}
+                  onToggle={onTogglePlan('specialEnabled')}
+                  amount={form.specialAmount}
+                  onAmountChange={onAmountChange('specialAmount')}
+                  error={errors.specialAmount}
+                />
+              </div>
 
-                  <div className="mt-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Total monthly contribution</p>
-                      <p className="mt-1 text-xs text-slate-400">Automatically used for your member setup</p>
-                    </div>
-                    <p className="text-lg font-bold text-slate-950">
-                      {formatCurrency(
-                        (form.thriftEnabled ? Number(form.thriftAmount || 0) : 0) +
-                          (form.specialEnabled ? Number(form.specialAmount || 0) : 0)
-                      )}
-                    </p>
-                  </div>
+              {errors.plan && (
+                <p className="mt-3 text-xs font-medium text-rose-500" data-testid="register-plan-error">{errors.plan}</p>
+              )}
+
+              <div
+                className="mt-5 flex items-center justify-between rounded-xl border bg-surface-2 px-4 py-3"
+                style={{ borderColor: 'rgb(var(--border))' }}
+              >
+                <div>
+                  <p className="label-eyebrow">Total monthly</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">Combined from selected plans</p>
                 </div>
+                <p className="text-xl font-semibold tracking-tight" data-testid="register-total-amount">
+                  {formatCurrency(total)}
+                </p>
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0f1c15] px-5 py-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#13261c] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      Submit application
-                      <ArrowRight className="h-5 w-5" />
-                    </>
-                  )}
-                </button>
-              </form>
-            </section>
-          </div>
+              <button
+                type="submit"
+                data-testid="register-submit-button"
+                disabled={isLoading}
+                className="btn-primary mt-6 w-full !py-3.5"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Submitting…
+                  </>
+                ) : (
+                  <>
+                    Submit application
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+
+              <p className="mt-3 text-center text-[11px] text-muted-foreground">
+                You will be notified once an admin approves your account.
+              </p>
+            </div>
+          </form>
         </div>
-      </div>
+      </section>
     </main>
   )
 }
 
-const inputClassName =
-  'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#8bd49d] focus:ring-4 focus:ring-[#8bd49d]/15'
-
 function Field({
   label,
   error,
+  icon: Icon,
   children,
 }: {
   label: string
   error?: string
+  icon: any
   children: ReactNode
 }) {
   return (
-    <label className="block space-y-2">
-      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</span>
-      {children}
-      {error ? <p className="text-xs font-medium text-rose-600">{error}</p> : null}
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <div className="relative">
+        <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        {children}
+      </div>
+      {error && <p className="mt-1.5 text-xs font-medium text-rose-500">{error}</p>}
     </label>
   )
 }
 
 function SavingsPlanCard({
   inputId,
+  testIdPrefix,
   title,
   description,
+  icon: Icon,
   enabled,
   onToggle,
   amount,
@@ -279,8 +344,10 @@ function SavingsPlanCard({
   error,
 }: {
   inputId: string
+  testIdPrefix: string
   title: string
   description: string
+  icon: any
   enabled: boolean
   onToggle: (event: ChangeEvent<HTMLInputElement>) => void
   amount: string
@@ -288,43 +355,68 @@ function SavingsPlanCard({
   error?: string
 }) {
   return (
-    <div className={`rounded-2xl border p-4 transition ${enabled ? 'border-emerald-200 bg-white shadow-sm' : 'border-slate-200 bg-white/80'}`}>
+    <div
+      className={`group relative rounded-2xl border p-4 transition-all ${
+        enabled
+          ? 'border-accent/40 bg-accent/[0.04] ring-1 ring-accent/20'
+          : 'bg-surface hover:bg-surface-2'
+      }`}
+      style={{ borderColor: enabled ? undefined : 'rgb(var(--border))' }}
+    >
       <div className="flex items-start gap-3">
-        <input
-          id={inputId}
-          type="checkbox"
-          checked={enabled}
-          onChange={onToggle}
-          className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-        />
-        <div className="flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <label htmlFor={inputId} className="cursor-pointer">
-              <p className="text-sm font-semibold text-slate-950">{title}</p>
-              <p className="mt-1 text-xs text-slate-500">{description}</p>
-            </label>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              {enabled ? 'Selected' : 'Optional'}
-            </p>
-          </div>
-
-          <div className="mt-3">
+        <label htmlFor={inputId} className="flex flex-1 cursor-pointer items-start gap-3">
+          <div className="relative mt-0.5 flex h-5 w-5 flex-none items-center justify-center">
             <input
+              id={inputId}
+              data-testid={`register-${testIdPrefix}-toggle`}
+              type="checkbox"
+              checked={enabled}
+              onChange={onToggle}
+              className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border transition-colors checked:border-accent checked:bg-accent"
+              style={{ borderColor: 'rgb(var(--border))' }}
+            />
+            {enabled && (
+              <Check className="pointer-events-none absolute h-3.5 w-3.5 text-accent-foreground" strokeWidth={3} />
+            )}
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Icon className={`h-4 w-4 ${enabled ? 'text-accent' : 'text-muted-foreground'}`} />
+              <p className="text-sm font-semibold text-foreground">{title}</p>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+          </div>
+        </label>
+        <span
+          className={`pill ${
+            enabled ? 'bg-accent/10 text-accent' : 'bg-surface-2 text-muted-foreground'
+          }`}
+        >
+          {enabled ? 'Selected' : 'Optional'}
+        </span>
+      </div>
+
+      {enabled && (
+        <div className="mt-4 pl-8">
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
+              ₦
+            </span>
+            <input
+              data-testid={`register-${testIdPrefix}-amount`}
               type="number"
               min="0"
               step="100"
-              disabled={!enabled}
               value={amount}
               onChange={onAmountChange}
               placeholder="0"
               aria-label={`${title} monthly amount`}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#8bd49d] focus:ring-4 focus:ring-[#8bd49d]/15 disabled:cursor-not-allowed disabled:bg-slate-100"
+              className="input-base pl-8"
             />
           </div>
-
-          {error ? <p className="mt-2 text-xs font-medium text-rose-600">{error}</p> : null}
+          {error && <p className="mt-1.5 text-xs font-medium text-rose-500">{error}</p>}
         </div>
-      </div>
+      )}
     </div>
   )
 }

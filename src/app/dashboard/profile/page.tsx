@@ -39,14 +39,7 @@ export default async function ProfilePage() {
   })
 
   return (
-    <div className="animate-fadeIn space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Your joined date, savings, and loan activity at a glance.
-        </p>
-      </div>
-
+    <div className="space-y-6">
       <ProfileView
         member={{
           ...member,
