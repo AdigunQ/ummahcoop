@@ -229,7 +229,7 @@ export async function AdminAnalytics() {
           fees={currentFees}
           thriftSavings={currentThriftSavings}
           specialSavings={currentSpecialSavings}
-          footer={`May stays at ${currentRows.length.toLocaleString('en-NG')} members until fresh registrations are added.`}
+          footer={`${currentLabel} stays at ${currentRows.length.toLocaleString('en-NG')} members until fresh registrations are added.`}
         />
       </div>
 

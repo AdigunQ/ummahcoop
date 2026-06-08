@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import * as XLSX from 'xlsx'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
+import { getDefaultMemberPassword } from '@/lib/default-member-password'
 
 export const runtime = 'nodejs'
 
@@ -388,7 +389,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Confirmation text must be exactly: REPLACE MEMBERS' }, { status: 400 })
   }
 
-  const passwordPlain = (process.env.DEFAULT_MEMBER_PASSWORD || 'member123').trim() || 'member123'
+  let passwordPlain: string
+  try {
+    passwordPlain = getDefaultMemberPassword()
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Member password configuration is missing.' }, { status: 503 })
+  }
   const passwordHash = await bcrypt.hash(passwordPlain, 10)
   const fallbackCreatedAt = new Date('2025-10-01T00:00:00.000Z')
 
@@ -432,7 +438,6 @@ export async function POST(req: Request) {
     ...result,
     defaultMemberLogin: {
       emailPattern: `<staffId>@${(process.env.MEMBER_EMAIL_DOMAIN || 'faan-ummah.coop').trim().replace(/^@/, '')}`,
-      password: passwordPlain,
     },
   })
 }

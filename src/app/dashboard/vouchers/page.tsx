@@ -83,7 +83,7 @@ export default async function VouchersPage({
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
           <p className="font-semibold">Using current live member data for {formatPeriodLabel(resolved.period)}</p>
           <p className="mt-1 text-sm">
-            This period carries April forward until fresh members are added, so the report stays in step with the current live workbook.
+            This period carries the latest snapshot forward until fresh members are added, so the report stays in step with the current live workbook.
           </p>
         </div>
       )}

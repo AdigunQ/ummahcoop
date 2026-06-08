@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
+import { getDefaultMemberPassword } from '@/lib/default-member-password'
 
 const registerPayloadSchema = z.object({
   name: z.string().trim().min(1),
@@ -74,7 +75,15 @@ export async function POST(req: Request) {
       )
     }
 
-    const defaultPassword = (process.env.DEFAULT_MEMBER_PASSWORD || 'member123').trim() || 'member123'
+    let defaultPassword: string
+    try {
+      defaultPassword = getDefaultMemberPassword()
+    } catch {
+      return NextResponse.json(
+        { error: 'Registration is temporarily unavailable. Please contact admin.' },
+        { status: 503 }
+      )
+    }
     const passwordValue = (password || defaultPassword).trim()
 
     // Check if user already exists

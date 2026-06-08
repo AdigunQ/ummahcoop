@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
 import { ArrowRight, Check, Loader2 } from 'lucide-react'
+import { UmmahLogo } from '@/components/brand/ummah-logo'
 import { formatCurrency } from '@/lib/utils'
 
 type FormState = {
@@ -119,6 +120,7 @@ export default function RegisterPage() {
         <div className="w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
           <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
             <section className="border-b border-slate-200 bg-[#07130d] px-6 py-7 text-[#f7f3ea] lg:border-b-0 lg:border-r lg:px-7 lg:py-8">
+              <UmmahLogo textClassName="text-white" />
               <h1 className="mt-5 text-3xl font-bold tracking-tight text-white">Join Ummah Coop</h1>
 
               <p className="mt-6 text-sm text-[#c6d7c7]">

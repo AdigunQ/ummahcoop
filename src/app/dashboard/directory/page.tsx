@@ -77,7 +77,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams?: S
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Update Member</h1>
           <p className="mt-1 text-gray-500">
-            Showing the current live member data for {liveLabel}. April rows carry forward into May until fresh members are added.
+            Showing the current live member data for {liveLabel}. Rows carried forward from the previous snapshot stay active until fresh members are added.
           </p>
         </div>
 

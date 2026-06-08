@@ -81,13 +81,17 @@ async function updateMemberRecord(formData: FormData) {
           balance,
           specialBalance,
           loanBalance,
+          totalContributions: balance + specialBalance,
           voucherEnabled,
         },
       })
 
       await tx.voucher.updateMany({
         where: { userId: memberId },
-        data: { staffId },
+        data: {
+          staffId,
+          monthlyDeduction: monthlyContribution + specialContribution,
+        },
       })
     })
   } catch {

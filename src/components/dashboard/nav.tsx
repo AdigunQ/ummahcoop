@@ -24,6 +24,7 @@ import {
   Settings,
   LineChart,
 } from 'lucide-react'
+import { UmmahLogo } from '@/components/brand/ummah-logo'
 import { cn, getInitials } from '@/lib/utils'
 
 interface NavProps {
@@ -125,13 +126,11 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
           ) : (
             <div className="p-6 border-b border-gray-800">
               <Link href="/dashboard" className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center">
-                  <LayoutDashboard className="w-6 h-6" />
-                </div>
-                <div>
-                  <h1 className="font-bold text-sm leading-tight">FAAN STAFF UMMAH</h1>
-                  <p className="text-xs text-gray-400">MULTIPURPOSE COOPERATIVE</p>
-                </div>
+                <UmmahLogo
+                  markClassName="h-11 w-11"
+                  textClassName="text-white"
+                  compactText
+                />
               </Link>
             </div>
           )}

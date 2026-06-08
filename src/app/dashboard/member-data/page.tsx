@@ -168,7 +168,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
 
   const currentLiveNote =
     isCurrentLiveView && latestUploadedMonth
-      ? `${formatPeriodLabel(currentPeriod)} keeps the same member list as ${latestUploadedMonth.label}, but rows that were NEW in April now show as OLD in May with Charges = 100 and New Member Fee blank until fresh May members are added.`
+      ? `${formatPeriodLabel(currentPeriod)} keeps the same member list as ${latestUploadedMonth.label}. Rows carried forward from the previous snapshot show as OLD with Charges = 100 and New Member Fee blank until fresh registrations are added.`
       : null
 
   return (
@@ -232,7 +232,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
           <p className="mt-1 text-sm text-slate-500">
             {usingSnapshot
               ? `Showing uploaded rows for this month only (${displayRows.length.toLocaleString()} rows). Uploaded ${new Date(uploadedMonth!.uploadedAt).toLocaleString()}.`
-              : 'The live month uses the same columns as the workbook, and April rows tagged NEW are shown as OLD in May with a 100 charge.'}
+              : 'The live month uses the same columns as the workbook, and rows carried forward from the previous snapshot are shown as OLD with a 100 charge.'}
           </p>
         </div>
 

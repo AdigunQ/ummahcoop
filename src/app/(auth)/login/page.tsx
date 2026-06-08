@@ -5,7 +5,8 @@ import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
-import { Loader2, Handshake } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import { UmmahLogo } from '@/components/brand/ummah-logo'
 
 function getLoginErrorMessage(error?: string | null) {
   if (!error || error === 'undefined') {
@@ -90,10 +91,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-600 p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-fadeIn">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-primary-50 rounded-full mb-4">
-            <Handshake className="w-10 h-10 text-primary-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">FAAN STAFF UMMAH MULTIPURPOSE COOPERATIVE</h1>
+          <UmmahLogo
+            className="mx-auto mb-5 justify-center"
+            markClassName="h-16 w-16"
+            textClassName="text-left text-gray-900"
+          />
+          <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
           <p className="text-gray-500 mt-2">Sign in to continue.</p>
         </div>
 
@@ -155,14 +158,12 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Don't have an account?{' '}
+            Need an account?{' '}
             <Link href="/register" className="text-primary-500 font-semibold hover:underline">
               Register here
             </Link>
           </p>
-          <p className="text-sm text-gray-400 mt-4">
-            Members can use Staff ID or email. Default Admin: admin@coop.com / admin123
-          </p>
+          <p className="text-sm text-gray-400 mt-4">Members can use Staff ID or email.</p>
         </div>
       </div>
     </div>

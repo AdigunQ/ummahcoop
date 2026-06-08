@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { ArrowRight, HandCoins, PiggyBank, ShieldCheck, Wallet } from 'lucide-react'
+import { ArrowRight, HandCoins, PiggyBank, Wallet } from 'lucide-react'
+import { UmmahLogo } from '@/components/brand/ummah-logo'
 
 const featureCards = [
   {
@@ -27,9 +28,12 @@ export default function HomePage() {
 
       <div className="relative mx-auto flex min-h-screen max-w-4xl items-center px-6 py-10 lg:px-10">
         <section className="w-full space-y-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#d2ddce] backdrop-blur">
-              <ShieldCheck className="h-4 w-4 text-[#8bd49d]" />
-              Ummah Coop
+            <div className="inline-flex rounded-full border border-white/10 bg-white/8 px-4 py-2 text-[#f7f3ea] backdrop-blur">
+              <UmmahLogo
+                markClassName="h-7 w-7"
+                textClassName="text-sm"
+                compactText
+              />
             </div>
 
             <div className="space-y-4">

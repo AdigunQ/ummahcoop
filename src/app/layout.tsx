@@ -4,20 +4,19 @@ import { Providers } from '@/components/providers'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
-  title: 'FAAN STAFF UMMAH MULTIPURPOSE COOPERATIVE',
-  description: 'FAAN STAFF UMMAH MULTIPURPOSE COOPERATIVE management system',
+  title: 'Ummah Coop',
+  description: 'Private cooperative savings and loan portal for Ummah Coop members',
   manifest: '/manifest.json',
   icons: {
-    apple: '/icons/icon-192x192.png',
+    icon: '/icon.svg',
+    apple: '/icon.svg',
   },
-  themeColor: '#1a5f2a',
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#1a5f2a',
 }
 
 export default function RootLayout({
@@ -31,7 +30,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="FAAN STAFF UMMAH MULTIPURPOSE COOPERATIVE" />
+        <meta name="apple-mobile-web-app-title" content="Ummah Coop" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="theme-color" content="#1a5f2a" />
       </head>

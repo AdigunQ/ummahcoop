@@ -5,12 +5,17 @@ import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 
 function normalizeAuthErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message.trim()
-  }
+  const allowedMessages = new Set([
+    'Account pending approval. Please wait for admin verification.',
+    'Account has been rejected. Contact admin for assistance.',
+    'Account has been suspended. Contact admin.',
+    'Account is closed. Contact admin for reactivation.',
+    'Unable to sign in right now. Please try again.',
+  ])
 
-  if (typeof error === 'string' && error.trim()) {
-    return error.trim()
+  const message = error instanceof Error ? error.message.trim() : typeof error === 'string' ? error.trim() : ''
+  if (message && allowedMessages.has(message)) {
+    return message
   }
 
   return 'Unable to sign in right now. Please try again.'
@@ -143,7 +148,9 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async signIn({ user }) {
-      console.log(`User ${user.email} signed in`)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`User ${user.email} signed in`)
+      }
     },
   },
 }

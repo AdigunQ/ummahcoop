@@ -700,9 +700,7 @@ async function main() {
   console.log(`✅ Created/updated ${members.length} member profiles with Nigerian sample data`)
   console.log('✅ Seeded payment verifications, loan requests, member directory records, and transactions')
   console.log('\n🎉 Database seeded successfully!')
-  console.log('\nLogin credentials:')
-  console.log('Admin: admin@coop.com / admin123')
-  console.log('Members: any seeded email / member123')
+  console.log('\nLogin credentials are seeded for local development only.')
 }
 
 main()

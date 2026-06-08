@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
+import { getDefaultMemberPassword } from '@/lib/default-member-password'
 
 const integrationPayloadSchema = z.object({
   fullName: z.string().trim().min(1),
@@ -62,18 +63,10 @@ function isAuthorized(req: Request): boolean {
   const authHeader = req.headers.get('authorization')
   const bearerToken = authHeader?.replace(/^Bearer\s+/i, '').trim()
   const customHeader = req.headers.get('x-webhook-secret')?.trim()
-  let querySecret: string | undefined
-
-  try {
-    querySecret = new URL(req.url).searchParams.get('secret')?.trim() || undefined
-  } catch {
-    querySecret = undefined
-  }
 
   return (
     bearerToken === expectedSecret ||
-    customHeader === expectedSecret ||
-    querySecret === expectedSecret
+    customHeader === expectedSecret
   )
 }
 
@@ -187,7 +180,15 @@ export async function POST(req: Request) {
       )
     }
 
-    const defaultPassword = (process.env.DEFAULT_MEMBER_PASSWORD || 'member123').trim() || 'member123'
+    let defaultPassword: string
+    try {
+      defaultPassword = getDefaultMemberPassword()
+    } catch {
+      return NextResponse.json(
+        { error: 'Webhook processing is temporarily unavailable.' },
+        { status: 503 }
+      )
+    }
     const passwordHash = await bcrypt.hash(defaultPassword, 10)
 
     const now = new Date()

@@ -20,6 +20,10 @@ export async function updateProfile(formData: FormData) {
   if (bankAccountNumber) data.bankAccountNumber = bankAccountNumber
   if (bankAccountName) data.bankAccountName = bankAccountName
 
+  if (Object.keys(data).length === 0) {
+    return { error: 'Nothing to update' }
+  }
+
   await prisma.user.update({
     where: { id: session.user.id },
     data,
