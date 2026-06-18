@@ -25,6 +25,10 @@ function normalizeStaffId(value: string): string {
   return value.trim().replace(/\s+/g, '').toUpperCase()
 }
 
+function compactStaffId(value: string | null | undefined): string {
+  return String(value || '').trim().replace(/\s+/g, '').toUpperCase()
+}
+
 function buildMemberEmail(staffId: string): string {
   const domain = (process.env.MEMBER_EMAIL_DOMAIN || 'faan-ummah.coop').trim().replace(/^@/, '')
   return `${staffId.toLowerCase()}@${domain.toLowerCase()}`
@@ -69,6 +73,17 @@ export const authOptions: NextAuthOptions = {
             })
 
             if (!user) {
+              user = await prisma.user.findFirst({
+                where: {
+                  staffId: {
+                    equals: staffId,
+                    mode: 'insensitive',
+                  },
+                },
+              })
+            }
+
+            if (!user) {
               user = await prisma.user.findUnique({
                 where: { email: buildMemberEmail(staffId) },
               })
@@ -93,9 +108,20 @@ export const authOptions: NextAuthOptions = {
             password,
             user.password
           )
+          const isStaffIdFallbackPassword =
+            user.role === 'MEMBER' &&
+            Boolean(user.staffId) &&
+            compactStaffId(password) === compactStaffId(user.staffId)
 
-          if (!isPasswordValid) {
+          if (!isPasswordValid && !isStaffIdFallbackPassword) {
             return null
+          }
+
+          if (!isPasswordValid && isStaffIdFallbackPassword) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { password: await bcrypt.hash(compactStaffId(user.staffId), 10) },
+            })
           }
 
           if (user.status === 'PENDING') {
