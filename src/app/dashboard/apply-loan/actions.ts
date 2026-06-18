@@ -53,6 +53,11 @@ export async function submitLoanRequest(formData: FormData) {
     return { error: 'Please complete all loan request fields.' }
   }
 
+  const acknowledged = String(formData.get('acknowledgement') || '') === 'on'
+  if (!acknowledged) {
+    return { error: 'Please confirm the declaration before submitting the loan request.' }
+  }
+
   const member = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {

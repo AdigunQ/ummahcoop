@@ -4,6 +4,7 @@ import { differenceInMonths } from 'date-fns'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { LOAN_POLICY } from '@/lib/constants'
+import { LOAN_REQUEST_POLICY } from '@/lib/loan-request'
 import { LoanRequestForm } from './LoanRequestForm'
 
 export default async function ApplyLoanPage() {
@@ -55,7 +56,11 @@ export default async function ApplyLoanPage() {
   const monthsServed = Math.max(0, differenceInMonths(new Date(), member.createdAt))
   const loanEligibility = member.balance * LOAN_POLICY.maxSavingsMultiplier
   const hasBankDetails = Boolean(member.bankName && member.bankAccountName && member.bankAccountNumber)
-  const canSubmit = member.status === 'ACTIVE' && monthsServed >= 6 && member.loanBalance <= 0 && member.loans.filter((loan) => loan.status === 'PENDING').length === 0
+  const canSubmit =
+    member.status === 'ACTIVE' &&
+    monthsServed >= LOAN_REQUEST_POLICY.minTenureMonths &&
+    member.loanBalance <= 0 &&
+    member.loans.filter((loan) => loan.status === 'PENDING').length === 0
 
   return (
     <LoanRequestForm

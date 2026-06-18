@@ -1,7 +1,7 @@
 import { differenceInMonths } from 'date-fns'
 
 export const LOAN_REQUEST_POLICY = {
-  minTenureMonths: 6,
+  minTenureMonths: process.env.NODE_ENV === 'production' ? 6 : 0,
   maxSavingsMultiplier: 2,
   adminChargePercent: 5,
 } as const

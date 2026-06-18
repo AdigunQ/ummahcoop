@@ -151,6 +151,7 @@ export default async function LoansPage() {
       },
     }),
   ])
+  const hasTenureRequirement = LOAN_REQUEST_POLICY.minTenureMonths > 0
 
   return (
     <div className="space-y-6">
@@ -161,12 +162,8 @@ export default async function LoansPage() {
             <p className="label-eyebrow">Admin · Loans</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em]">Loan requests</h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Review pending requests, verify guarantors, and approve only when the member has met the 6-month rule and stays within the 2x thrift limit.
+              Review pending requests, verify guarantors, and approve only when the request stays within the 2x thrift limit{hasTenureRequirement ? ` and the member meets the ${LOAN_REQUEST_POLICY.minTenureMonths}-month rule` : ''}.
             </p>
-          </div>
-          <div className="inline-flex items-center gap-2 self-start rounded-full border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted-foreground" style={{ borderColor: 'rgb(var(--border))' }}>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            5% admin charge on repayment
           </div>
         </div>
       </section>
@@ -283,7 +280,7 @@ export default async function LoansPage() {
                           Member has an outstanding loan. New requests should not be approved.
                         </p>
                       )}
-                      {tenureMonths < LOAN_REQUEST_POLICY.minTenureMonths && (
+                      {hasTenureRequirement && tenureMonths < LOAN_REQUEST_POLICY.minTenureMonths && (
                         <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                           Member has only been active for {tenureMonths} month{tenureMonths === 1 ? '' : 's'}.
                           A 6-month membership period is required.
@@ -329,7 +326,7 @@ export default async function LoansPage() {
 
                       {!canApprove && (
                         <p className="text-xs text-amber-700">
-                          Approval is blocked until the member meets the savings and tenure rules.
+                          Approval is blocked until the request meets the savings rules{hasTenureRequirement ? ' and tenure rule' : ''}.
                         </p>
                       )}
                     </div>

@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { formatDistanceToNowStrict } from 'date-fns'
-import { ArrowRight, Building2, CalendarDays, FileText, Hash, Loader2, Mail, PhoneCall, ShieldCheck, User } from 'lucide-react'
+import { ArrowRight, Building2, CalendarDays, FileText, Hash, Loader2, Mail, PhoneCall, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { LOAN_REQUEST_POLICY } from '@/lib/loan-request'
 import { submitLoanRequest } from './actions'
 
 type RecentLoan = {
@@ -51,6 +52,8 @@ export function LoanRequestForm({
   canSubmit,
   hasBankDetails,
 }: LoanRequestFormProps) {
+  const [acknowledged, setAcknowledged] = useState(false)
+
   async function handleSubmit(formData: FormData) {
     const res = await submitLoanRequest(formData)
     if (res?.error) {
@@ -61,6 +64,7 @@ export function LoanRequestForm({
   }
 
   const memberSince = useMemo(() => formatDate(member.createdAt), [member.createdAt])
+  const canSend = canSubmit && hasBankDetails && acknowledged
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -71,13 +75,11 @@ export function LoanRequestForm({
               <p className="label-eyebrow">Loan request</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">Fill the cooperative loan form</h1>
             </div>
-            <span className="pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <ShieldCheck className="h-3 w-3" />
-              5% admin charge
-            </span>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            You must be active for at least 6 months and your request cannot exceed 2x your thrift savings.
+            {LOAN_REQUEST_POLICY.minTenureMonths > 0
+              ? `You must be active for at least ${LOAN_REQUEST_POLICY.minTenureMonths} months and your request cannot exceed 2x your thrift savings.`
+              : 'Your request cannot exceed 2x your thrift savings.'}
           </p>
         </div>
 
@@ -215,18 +217,39 @@ export function LoanRequestForm({
 
             {!canSubmit && (
               <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                Loan requests are only available for active members with at least 6 months on the platform and no pending or outstanding loan.
+                {LOAN_REQUEST_POLICY.minTenureMonths > 0
+                  ? `Loan requests are available for active members who have been on the platform for at least ${LOAN_REQUEST_POLICY.minTenureMonths} months and have no pending or outstanding loan.`
+                  : 'Loan requests are available for active members with no pending or outstanding loan.'}
               </div>
             )}
 
+            <label className="flex items-start gap-3 rounded-2xl border bg-surface-2 px-4 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+              <input
+                type="checkbox"
+                name="acknowledgement"
+                checked={acknowledged}
+                onChange={(event) => setAcknowledged(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+              />
+              <span className="text-sm text-muted-foreground">
+                I hereby declare that the information provided is true and correct. I agree to abide by the rules of the cooperative society and authorize the deduction of loan repayments from my salary.
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={!canSubmit || !hasBankDetails}
+              disabled={!canSend}
               className="btn-primary w-full !py-3.5"
             >
               Submit loan request
               <ArrowRight className="h-4 w-4" />
             </button>
+
+            {!acknowledged && (
+              <p className="text-center text-xs text-muted-foreground">
+                Tick the declaration above to enable submission.
+              </p>
+            )}
           </div>
 
           <aside className="space-y-4">
