@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
-import { getDefaultMemberPassword } from '@/lib/default-member-password'
 
 const registerPayloadSchema = z.object({
   name: z.string().trim().min(1),
@@ -13,8 +12,6 @@ const registerPayloadSchema = z.object({
   bankName: z.string().trim().optional(),
   bankAccountNumber: z.string().trim().optional(),
   bankAccountName: z.string().trim().optional(),
-  monthlyContribution: z.coerce.number().min(0).optional(),
-  specialContribution: z.coerce.number().min(0).optional(),
   password: z.string().min(6).optional(),
 })
 
@@ -54,8 +51,6 @@ export async function POST(req: Request) {
       bankName,
       bankAccountNumber,
       bankAccountName,
-      monthlyContribution,
-      specialContribution,
       password,
     } = parsed.data
 
@@ -65,26 +60,7 @@ export async function POST(req: Request) {
     const normalizedBankName = bankName?.trim() || null
     const normalizedBankAccountNumber = bankAccountNumber?.trim() || null
     const normalizedBankAccountName = bankAccountName?.trim() || null
-    const normalizedMonthlyContribution = monthlyContribution ?? 0
-    const normalizedSpecialContribution = specialContribution ?? 0
-
-    if (normalizedMonthlyContribution <= 0 && normalizedSpecialContribution <= 0) {
-      return NextResponse.json(
-        { error: 'Choose Thrift saving, Special saving, or both with at least one monthly amount.' },
-        { status: 400 }
-      )
-    }
-
-    let defaultPassword: string
-    try {
-      defaultPassword = getDefaultMemberPassword()
-    } catch {
-      return NextResponse.json(
-        { error: 'Registration is temporarily unavailable. Please contact admin.' },
-        { status: 503 }
-      )
-    }
-    const passwordValue = (password || defaultPassword).trim()
+    const passwordValue = (password || normalizedStaffId).trim()
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -112,9 +88,6 @@ export async function POST(req: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(passwordValue, 10)
 
-    const now = new Date()
-    const effectiveStartDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -126,8 +99,8 @@ export async function POST(req: Request) {
         bankName: normalizedBankName,
         bankAccountNumber: normalizedBankAccountNumber,
         bankAccountName: normalizedBankAccountName,
-        monthlyContribution: normalizedMonthlyContribution,
-        specialContribution: normalizedSpecialContribution,
+        monthlyContribution: 0,
+        specialContribution: 0,
         password: hashedPassword,
         role: 'MEMBER',
         status: 'PENDING',
@@ -135,19 +108,6 @@ export async function POST(req: Request) {
         totalContributions: 0,
         loanBalance: 0,
       },
-    })
-
-    await prisma.voucher.create({
-        data: {
-          userId: user.id,
-          fullName: user.name || 'Unnamed Member',
-          staffId: normalizedStaffId,
-          department: normalizedDepartment,
-          monthlyDeduction: normalizedMonthlyContribution + normalizedSpecialContribution,
-          effectiveStartDate,
-          status: 'GENERATED',
-          notes: 'Auto-generated at member registration. Queued for Finance inbox.',
-        },
     })
 
     return NextResponse.json(

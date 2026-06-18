@@ -63,8 +63,8 @@ export default function LoginPage() {
       return
     }
 
-    if (password.length < 6) {
-      setPasswordError('Password must be at least 6 characters.')
+    if (!password.trim()) {
+      setPasswordError('Password is required.')
       return
     }
 

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 export default async function TransactionsPage() {
   const session = await getServerSession(authOptions)
@@ -11,7 +12,7 @@ export default async function TransactionsPage() {
     redirect('/login')
   }
 
-  if (session.user.role !== 'ADMIN') {
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.VIEW_FINANCE))) {
     redirect('/dashboard')
   }
 

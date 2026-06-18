@@ -13,22 +13,21 @@ async function submitCommodityRequest(formData: FormData) {
     redirect('/dashboard')
   }
 
-  const requestTitle = String(formData.get('requestTitle') || '').trim()
-  const requestDetails = String(formData.get('requestDetails') || '').trim()
+  const requestText = String(formData.get('requestText') || '').trim()
 
-  if (!requestTitle || !requestDetails) {
+  if (!requestText) {
     return
   }
 
   await prisma.commodityRequest.create({
     data: {
       userId: session.user.id,
-      itemCategory: requestTitle,
+      itemCategory: 'Commodity request',
       itemModel: 'Open Request',
       preferredBudget: 0,
       preferredMonths: 0,
       contactPreference: 'BOTH',
-      notes: requestDetails,
+      notes: requestText,
       status: 'PENDING',
     },
   })
@@ -270,21 +269,11 @@ export default async function CommodityPage() {
           <h2 className="text-lg font-semibold text-gray-900">New Commodity Request</h2>
           <form action={submitCommodityRequest} className="mt-6 space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Request Title</label>
-              <input
-                name="requestTitle"
-                type="text"
-                placeholder="e.g. Laptop for work, Home appliance, School fees support"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Request Details</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">What do you want?</label>
               <textarea
-                name="requestDetails"
+                name="requestText"
                 rows={5}
-                placeholder="Describe what you need. Include quantity/specification if needed."
+                placeholder="Write exactly what you need. Admin will see it and follow up."
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
                 required
               />

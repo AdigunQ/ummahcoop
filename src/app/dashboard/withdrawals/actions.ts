@@ -5,16 +5,11 @@ import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-function canUsePartialWithdrawal(status: string, partialWithdrawalUsed: boolean) {
-  return status === 'ACTIVE' && !partialWithdrawalUsed
-}
-
 export async function submitWithdrawalRequest(formData: FormData) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return { error: 'Unauthorized' }
 
-  const source = String(formData.get('source') || 'MONTHLY_SAVINGS')
-  const requestedAmount = Number(formData.get('requestedAmount') || 0)
+  const source = String(formData.get('source') || 'SPECIAL_SAVINGS')
   const reason = String(formData.get('reason') || '').trim()
 
   const user = await prisma.user.findUnique({
@@ -23,21 +18,19 @@ export async function submitWithdrawalRequest(formData: FormData) {
 
   if (!user) return { error: 'User not found' }
 
-  // Logic for Monthly vs Special
-  let maxAllowed = 0
-  if (source === 'MONTHLY_SAVINGS') {
-    if (!canUsePartialWithdrawal(user.status, user.partialWithdrawalUsed)) {
-      return { error: 'Partial withdrawal limit reached for Monthly Savings.' }
-    }
-    maxAllowed = user.balance * 0.7
-  } else {
-    // Special Savings - 100% allowed
-    maxAllowed = user.specialBalance
+  if (source !== 'SPECIAL_SAVINGS') {
+    return { error: 'Thrift savings withdrawals are only available through full membership closure.' }
   }
 
-  if (requestedAmount <= 0 || requestedAmount > maxAllowed) {
-    return { error: `Invalid amount. Max allowed: ${maxAllowed}` }
+  if (new Date().getMonth() !== 9) {
+    return { error: 'Special savings withdrawal is only available in October.' }
   }
+
+  const requestedAmount = user.specialBalance
+  if (requestedAmount <= 0) {
+    return { error: 'No special savings balance available for withdrawal.' }
+  }
+  const maxAllowed = requestedAmount
 
   // Check pending requests
   const pending = await prisma.withdrawal.findFirst({
@@ -49,7 +42,7 @@ export async function submitWithdrawalRequest(formData: FormData) {
     data: {
       userId: user.id,
       type: 'PARTIAL', // We treat both as partial for now logic-wise
-      source: source as 'MONTHLY_SAVINGS' | 'SPECIAL_SAVINGS',
+      source: 'SPECIAL_SAVINGS',
       requestedAmount,
       maxAllowedAtRequest: maxAllowed,
       reason,

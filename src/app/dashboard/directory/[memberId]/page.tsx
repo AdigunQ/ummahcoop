@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import ConfirmDeleteButton from './confirm-delete-button'
+import { MANAGEABLE_PRIVILEGES, PRIVILEGE_LABELS, canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 type SearchParams = {
   saved?: string
@@ -28,12 +29,13 @@ async function updateMemberRecord(formData: FormData) {
   'use server'
 
   const session = await getServerSession(authOptions)
-  if (session?.user?.role !== 'ADMIN') redirect('/dashboard')
+  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) redirect('/dashboard')
 
   const memberId = String(formData.get('memberId') || '')
   const staffId = normalizeStaffId(String(formData.get('staffId') || ''))
   const monthlyContribution = Number(formData.get('monthlyContribution') || 0)
   const specialContribution = Number(formData.get('specialContribution') || 0)
+  const department = String(formData.get('department') || '').trim()
   const balance = Number(formData.get('balance') || 0)
   const specialBalance = Number(formData.get('specialBalance') || 0)
   const loanBalance = Number(formData.get('loanBalance') || 0)
@@ -76,6 +78,7 @@ async function updateMemberRecord(formData: FormData) {
         where: { id: memberId },
         data: {
           staffId,
+          department: department || null,
           monthlyContribution,
           specialContribution,
           balance,
@@ -90,6 +93,7 @@ async function updateMemberRecord(formData: FormData) {
         where: { userId: memberId },
         data: {
           staffId,
+          department: department || 'N/A',
           monthlyDeduction: monthlyContribution + specialContribution,
         },
       })
@@ -135,6 +139,57 @@ async function deleteMemberRecord(formData: FormData) {
   redirect('/dashboard/directory?deleted=1')
 }
 
+async function updateMemberPrivileges(formData: FormData) {
+  'use server'
+
+  const session = await getServerSession(authOptions)
+  if (session?.user?.role !== 'ADMIN') redirect('/dashboard')
+
+  const memberId = String(formData.get('memberId') || '')
+  if (!memberId) redirect('/dashboard/directory')
+
+  const selectedPrivileges = MANAGEABLE_PRIVILEGES.filter((code) => String(formData.get(code) || '') === 'on')
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.memberPrivilege.deleteMany({
+        where: {
+          userId: memberId,
+          code: { notIn: selectedPrivileges },
+        },
+      })
+
+      for (const code of selectedPrivileges) {
+        await tx.memberPrivilege.upsert({
+          where: {
+            userId_code: {
+              userId: memberId,
+              code,
+            },
+          },
+          update: {
+            grantedById: session.user.id,
+            note: 'Granted from admin member editor',
+          },
+          create: {
+            userId: memberId,
+            code,
+            grantedById: session.user.id,
+            note: 'Granted from admin member editor',
+          },
+        })
+      }
+    })
+  } catch {
+    redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
+  }
+
+  revalidatePath(`/dashboard/directory/${memberId}`)
+  revalidatePath('/dashboard/directory')
+  revalidatePath('/dashboard')
+  redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?saved=1`)
+}
+
 export default async function MemberProfileEditorPage({
   params,
   searchParams,
@@ -144,11 +199,12 @@ export default async function MemberProfileEditorPage({
 }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) redirect('/login')
-  if (session.user.role !== 'ADMIN') redirect('/dashboard')
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) redirect('/dashboard')
+  const isFullAdmin = session.user.role === 'ADMIN'
 
   const member = await prisma.user.findUnique({
     where: { id: params.memberId },
-    select: {
+      select: {
       id: true,
       name: true,
       staffId: true,
@@ -165,6 +221,11 @@ export default async function MemberProfileEditorPage({
       loanBalance: true,
       status: true,
       voucherEnabled: true,
+      privileges: {
+        select: {
+          code: true,
+        },
+      },
     },
   })
 
@@ -226,6 +287,16 @@ export default async function MemberProfileEditorPage({
               required
               defaultValue={member.staffId || ''}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase outline-none focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Department</label>
+            <input
+              name="department"
+              defaultValue={member.department || ''}
+              placeholder="e.g. Operations"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
 
@@ -313,6 +384,47 @@ export default async function MemberProfileEditorPage({
           </div>
         </form>
 
+        {isFullAdmin && (
+        <div className="mt-6 border-t border-gray-100 pt-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Special access</p>
+              <p className="mt-1 text-xs text-gray-500">Grant targeted access to a member without making them a full admin.</p>
+            </div>
+          </div>
+
+          <form action={updateMemberPrivileges} className="mt-4 space-y-4">
+            <input type="hidden" name="memberId" value={member.id} />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {MANAGEABLE_PRIVILEGES.map((code) => (
+                <label
+                  key={code}
+                  className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700"
+                >
+                  <input
+                    type="checkbox"
+                    name={code}
+                    defaultChecked={member.privileges?.some((privilege) => privilege.code === code)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300"
+                  />
+                  <span>
+                    <span className="block font-medium text-gray-900">{PRIVILEGE_LABELS[code]}</span>
+                    <span className="block text-xs text-gray-500">{code}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black"
+            >
+              Save access
+            </button>
+          </form>
+        </div>
+        )}
+
+        {isFullAdmin && (
         <div className="mt-6 border-t border-red-100 pt-5">
           <p className="text-sm font-medium text-gray-800">Danger Zone</p>
           <p className="mt-1 text-xs text-gray-500">Delete this member and all associated records.</p>
@@ -321,6 +433,7 @@ export default async function MemberProfileEditorPage({
             <ConfirmDeleteButton memberName={member.name || 'this member'} />
           </form>
         </div>
+        )}
       </div>
     </div>
   )

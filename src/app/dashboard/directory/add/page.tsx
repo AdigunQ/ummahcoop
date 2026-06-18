@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { getDefaultMemberPassword } from '@/lib/default-member-password'
 import { prisma } from '@/lib/prisma'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 type SearchParams = {
   created?: string
@@ -33,7 +34,7 @@ async function createMember(formData: FormData) {
   'use server'
 
   const session = await getServerSession(authOptions)
-  if (session?.user?.role !== 'ADMIN') redirect('/dashboard')
+  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) redirect('/dashboard')
 
   const staffId = normalizeStaffId(String(formData.get('staffId') || ''))
   const name = String(formData.get('name') || '').trim()
@@ -64,7 +65,7 @@ async function createMember(formData: FormData) {
   try {
     defaultPassword = getDefaultMemberPassword()
   } catch {
-    redirect('/dashboard/directory/add?error=failed')
+    defaultPassword = staffId || 'member123'
   }
   const passwordHash = await bcrypt.hash(defaultPassword, 10)
 
@@ -120,7 +121,7 @@ async function createMember(formData: FormData) {
 export default async function AddMemberPage({ searchParams }: { searchParams?: SearchParams }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) redirect('/login')
-  if (session.user.role !== 'ADMIN') redirect('/dashboard')
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) redirect('/dashboard')
 
   const error = mapError(searchParams?.error)
   const created = searchParams?.created === '1'

@@ -28,6 +28,11 @@ export default async function DashboardLayout({
       status: true,
       balance: true,
       loanBalance: true,
+      privileges: {
+        select: {
+          code: true,
+        },
+      },
     },
   })
 
@@ -39,18 +44,20 @@ export default async function DashboardLayout({
     await autoPostMonthEndIfDue()
   }
 
-  const adminBadges =
-    user.role === 'ADMIN'
-      ? await (async () => {
-          const [pendingMembers, pendingPayments, pendingLoans] = await Promise.all([
-            prisma.user.count({ where: { role: 'MEMBER', status: 'PENDING' } }),
-            prisma.payment.count({ where: { status: 'PENDING' } }),
-            prisma.loan.count({ where: { status: 'PENDING' } }),
-          ])
+  const canSeeAdminBadges =
+    user.role === 'ADMIN' || (user.privileges?.length || 0) > 0
 
-          return { pendingMembers, pendingPayments, pendingLoans }
-        })()
-      : undefined
+  const adminBadges = canSeeAdminBadges
+    ? await (async () => {
+        const [pendingMembers, pendingPayments, pendingLoans] = await Promise.all([
+          prisma.user.count({ where: { role: 'MEMBER', status: 'PENDING' } }),
+          prisma.payment.count({ where: { status: 'PENDING' } }),
+          prisma.loan.count({ where: { status: 'PENDING' } }),
+        ])
+
+        return { pendingMembers, pendingPayments, pendingLoans }
+      })()
+    : undefined
 
   return (
     <div className="min-h-screen bg-background">

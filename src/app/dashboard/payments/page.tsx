@@ -4,12 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 async function reviewPayment(formData: FormData) {
   'use server'
 
   const session = await getServerSession(authOptions)
-  if (session?.user?.role !== 'ADMIN') {
+  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.REVIEW_PAYMENTS))) {
     redirect('/dashboard')
   }
 
@@ -97,7 +98,7 @@ export default async function PaymentsPage() {
     redirect('/login')
   }
 
-  if (session.user.role !== 'ADMIN') {
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.REVIEW_PAYMENTS))) {
     redirect('/dashboard')
   }
 

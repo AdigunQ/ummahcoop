@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
 import type { VoucherRow } from '@/lib/vouchers'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 type SearchParams = {
   deleted?: string
@@ -41,7 +42,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams?: S
     redirect('/login')
   }
 
-  if (session.user.role !== 'ADMIN') {
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) {
     redirect('/dashboard')
   }
 

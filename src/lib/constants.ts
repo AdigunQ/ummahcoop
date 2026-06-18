@@ -5,7 +5,7 @@ export const COOPERATIVE_BANK_DETAILS = {
 
 export const LOAN_POLICY = {
   maxSavingsMultiplier: 2,
-  minAmount: 10000,
+  minAmount: 1,
   minDurationMonths: 3,
   maxDurationMonths: 24,
   interestRatePercent: 5,

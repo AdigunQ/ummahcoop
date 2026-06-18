@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { buildVoucherDataset, resolveVoucherPeriod, type VoucherRow } from '@/lib/vouchers'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 type SearchParams = {
   period?: string
@@ -108,7 +109,9 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) redirect('/login')
-  if (session.user.role !== 'ADMIN') redirect('/dashboard')
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.VIEW_MEMBER_DATA))) {
+    redirect('/dashboard')
+  }
 
   const months = await prisma.memberDataMonth.findMany({
     orderBy: { period: 'asc' },

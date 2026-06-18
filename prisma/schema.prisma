@@ -72,6 +72,8 @@ model User {
   vouchers      Voucher[]
   withdrawals   Withdrawal[]
   commodityRequests CommodityRequest[]
+  privileges    MemberPrivilege[]
+  privilegesGranted MemberPrivilege[] @relation("PrivilegeGrantedBy")
   payrollLines  PayrollLine[]
   memberDataMonths MemberDataMonth[] @relation("MemberDataMonthUploader")
 
@@ -167,6 +169,7 @@ model Loan {
   totalRepayable Float?  @map("total_repayable")
   balance     Float      @default(0)
   notes       String?
+  applicationData Json?  @map("application_data")
   status      LoanStatus @default(PENDING)
   approvedBy  String?    @map("approved_by")
   approvedAt  DateTime?  @map("approved_at")
@@ -181,6 +184,23 @@ model Loan {
   payrollLines PayrollLine[]
 
   @@map("loans")
+}
+
+model MemberPrivilege {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  code        String
+  note        String?
+  grantedById String?  @map("granted_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("PrivilegeGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, code])
+  @@index([code])
+  @@map("member_privileges")
 }
 
 model PayrollCycle {

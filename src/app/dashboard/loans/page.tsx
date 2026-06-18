@@ -1,16 +1,19 @@
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { differenceInMonths } from 'date-fns'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils'
 import { LOAN_POLICY } from '@/lib/constants'
+import { LOAN_REQUEST_POLICY, sanitizeLoanApplicationData } from '@/lib/loan-request'
+import { PRIVILEGE_CODES, canAccessWithPrivileges } from '@/lib/access'
 
 async function reviewLoan(formData: FormData) {
   'use server'
 
   const session = await getServerSession(authOptions)
-  if (session?.user?.role !== 'ADMIN') {
+  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.REVIEW_LOANS))) {
     redirect('/dashboard')
   }
 
@@ -28,10 +31,12 @@ async function reviewLoan(formData: FormData) {
         select: {
           balance: true,
           loanBalance: true,
+          createdAt: true,
         },
       },
     },
   })
+
   if (!loan) {
     return
   }
@@ -39,7 +44,8 @@ async function reviewLoan(formData: FormData) {
   const approved = action === 'approve'
   const eligibility = (loan.user?.balance || 0) * LOAN_POLICY.maxSavingsMultiplier
   const hasOutstandingLoan = (loan.user?.loanBalance || 0) > 0
-  const cannotApprove = loan.amount > eligibility || hasOutstandingLoan
+  const tenureOk = loan.user?.createdAt ? differenceInMonths(new Date(), loan.user.createdAt) >= LOAN_REQUEST_POLICY.minTenureMonths : false
+  const cannotApprove = loan.amount > eligibility || hasOutstandingLoan || !tenureOk
 
   if (approved && cannotApprove) {
     await prisma.loan.update({
@@ -48,15 +54,15 @@ async function reviewLoan(formData: FormData) {
         status: 'REJECTED',
         approvedBy: session.user.id,
         approvedAt: new Date(),
-        notes: 'Rejected: member exceeds eligibility limit or has outstanding loan.',
+        notes: 'Rejected: member does not meet tenure or eligibility requirements.',
       },
     })
     revalidatePath('/dashboard/loans')
     return
   }
 
-  const interest = loan.amount * ((loan.interestRate || LOAN_POLICY.interestRatePercent) / 100)
-  const totalRepayable = loan.amount + interest
+  const chargeRate = loan.interestRate || LOAN_REQUEST_POLICY.adminChargePercent
+  const totalRepayable = loan.amount + loan.amount * (chargeRate / 100)
 
   await prisma.loan.update({
     where: { id: loanId },
@@ -68,7 +74,7 @@ async function reviewLoan(formData: FormData) {
       monthlyPayment: totalRepayable / loan.duration,
       balance: approved ? totalRepayable : 0,
       notes: approved
-        ? `Loan approved for disbursement to ${loan.disbursementBankName || 'member bank'} (${loan.disbursementAccountNumber || 'N/A'}). Repayment to be deducted monthly by Finance Department in tranches.`
+        ? `Loan approved with ${chargeRate}% admin charge. Repayment will be deducted monthly.`
         : 'Loan request declined after review.',
     },
   })
@@ -101,11 +107,11 @@ async function reviewLoan(formData: FormData) {
 export default async function LoansPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.email) {
+  if (!session?.user?.email || !session?.user?.id) {
     redirect('/login')
   }
 
-  if (session.user.role !== 'ADMIN') {
+  if (!(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.REVIEW_LOANS))) {
     redirect('/dashboard')
   }
 
@@ -118,6 +124,10 @@ export default async function LoansPage() {
           select: {
             name: true,
             email: true,
+            phone: true,
+            staffId: true,
+            department: true,
+            createdAt: true,
             balance: true,
             loanBalance: true,
             bankName: true,
@@ -143,86 +153,185 @@ export default async function LoansPage() {
   ])
 
   return (
-    <div className="animate-fadeIn space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Loan Requests</h1>
-        <p className="mt-1 text-gray-500">Review and decide pending cooperative facility requests.</p>
-      </div>
+    <div className="space-y-6">
+      <section className="card relative overflow-hidden p-6 sm:p-7">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.07] via-transparent to-transparent" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="label-eyebrow">Admin · Loans</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em]">Loan requests</h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Review pending requests, verify guarantors, and approve only when the member has met the 6-month rule and stays within the 2x thrift limit.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 self-start rounded-full border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted-foreground" style={{ borderColor: 'rgb(var(--border))' }}>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            5% admin charge on repayment
+          </div>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <MetricCard label="Pending Requests" value={pendingLoans.length.toString()} tone="amber" />
+      <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
-          label="Pending Exposure"
+          label="Pending requests"
+          value={pendingLoans.length.toString()}
+          tone="amber"
+          caption="Awaiting review"
+        />
+        <MetricCard
+          label="Pending exposure"
           value={formatCurrency(pendingLoans.reduce((sum, loan) => sum + loan.amount, 0))}
           tone="blue"
+          caption="Gross request value"
         />
-        <MetricCard label="Recently Decided" value={recentLoans.length.toString()} tone="green" />
+        <MetricCard
+          label="Recently decided"
+          value={recentLoans.length.toString()}
+          tone="green"
+          caption="Last 10 decisions"
+        />
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Pending Queue</h2>
+      <section className="card overflow-hidden">
+        <div className="flex items-end justify-between gap-4 border-b px-6 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+          <div>
+            <p className="label-eyebrow">Pending queue</p>
+            <h2 className="mt-1 text-base font-semibold tracking-tight">Requests for approval</h2>
+          </div>
         </div>
 
         {pendingLoans.length === 0 ? (
-          <div className="px-6 py-10 text-center text-gray-500">No pending loan requests.</div>
+          <div className="px-6 py-10 text-center text-sm text-muted-foreground">No pending loan requests.</div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
             {pendingLoans.map((loan) => {
+              const application = sanitizeLoanApplicationData(loan.applicationData)
               const maxEligible = loan.user?.balance ? loan.user.balance * LOAN_POLICY.maxSavingsMultiplier : 0
+              const tenureMonths = loan.user?.createdAt ? differenceInMonths(new Date(), loan.user.createdAt) : 0
               const hasOutstandingLoan = (loan.user?.loanBalance || 0) > 0
-              const canApprove = !hasOutstandingLoan && loan.amount <= maxEligible
+              const canApprove = !hasOutstandingLoan && loan.amount <= maxEligible && tenureMonths >= LOAN_REQUEST_POLICY.minTenureMonths
+
               return (
                 <div key={loan.id} className="px-6 py-5">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <p className="text-lg font-semibold text-gray-900">{loan.user?.name || 'Unknown Member'}</p>
-                      <p className="text-sm text-gray-600">{loan.user?.email}</p>
-                      <p className="mt-1 text-sm text-gray-500">Purpose: {loan.purpose}</p>
-                      <p className="text-sm text-gray-500">Duration: {loan.duration} months · Rate: {loan.interestRate}%</p>
-                      <p className="text-sm text-gray-500">Submitted: {formatDateTime(loan.createdAt)}</p>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Member max eligibility: {formatCurrency(maxEligible)}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Disbursement account: {loan.disbursementBankName || loan.user?.bankName || 'N/A'} · {loan.disbursementAccountNumber || loan.user?.bankAccountNumber || 'N/A'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Account name: {loan.disbursementAccountName || loan.user?.bankAccountName || 'N/A'}
-                      </p>
+                  <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-lg font-semibold">{loan.user?.name || 'Unknown Member'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {loan.user?.email} · {loan.user?.phone || 'No phone'} · Staff ID: {loan.user?.staffId || 'N/A'}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Department: {loan.user?.department || 'N/A'} · Member since {loan.user?.createdAt ? formatDate(loan.user.createdAt) : 'N/A'}
+                          </p>
+                        </div>
+                        <StatusBadge status={loan.status} />
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <InfoCard label="Requested amount" value={formatCurrency(loan.amount)} />
+                        <InfoCard label="Loan duration" value={`${loan.duration} months`} />
+                        <InfoCard label="Loan type" value={application?.loan.type || 'General'} />
+                        <InfoCard label="Max eligible" value={formatCurrency(maxEligible)} />
+                      </div>
+
+                      <div className="rounded-2xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Purpose</p>
+                        <p className="mt-2 text-sm leading-relaxed text-foreground">{loan.purpose}</p>
+                      </div>
+
+                      {application && (
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <InfoCard label="Thrift savings" value={formatCurrency(application.applicant.thriftSavings)} />
+                          <InfoCard label="Special savings" value={formatCurrency(application.applicant.specialSavings)} />
+                          <InfoCard label="Monthly contribution" value={formatCurrency(application.applicant.monthlyContribution)} />
+                          <InfoCard label="Applicant phone" value={application.applicant.phone || 'N/A'} />
+                        </div>
+                      )}
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-2xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Bank details</p>
+                          <div className="mt-2 space-y-1 text-sm">
+                            <p>{loan.user?.bankName || 'N/A'}</p>
+                            <p className="font-mono">{loan.user?.bankAccountNumber || 'N/A'}</p>
+                            <p>{loan.user?.bankAccountName || 'N/A'}</p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Guarantors</p>
+                          <div className="mt-2 space-y-1 text-sm">
+                            {application?.guarantors.length ? (
+                              application.guarantors.map((guarantor) => (
+                                <div key={guarantor.staffId} className="space-y-0.5">
+                                  <p className="font-semibold">{guarantor.staffId} · {guarantor.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {guarantor.department || 'No department'} · {guarantor.phone || 'No phone'}
+                                  </p>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-muted-foreground">Guarantor data not stored.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
                       {hasOutstandingLoan && (
-                        <p className="mt-1 text-xs font-semibold text-red-600">
-                          Member has outstanding loan. New loan must not be approved.
+                        <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                          Member has an outstanding loan. New requests should not be approved.
                         </p>
                       )}
-                      <p className="mt-2 text-sm font-medium text-gray-800">
-                        Request Amount: <span className="text-gray-900">{formatCurrency(loan.amount)}</span>
+                      {tenureMonths < LOAN_REQUEST_POLICY.minTenureMonths && (
+                        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                          Member has only been active for {tenureMonths} month{tenureMonths === 1 ? '' : 's'}.
+                          A 6-month membership period is required.
+                        </p>
+                      )}
+
+                      <p className="text-sm text-muted-foreground">
+                        Submitted {formatDateTime(loan.createdAt)}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <form action={reviewLoan}>
-                        <input type="hidden" name="loanId" value={loan.id} />
-                        <input type="hidden" name="action" value="approve" />
-                        <button
-                          type="submit"
-                          disabled={!canApprove}
-                          className="rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                        >
-                          Approve
-                        </button>
-                      </form>
+                    <div className="flex flex-col justify-between gap-3 rounded-2xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
+                      <div className="space-y-2 text-sm">
+                        <p className="font-semibold">Review actions</p>
+                        <p className="text-muted-foreground">The repayment charge is {loan.interestRate || LOAN_REQUEST_POLICY.adminChargePercent}%.</p>
+                        {loan.notes && <p className="text-muted-foreground">{loan.notes}</p>}
+                      </div>
 
-                      <form action={reviewLoan}>
-                        <input type="hidden" name="loanId" value={loan.id} />
-                        <input type="hidden" name="action" value="reject" />
-                        <button
-                          type="submit"
-                          className="rounded-lg bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
-                        >
-                          Reject
-                        </button>
-                      </form>
+                      <div className="flex flex-wrap gap-2">
+                        <form action={reviewLoan}>
+                          <input type="hidden" name="loanId" value={loan.id} />
+                          <input type="hidden" name="action" value="approve" />
+                          <button
+                            type="submit"
+                            disabled={!canApprove}
+                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                          >
+                            Approve
+                          </button>
+                        </form>
+
+                        <form action={reviewLoan}>
+                          <input type="hidden" name="loanId" value={loan.id} />
+                          <input type="hidden" name="action" value="reject" />
+                          <button
+                            type="submit"
+                            className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+                          >
+                            Reject
+                          </button>
+                        </form>
+                      </div>
+
+                      {!canApprove && (
+                        <p className="text-xs text-amber-700">
+                          Approval is blocked until the member meets the savings and tenure rules.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -230,59 +339,82 @@ export default async function LoansPage() {
             })}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Decisions</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b px-6 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+          <p className="label-eyebrow">Recent decisions</p>
+          <h2 className="mt-1 text-base font-semibold tracking-tight">Approved and rejected loans</h2>
         </div>
 
         {recentLoans.length === 0 ? (
-          <div className="px-6 py-10 text-center text-gray-500">No reviewed loan requests yet.</div>
+          <div className="px-6 py-10 text-center text-sm text-muted-foreground">No reviewed loan requests yet.</div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
             {recentLoans.map((loan) => (
               <div key={loan.id} className="flex flex-col gap-2 px-6 py-4 text-sm md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="font-medium text-gray-900">{loan.user?.name || 'Unknown Member'}</p>
-                  <p className="text-gray-500">{formatCurrency(loan.amount)} · {loan.duration} months</p>
+                  <p className="font-semibold">{loan.user?.name || 'Unknown Member'}</p>
+                  <p className="text-muted-foreground">{formatCurrency(loan.amount)} · {loan.duration} months</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-gray-500">{loan.approvedAt ? formatDateTime(loan.approvedAt) : '-'}</span>
+                  <span className="text-muted-foreground">{loan.approvedAt ? formatDateTime(loan.approvedAt) : '-'}</span>
                   <StatusBadge status={loan.status} />
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   )
 }
 
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'amber' | 'blue' | 'green' }) {
+function MetricCard({
+  label,
+  value,
+  tone,
+  caption,
+}: {
+  label: string
+  value: string
+  tone: 'amber' | 'blue' | 'green'
+  caption: string
+}) {
   const tones = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    blue: 'border-blue-200 bg-blue-50 text-blue-800',
-    green: 'border-green-200 bg-green-50 text-green-800',
+    amber: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200',
+    blue: 'border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-200',
+    green: 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200',
   }
 
   return (
-    <div className={`rounded-xl border p-4 ${tones[tone]}`}>
-      <p className="text-xs uppercase tracking-wide">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-1 text-xs opacity-70">{caption}</p>
+    </div>
+  )
+}
+
+function InfoCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border bg-surface-2 p-3" style={{ borderColor: 'rgb(var(--border))' }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
     </div>
   )
 }
 
 function StatusBadge({ status }: { status: string }) {
   const styles = {
-    APPROVED: 'bg-green-100 text-green-800',
-    REJECTED: 'bg-red-100 text-red-800',
+    PENDING: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    APPROVED: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    REJECTED: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
+    COMPLETED: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
   }
 
   return (
-    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-700'}`}>
+    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${styles[status as keyof typeof styles] || 'bg-surface-2 text-muted-foreground'}`}>
       {status}
     </span>
   )

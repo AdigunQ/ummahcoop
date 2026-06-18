@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 function monthRange(baseDate: Date) {
   const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1)
@@ -13,7 +14,9 @@ function monthRange(baseDate: Date) {
 export default async function FinanceReportPage() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) redirect('/login')
-  if (session.user.role !== 'ADMIN') redirect('/dashboard')
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.VIEW_FINANCE))) {
+    redirect('/dashboard')
+  }
 
   const today = new Date()
   const { start, end } = monthRange(today)

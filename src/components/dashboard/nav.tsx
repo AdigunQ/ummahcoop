@@ -27,6 +27,7 @@ import {
 import { UmmahLogo } from '@/components/brand/ummah-logo'
 import { cn, getInitials } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { PRIVILEGE_CODES, type PrivilegeCode } from '@/lib/privileges'
 
 interface NavProps {
   user: {
@@ -37,6 +38,7 @@ interface NavProps {
     status: string
     balance: number
     loanBalance: number
+    privileges?: { code: string }[]
   }
   adminBadges?: {
     pendingMembers: number
@@ -85,11 +87,29 @@ const memberNavItems: NavItem[] = [
   { href: '/dashboard/history', label: 'Transactions', icon: PiggyBank, group: 'History' },
 ]
 
+const privilegedNavItems: Array<NavItem & { privilege: PrivilegeCode }> = [
+  { privilege: PRIVILEGE_CODES.VIEW_ANALYTICS, href: '/dashboard/analytics', label: 'Analytics', icon: LineChart, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.VIEW_MEMBER_DATA, href: '/dashboard/member-data', label: 'Member Data', icon: FileText, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.EDIT_MEMBERS, href: '/dashboard/directory', label: 'Update Member', icon: Users, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.APPROVE_MEMBERS, href: '/dashboard/members', label: 'Approvals', icon: UserCheck, badge: 'pending', group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.REVIEW_PAYMENTS, href: '/dashboard/payments', label: 'Payments', icon: ReceiptText, badge: 'payments', group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.REVIEW_WITHDRAWALS, href: '/dashboard/withdrawals', label: 'Withdrawals', icon: ArrowDownUp, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.REVIEW_COMMODITY, href: '/dashboard/commodity', label: 'Commodity', icon: ShoppingBag, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.REVIEW_LOANS, href: '/dashboard/loans', label: 'Loans', icon: HandCoins, badge: 'loans', group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/vouchers', label: 'Reports', icon: ScrollText, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/finance-report', label: 'Monthly Report', icon: ClipboardList, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/transactions', label: 'Transactions', icon: List, group: 'Granted access' },
+]
+
 export function DashboardNav({ user, adminBadges }: NavProps) {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  const navItems = user.role === 'ADMIN' ? adminNavItems : memberNavItems
+  const privilegeCodes = new Set((user.privileges || []).map((privilege) => privilege.code))
+  const specialItems = user.role === 'ADMIN'
+    ? []
+    : privilegedNavItems.filter((item, index, list) => privilegeCodes.has(item.privilege) && list.findIndex((candidate) => candidate.href === item.href) === index)
+  const navItems = user.role === 'ADMIN' ? adminNavItems : [...memberNavItems, ...specialItems]
   const badgeCounts = {
     pending: adminBadges?.pendingMembers ?? 0,
     payments: adminBadges?.pendingPayments ?? 0,

@@ -50,7 +50,7 @@ export default async function WithdrawalsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Withdraw Funds</h1>
         <p className="mt-1 text-gray-500">
-          Request a withdrawal from your Monthly or Special savings.
+          Special savings withdrawals open in October only. Thrift savings withdrawal is handled through full membership closure.
         </p>
       </div>
 
