@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 import ImportMembersClient from './import-members-client'
 import MonthlyMemberDataClient from './monthly-member-data-client'
 
@@ -8,7 +9,9 @@ export default async function ImportMembersPage() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) redirect('/login')
-  if (session.user.role !== 'ADMIN') redirect('/dashboard')
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.IMPORT_MEMBERS))) {
+    redirect('/dashboard')
+  }
 
   return (
     <div className="animate-fadeIn space-y-10">

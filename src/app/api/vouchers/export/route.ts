@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { buildVoucherDataset, resolveVoucherPeriod } from '@/lib/vouchers'
 import { getCurrentMemberReportDataset } from '@/lib/current-member-data'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 function escapeCsv(value: unknown): string {
   const raw = String(value ?? '')
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (session.user.role !== 'ADMIN') {
+  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.VIEW_FINANCE))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

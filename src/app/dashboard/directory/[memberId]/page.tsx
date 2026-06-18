@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import ConfirmDeleteButton from './confirm-delete-button'
-import { MANAGEABLE_PRIVILEGES, PRIVILEGE_LABELS, canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 type SearchParams = {
   saved?: string
@@ -139,57 +139,6 @@ async function deleteMemberRecord(formData: FormData) {
   redirect('/dashboard/directory?deleted=1')
 }
 
-async function updateMemberPrivileges(formData: FormData) {
-  'use server'
-
-  const session = await getServerSession(authOptions)
-  if (session?.user?.role !== 'ADMIN') redirect('/dashboard')
-
-  const memberId = String(formData.get('memberId') || '')
-  if (!memberId) redirect('/dashboard/directory')
-
-  const selectedPrivileges = MANAGEABLE_PRIVILEGES.filter((code) => String(formData.get(code) || '') === 'on')
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.memberPrivilege.deleteMany({
-        where: {
-          userId: memberId,
-          code: { notIn: selectedPrivileges },
-        },
-      })
-
-      for (const code of selectedPrivileges) {
-        await tx.memberPrivilege.upsert({
-          where: {
-            userId_code: {
-              userId: memberId,
-              code,
-            },
-          },
-          update: {
-            grantedById: session.user.id,
-            note: 'Granted from admin member editor',
-          },
-          create: {
-            userId: memberId,
-            code,
-            grantedById: session.user.id,
-            note: 'Granted from admin member editor',
-          },
-        })
-      }
-    })
-  } catch {
-    redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
-  }
-
-  revalidatePath(`/dashboard/directory/${memberId}`)
-  revalidatePath('/dashboard/directory')
-  revalidatePath('/dashboard')
-  redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?saved=1`)
-}
-
 export default async function MemberProfileEditorPage({
   params,
   searchParams,
@@ -221,11 +170,6 @@ export default async function MemberProfileEditorPage({
       loanBalance: true,
       status: true,
       voucherEnabled: true,
-      privileges: {
-        select: {
-          code: true,
-        },
-      },
     },
   })
 
@@ -383,46 +327,6 @@ export default async function MemberProfileEditorPage({
             </button>
           </div>
         </form>
-
-        {isFullAdmin && (
-        <div className="mt-6 border-t border-gray-100 pt-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-gray-800">Special access</p>
-              <p className="mt-1 text-xs text-gray-500">Grant targeted access to a member without making them a full admin.</p>
-            </div>
-          </div>
-
-          <form action={updateMemberPrivileges} className="mt-4 space-y-4">
-            <input type="hidden" name="memberId" value={member.id} />
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {MANAGEABLE_PRIVILEGES.map((code) => (
-                <label
-                  key={code}
-                  className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700"
-                >
-                  <input
-                    type="checkbox"
-                    name={code}
-                    defaultChecked={member.privileges?.some((privilege) => privilege.code === code)}
-                    className="mt-1 h-4 w-4 rounded border-gray-300"
-                  />
-                  <span>
-                    <span className="block font-medium text-gray-900">{PRIVILEGE_LABELS[code]}</span>
-                    <span className="block text-xs text-gray-500">{code}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            <button
-              type="submit"
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black"
-            >
-              Save access
-            </button>
-          </form>
-        </div>
-        )}
 
         {isFullAdmin && (
         <div className="mt-6 border-t border-red-100 pt-5">

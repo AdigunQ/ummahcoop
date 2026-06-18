@@ -64,6 +64,8 @@ const adminNavItems: NavItem[] = [
   { href: '/dashboard/member-data', label: 'Member Data', icon: FileText, group: 'Members' },
   { href: '/dashboard/directory', label: 'Update Member', icon: Users, group: 'Members' },
   { href: '/dashboard/members', label: 'Approvals', icon: UserCheck, badge: 'pending', group: 'Members' },
+  { href: '/dashboard/import-members', label: 'Import Members', icon: ClipboardList, group: 'Members' },
+  { href: '/dashboard/admin-access', label: 'Admin Access', icon: ShieldAlert, group: 'Members' },
 
   { href: '/dashboard/payments', label: 'Payments', icon: ReceiptText, badge: 'payments', group: 'Operations' },
   { href: '/dashboard/withdrawals', label: 'Withdrawals', icon: ArrowDownUp, group: 'Operations' },
@@ -92,6 +94,7 @@ const privilegedNavItems: Array<NavItem & { privilege: PrivilegeCode }> = [
   { privilege: PRIVILEGE_CODES.VIEW_MEMBER_DATA, href: '/dashboard/member-data', label: 'Member Data', icon: FileText, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.EDIT_MEMBERS, href: '/dashboard/directory', label: 'Update Member', icon: Users, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.APPROVE_MEMBERS, href: '/dashboard/members', label: 'Approvals', icon: UserCheck, badge: 'pending', group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.IMPORT_MEMBERS, href: '/dashboard/import-members', label: 'Import Members', icon: ClipboardList, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_PAYMENTS, href: '/dashboard/payments', label: 'Payments', icon: ReceiptText, badge: 'payments', group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_WITHDRAWALS, href: '/dashboard/withdrawals', label: 'Withdrawals', icon: ArrowDownUp, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_COMMODITY, href: '/dashboard/commodity', label: 'Commodity', icon: ShoppingBag, group: 'Granted access' },
@@ -99,6 +102,7 @@ const privilegedNavItems: Array<NavItem & { privilege: PrivilegeCode }> = [
   { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/vouchers', label: 'Reports', icon: ScrollText, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/finance-report', label: 'Monthly Report', icon: ClipboardList, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/transactions', label: 'Transactions', icon: List, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.MANAGE_ACCESS, href: '/dashboard/admin-access', label: 'Admin Access', icon: ShieldAlert, group: 'Granted access' },
 ]
 
 export function DashboardNav({ user, adminBadges }: NavProps) {
@@ -106,6 +110,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const privilegeCodes = new Set((user.privileges || []).map((privilege) => privilege.code))
+  const hasGrantedAccess = privilegeCodes.size > 0
   const specialItems = user.role === 'ADMIN'
     ? []
     : privilegedNavItems.filter((item, index, list) => privilegeCodes.has(item.privilege) && list.findIndex((candidate) => candidate.href === item.href) === index)
@@ -243,7 +248,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
                         )}
                         <item.icon className="h-4 w-4 flex-none" />
                         <span className="flex-1 truncate">{item.label}</span>
-                        {user.role === 'ADMIN' && item.badge && badgeCounts[item.badge] > 0 && (
+                        {(user.role === 'ADMIN' || hasGrantedAccess) && item.badge && badgeCounts[item.badge] > 0 && (
                           <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500/15 px-1.5 text-[10px] font-bold text-rose-600 dark:text-rose-400">
                             {badgeCounts[item.badge]}
                           </span>

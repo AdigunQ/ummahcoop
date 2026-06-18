@@ -18,6 +18,14 @@ export default async function DashboardPage() {
     return <AdminAnalytics />
   }
 
+  const grantedAccessCount = session.user?.id
+    ? await prisma.memberPrivilege.count({ where: { userId: session.user.id } })
+    : 0
+
+  if (grantedAccessCount > 0) {
+    return <AdminAnalytics />
+  }
+
   // Get member data
   const user = await prisma.user.findUnique({
     where: { email },

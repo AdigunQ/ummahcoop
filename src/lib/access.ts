@@ -1,8 +1,14 @@
 import { prisma } from './prisma'
 import { PRIVILEGE_CODES, type PrivilegeCode } from './privileges'
 
-export { MANAGEABLE_PRIVILEGES, PRIVILEGE_CODES, PRIVILEGE_LABELS, PRIVILEGE_ROUTE_MAP } from './privileges'
-export type { PrivilegeCode } from './privileges'
+export {
+  ACCESS_BUNDLES,
+  MANAGEABLE_PRIVILEGES,
+  PRIVILEGE_CODES,
+  PRIVILEGE_LABELS,
+  PRIVILEGE_ROUTE_MAP,
+} from './privileges'
+export type { AccessBundleKey, PrivilegeCode } from './privileges'
 
 export async function getUserPrivilegeCodes(userId: string): Promise<PrivilegeCode[]> {
   const grants = await prisma.memberPrivilege.findMany({
@@ -32,4 +38,12 @@ export async function canAccessWithPrivileges(
 
   const codes = await getUserPrivilegeCodes(user.id)
   return hasPrivilege(codes, required)
+}
+
+export async function canManageAdminAccess(user: { role: string; id: string }): Promise<boolean> {
+  if (user.role === 'ADMIN') {
+    return true
+  }
+
+  return canAccessWithPrivileges(user, PRIVILEGE_CODES.MANAGE_ACCESS)
 }

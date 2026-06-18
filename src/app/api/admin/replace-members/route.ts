@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getDefaultMemberPassword } from '@/lib/default-member-password'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 export const runtime = 'nodejs'
 
@@ -343,7 +344,7 @@ function buildEmail(staffId: string): string {
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email || session.user.role !== 'ADMIN') {
+  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.IMPORT_MEMBERS))) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 

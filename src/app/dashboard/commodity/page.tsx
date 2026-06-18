@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 async function submitCommodityRequest(formData: FormData) {
   'use server'
@@ -39,7 +40,7 @@ async function reviewCommodityRequest(formData: FormData) {
   'use server'
 
   const session = await getServerSession(authOptions)
-  if (session?.user?.role !== 'ADMIN') {
+  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.REVIEW_COMMODITY))) {
     redirect('/dashboard')
   }
 
@@ -104,7 +105,7 @@ export default async function CommodityPage() {
     redirect('/login')
   }
 
-  if (session.user.role === 'ADMIN') {
+  if (await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.REVIEW_COMMODITY)) {
     const [pending, reviewed] = await Promise.all([
       prisma.commodityRequest.findMany({
         where: { status: 'PENDING' },
