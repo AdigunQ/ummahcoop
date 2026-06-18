@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { formatDistanceToNowStrict } from 'date-fns'
-import { ArrowRight, Building2, CalendarDays, FileText, Hash, Loader2, Mail, PhoneCall, User } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Building2, CalendarDays, Landmark, Loader2, ShieldCheck, UserRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { LOAN_REQUEST_POLICY } from '@/lib/loan-request'
@@ -53,289 +53,331 @@ export function LoanRequestForm({
   hasBankDetails,
 }: LoanRequestFormProps) {
   const [acknowledged, setAcknowledged] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(formData: FormData) {
+    setIsSubmitting(true)
     const res = await submitLoanRequest(formData)
+    setIsSubmitting(false)
+
     if (res?.error) {
       toast.error(res.error)
-    } else {
-      toast.success('Loan request submitted for admin review.')
+      return
     }
+
+    toast.success('Loan request submitted for admin review.')
   }
 
   const memberSince = useMemo(() => formatDate(member.createdAt), [member.createdAt])
-  const canSend = canSubmit && hasBankDetails && acknowledged
+  const canSend = canSubmit && hasBankDetails && acknowledged && !isSubmitting
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <section className="card overflow-hidden">
-        <div className="border-b px-6 py-5" style={{ borderColor: 'rgb(var(--border))' }}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="label-eyebrow">Loan request</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight">Fill the cooperative loan form</h1>
-            </div>
+    <div className="space-y-6">
+      <header className="border-b border-gray-200 pb-5">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">Loan application</p>
+        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-950">Request cooperative loan</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
+              Complete the details below. Admin will review your request, confirm guarantors, and contact you before approval.
+            </p>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {LOAN_REQUEST_POLICY.minTenureMonths > 0
-              ? `You must be active for at least ${LOAN_REQUEST_POLICY.minTenureMonths} months and your request cannot exceed 2x your thrift savings.`
-              : 'Your request cannot exceed 2x your thrift savings.'}
-          </p>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Maximum request</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-950">{formatCurrency(loanEligibility)}</p>
+          </div>
         </div>
+      </header>
 
-        <form action={handleSubmit} className="grid gap-6 p-6 lg:grid-cols-[1fr_0.95fr]" noValidate>
-          <div className="space-y-5">
-            <fieldset className="space-y-4 rounded-2xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
-              <legend className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Applicant details
-              </legend>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <form action={handleSubmit} className="rounded-lg border border-gray-200 bg-white shadow-sm" noValidate>
+          <SectionHeader
+            number="01"
+            title="Applicant"
+            description="These details are pulled from your member profile."
+          />
+          <div className="grid gap-px border-b border-gray-200 bg-gray-200 md:grid-cols-2">
+            <InfoCell icon={UserRound} label="Full name" value={member.name || 'Member'} />
+            <InfoCell icon={BadgeCheck} label="Staff ID" value={member.staffId || 'N/A'} mono />
+            <InfoCell icon={CalendarDays} label="Member since" value={memberSince} />
+            <InfoCell icon={Building2} label="Department" value={member.department || 'N/A'} />
+          </div>
 
-              <ReadOnlyRow icon={User} label="Full name" value={member.name || 'Member'} />
-              <ReadOnlyRow icon={Hash} label="Staff No" value={member.staffId || 'N/A'} />
-              <ReadOnlyRow icon={CalendarDays} label="Member since" value={memberSince} />
-              <ReadOnlyRow icon={Building2} label="Organisation" value="Ummah Coop / FAAN" />
-              <ReadOnlyRow icon={FileText} label="Department / Unit" value={member.department || 'N/A'} />
-              <ReadOnlyRow icon={FileText} label="Position / Rank" value="Member" />
-              <ReadOnlyRow icon={Mail} label="Email" value={member.email} mono />
-              <ReadOnlyRow icon={PhoneCall} label="Phone" value={member.phone || 'N/A'} />
-            </fieldset>
+          <SectionHeader
+            number="02"
+            title="Loan details"
+            description="Keep the amount within your thrift savings eligibility."
+          />
+          <div className="grid gap-5 border-b border-gray-200 p-5 md:grid-cols-2">
+            <Field label="Type of loan">
+              <select name="loanType" defaultValue="Personal" className="input-base" required disabled={!canSubmit || !hasBankDetails}>
+                <option value="Personal">Personal</option>
+                <option value="Emergency">Emergency</option>
+                <option value="Education">Education</option>
+                <option value="Welfare">Welfare</option>
+                <option value="Project">Project</option>
+                <option value="Other">Other</option>
+              </select>
+            </Field>
 
-            <fieldset className="space-y-4 rounded-2xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
-              <legend className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Loan details
-              </legend>
+            <Field label="Loan duration">
+              <select name="duration" defaultValue="6" className="input-base" required disabled={!canSubmit || !hasBankDetails}>
+                <option value="3">3 months</option>
+                <option value="6">6 months</option>
+                <option value="9">9 months</option>
+                <option value="12">12 months</option>
+                <option value="18">18 months</option>
+                <option value="24">24 months</option>
+              </select>
+            </Field>
 
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Type of loan
-                </label>
-                <select name="loanType" defaultValue="Personal" className="input-base" required disabled={!canSubmit || !hasBankDetails}>
-                  <option value="Personal">Personal</option>
-                  <option value="Emergency">Emergency</option>
-                  <option value="Education">Education</option>
-                  <option value="Welfare">Welfare</option>
-                  <option value="Project">Project</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
+            <Field label="Amount requested" hint={`Limit: ${formatCurrency(loanEligibility)}`}>
+              <input
+                name="amount"
+                type="number"
+                min={1}
+                max={Math.max(1, Math.floor(loanEligibility))}
+                step={1}
+                placeholder="150000"
+                className="input-base"
+                required
+                disabled={!canSubmit || !hasBankDetails}
+              />
+            </Field>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Amount requested
-                  </label>
-                  <input
-                    name="amount"
-                    type="number"
-                    min={1}
-                    max={Math.max(1, Math.floor(loanEligibility))}
-                    step={1}
-                    placeholder="e.g. 150000"
-                    className="input-base"
-                    required
-                    disabled={!canSubmit || !hasBankDetails}
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Max allowed: {formatCurrency(loanEligibility)}
-                  </p>
-                </div>
+            <Field label="Purpose of loan" className="md:row-span-2">
+              <textarea
+                name="purpose"
+                rows={5}
+                placeholder="Briefly state what this loan is for"
+                className="input-base resize-none"
+                required
+                disabled={!canSubmit || !hasBankDetails}
+              />
+            </Field>
+          </div>
 
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Loan duration
-                  </label>
-                  <select name="duration" defaultValue="6" className="input-base" required disabled={!canSubmit || !hasBankDetails}>
-                    <option value="3">3 months</option>
-                    <option value="6">6 months</option>
-                    <option value="9">9 months</option>
-                    <option value="12">12 months</option>
-                    <option value="18">18 months</option>
-                    <option value="24">24 months</option>
-                  </select>
-                </div>
-              </div>
+          <SectionHeader
+            number="03"
+            title="Guarantors"
+            description="Enter Staff IDs only. Admin will confirm both members before approval."
+          />
+          <div className="grid gap-5 border-b border-gray-200 p-5 md:grid-cols-2">
+            <Field label="Guarantor 1 Staff ID">
+              <input
+                name="guarantor1StaffId"
+                type="text"
+                placeholder="e.g. 009709"
+                className="input-base font-mono uppercase"
+                required
+                disabled={!canSubmit || !hasBankDetails}
+              />
+            </Field>
 
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Purpose of loan
-                </label>
-                <textarea
-                  name="purpose"
-                  rows={4}
-                  placeholder="Tell us what the loan is for"
-                  className="input-base resize-none"
-                  required
-                  disabled={!canSubmit || !hasBankDetails}
-                />
-              </div>
-            </fieldset>
+            <Field label="Guarantor 2 Staff ID">
+              <input
+                name="guarantor2StaffId"
+                type="text"
+                placeholder="e.g. 010214"
+                className="input-base font-mono uppercase"
+                required
+                disabled={!canSubmit || !hasBankDetails}
+              />
+            </Field>
+          </div>
 
-            <fieldset className="space-y-4 rounded-2xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
-              <legend className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Guarantors
-              </legend>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Enter the Staff ID only. Admin will confirm both guarantors before approval.
-              </p>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Guarantor 1 Staff ID
-                  </label>
-                  <input
-                    name="guarantor1StaffId"
-                    type="text"
-                    placeholder="e.g. FAAN-001"
-                    className="input-base font-mono uppercase"
-                    required
-                    disabled={!canSubmit || !hasBankDetails}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Guarantor 2 Staff ID
-                  </label>
-                  <input
-                    name="guarantor2StaffId"
-                    type="text"
-                    placeholder="e.g. FAAN-002"
-                    className="input-base font-mono uppercase"
-                    required
-                    disabled={!canSubmit || !hasBankDetails}
-                  />
-                </div>
-              </div>
-            </fieldset>
-
+          <div className="space-y-4 p-5">
             {!hasBankDetails && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Add your bank details in Profile before requesting a loan.
-              </div>
+              <Notice tone="amber">
+                Add bank details in your profile before submitting a loan request.
+              </Notice>
             )}
 
             {!canSubmit && (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              <Notice tone="blue">
                 {LOAN_REQUEST_POLICY.minTenureMonths > 0
-                  ? `Loan requests are available for active members who have been on the platform for at least ${LOAN_REQUEST_POLICY.minTenureMonths} months and have no pending or outstanding loan.`
+                  ? `Loan requests are available for active members who have spent at least ${LOAN_REQUEST_POLICY.minTenureMonths} months on the platform and have no pending or outstanding loan.`
                   : 'Loan requests are available for active members with no pending or outstanding loan.'}
-              </div>
+              </Notice>
             )}
 
-            <label className="flex items-start gap-3 rounded-2xl border bg-surface-2 px-4 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+            <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-4">
               <input
                 type="checkbox"
                 name="acknowledgement"
                 checked={acknowledged}
                 onChange={(event) => setAcknowledged(event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-700 focus:ring-emerald-700"
               />
-              <span className="text-sm text-muted-foreground">
-                I hereby declare that the information provided is true and correct. I agree to abide by the rules of the cooperative society and authorize the deduction of loan repayments from my salary.
+              <span className="text-sm leading-6 text-gray-700">
+                I hereby declare that the information provided is true and correct. I agree to abide by the rules of
+                the cooperative society and authorize the deduction of loan repayments from my salary.
               </span>
             </label>
 
             <button
               type="submit"
               disabled={!canSend}
-              className="btn-primary w-full !py-3.5"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
             >
-              Submit loan request
-              <ArrowRight className="h-4 w-4" />
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Submitting request
+                </>
+              ) : (
+                <>
+                  Submit loan request
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
-
-            {!acknowledged && (
-              <p className="text-center text-xs text-muted-foreground">
-                Tick the declaration above to enable submission.
-              </p>
-            )}
           </div>
-
-          <aside className="space-y-4">
-            <section className="rounded-2xl border bg-surface p-5" style={{ borderColor: 'rgb(var(--border))' }}>
-              <p className="label-eyebrow">Current snapshot</p>
-              <div className="mt-4 space-y-3">
-                <SummaryRow label="Thrift savings" value={formatCurrency(member.balance)} />
-                <SummaryRow label="Special savings" value={formatCurrency(member.specialBalance)} />
-                <SummaryRow label="Monthly contribution" value={formatCurrency(member.monthlyContribution || 0)} />
-                <SummaryRow label="Loan eligibility" value={formatCurrency(loanEligibility)} />
-                <SummaryRow label="Months on platform" value={`${monthsServed} months`} />
-              </div>
-            </section>
-
-            <section className="rounded-2xl border bg-surface p-5" style={{ borderColor: 'rgb(var(--border))' }}>
-              <p className="label-eyebrow">Bank details</p>
-              <div className="mt-4 space-y-2 text-sm">
-                <SummaryRow label="Bank" value={member.bankName || 'Not set'} />
-                <SummaryRow label="Account name" value={member.bankAccountName || 'Not set'} />
-                <SummaryRow label="Account number" value={member.bankAccountNumber || 'Not set'} mono />
-              </div>
-            </section>
-
-            <section className="rounded-2xl border bg-surface p-5" style={{ borderColor: 'rgb(var(--border))' }}>
-              <p className="label-eyebrow">Recent requests</p>
-              <div className="mt-4 space-y-3">
-                {recentLoans.length === 0 ? (
-                  <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground" style={{ borderColor: 'rgb(var(--border))' }}>
-                    No loan requests yet.
-                  </div>
-                ) : (
-                  recentLoans.map((loan) => (
-                    <div key={loan.id} className="rounded-xl border bg-surface-2 p-3" style={{ borderColor: 'rgb(var(--border))' }}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold">{formatCurrency(loan.amount)}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {loan.duration} months · {loan.purpose}
-                          </p>
-                        </div>
-                        <StatusPill status={loan.status} />
-                      </div>
-                      <p className="mt-2 text-[11px] text-muted-foreground">
-                        Submitted {formatDistanceToNowStrict(new Date(loan.createdAt), { addSuffix: true })}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          </aside>
         </form>
-      </section>
+
+        <aside className="space-y-4">
+          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-700" />
+              <h2 className="text-base font-semibold text-gray-950">Eligibility check</h2>
+            </div>
+            <div className="mt-5 space-y-4">
+              <Metric label="Thrift savings" value={formatCurrency(member.balance)} />
+              <Metric label="Special savings" value={formatCurrency(member.specialBalance)} />
+              <Metric label="Monthly contribution" value={formatCurrency(member.monthlyContribution || 0)} />
+              <Metric label="Months on platform" value={`${monthsServed} months`} />
+            </div>
+            <p className="mt-5 border-t border-gray-200 pt-4 text-xs leading-5 text-gray-500">
+              {LOAN_REQUEST_POLICY.minTenureMonths > 0
+                ? `Requests are checked against thrift savings, active membership, ${LOAN_REQUEST_POLICY.minTenureMonths}-month tenure, and existing loan status.`
+                : 'Requests are checked against thrift savings, active membership, and existing loan status.'}
+            </p>
+          </section>
+
+          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Landmark className="h-5 w-5 text-emerald-700" />
+              <h2 className="text-base font-semibold text-gray-950">Bank destination</h2>
+            </div>
+            <div className="mt-5 space-y-4">
+              <Metric label="Bank" value={member.bankName || 'Not set'} />
+              <Metric label="Account name" value={member.bankAccountName || 'Not set'} />
+              <Metric label="Account number" value={member.bankAccountNumber || 'Not set'} mono />
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-gray-950">Recent loan requests</h2>
+            <div className="mt-4 space-y-3">
+              {recentLoans.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500">
+                  No loan requests yet.
+                </div>
+              ) : (
+                recentLoans.map((loan) => (
+                  <div key={loan.id} className="rounded-lg border border-gray-200 px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-950">{formatCurrency(loan.amount)}</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {loan.duration} months · {loan.purpose}
+                        </p>
+                      </div>
+                      <StatusPill status={loan.status} />
+                    </div>
+                    <p className="mt-3 text-xs text-gray-500">
+                      Submitted {formatDistanceToNowStrict(new Date(loan.createdAt), { addSuffix: true })}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   )
 }
 
-function ReadOnlyRow({ icon: Icon, label, value, mono }: { icon: any; label: string; value: string; mono?: boolean }) {
+function SectionHeader({ number, title, description }: { number: string; title: string; description: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border bg-surface px-4 py-3" style={{ borderColor: 'rgb(var(--border))' }}>
-      <Icon className="h-4 w-4 flex-none text-muted-foreground" />
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className={`ml-auto truncate text-sm font-semibold ${mono ? 'font-mono' : ''}`}>{value}</span>
+    <div className="flex gap-4 border-b border-gray-200 px-5 py-4">
+      <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-emerald-50 text-xs font-bold text-emerald-800">
+        {number}
+      </span>
+      <div>
+        <h2 className="text-base font-semibold text-gray-950">{title}</h2>
+        <p className="mt-1 text-sm text-gray-500">{description}</p>
+      </div>
     </div>
   )
 }
 
-function SummaryRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Field({
+  label,
+  hint,
+  className = '',
+  children,
+}: {
+  label: string
+  hint?: string
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={className}>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <label className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-600">{label}</label>
+        {hint && <span className="text-xs text-gray-500">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function InfoCell({ icon: Icon, label, value, mono }: { icon: any; label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="bg-white px-5 py-4">
+      <div className="flex items-center gap-3">
+        <Icon className="h-4 w-4 text-emerald-700" />
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">{label}</p>
+      </div>
+      <p className={`mt-2 truncate text-sm font-semibold text-gray-950 ${mono ? 'font-mono' : ''}`}>{value}</p>
+    </div>
+  )
+}
+
+function Metric({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
-      <span className={`text-sm font-semibold ${mono ? 'font-mono' : ''}`}>{value}</span>
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className={`text-sm font-semibold text-gray-950 ${mono ? 'font-mono' : ''}`}>{value}</span>
+    </div>
+  )
+}
+
+function Notice({ tone, children }: { tone: 'amber' | 'blue'; children: React.ReactNode }) {
+  const classes = tone === 'amber'
+    ? 'border-amber-200 bg-amber-50 text-amber-900'
+    : 'border-blue-200 bg-blue-50 text-blue-900'
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 text-sm ${classes}`}>
+      {children}
     </div>
   )
 }
 
 function StatusPill({ status }: { status: string }) {
   const styles = {
-    PENDING: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-    APPROVED: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-    REJECTED: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
-    COMPLETED: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
+    PENDING: 'bg-amber-50 text-amber-700 ring-amber-200',
+    APPROVED: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    REJECTED: 'bg-rose-50 text-rose-700 ring-rose-200',
+    COMPLETED: 'bg-sky-50 text-sky-700 ring-sky-200',
   }
 
   return (
-    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${styles[status as keyof typeof styles] || 'bg-surface-2 text-muted-foreground'}`}>
+    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ring-1 ${styles[status as keyof typeof styles] || 'bg-gray-50 text-gray-600 ring-gray-200'}`}>
       {status}
     </span>
   )
