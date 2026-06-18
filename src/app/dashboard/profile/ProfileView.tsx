@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Building2,
   CalendarDays,
@@ -36,10 +37,17 @@ type MemberProfile = {
   loanRequestedCount: number
 }
 
-export default function ProfileView({ member }: { member: MemberProfile }) {
+export default function ProfileView({
+  member,
+  mustChangePassword = false,
+}: {
+  member: MemberProfile
+  mustChangePassword?: boolean
+}) {
+  const router = useRouter()
   const [isEditingBank, setIsEditingBank] = useState(false)
   const [isEditingPhone, setIsEditingPhone] = useState(false)
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(mustChangePassword)
 
   async function handleSave(formData: FormData) {
     const res = await updateProfile(formData)
@@ -59,6 +67,10 @@ export default function ProfileView({ member }: { member: MemberProfile }) {
     } else {
       toast.success('Password changed')
       setIsChangingPassword(false)
+      router.refresh()
+      if (mustChangePassword) {
+        window.location.assign('/dashboard')
+      }
     }
   }
 
@@ -263,10 +275,12 @@ export default function ProfileView({ member }: { member: MemberProfile }) {
             <p className="label-eyebrow">Security</p>
             <h2 className="mt-1 text-base font-semibold tracking-tight">Password</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Members added manually can sign in first with Staff ID as password, then change it here.
+              {mustChangePassword
+                ? 'Please change your first-time Staff ID password before using the rest of the dashboard.'
+                : 'Members added manually can sign in first with Staff ID as password, then change it here.'}
             </p>
           </div>
-          {!isChangingPassword && (
+          {!isChangingPassword && !mustChangePassword && (
             <button
               type="button"
               onClick={() => setIsChangingPassword(true)}
@@ -277,6 +291,12 @@ export default function ProfileView({ member }: { member: MemberProfile }) {
             </button>
           )}
         </div>
+
+        {mustChangePassword && (
+          <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
+            Your current password is still your Staff ID. Enter your Staff ID as the current password, then choose a new password.
+          </div>
+        )}
 
         {isChangingPassword ? (
           <form action={handlePasswordChange} className="grid gap-4 p-5 md:grid-cols-3">
@@ -317,7 +337,7 @@ export default function ProfileView({ member }: { member: MemberProfile }) {
               <button
                 type="button"
                 onClick={() => setIsChangingPassword(false)}
-                className="btn-ghost !py-2.5 !px-4 !text-sm"
+                className={`btn-ghost !py-2.5 !px-4 !text-sm ${mustChangePassword ? 'hidden' : ''}`}
               >
                 Cancel
               </button>

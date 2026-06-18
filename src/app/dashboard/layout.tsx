@@ -1,9 +1,26 @@
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+import bcrypt from 'bcryptjs'
 import { authOptions } from '@/lib/auth'
 import { DashboardNav } from '@/components/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { autoPostMonthEndIfDue } from '@/lib/payroll'
+
+function compactStaffId(value: string | null | undefined): string {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^a-zA-Z0-9-]/g, '')
+    .toUpperCase()
+}
+
+async function mustChangeInitialPassword(user: { role: string; staffId: string | null; password: string | null }) {
+  if (user.role !== 'MEMBER' || !user.staffId) return false
+  if (!user.password) return true
+
+  return bcrypt.compare(compactStaffId(user.staffId), user.password)
+}
 
 export default async function DashboardLayout({
   children,
@@ -24,6 +41,8 @@ export default async function DashboardLayout({
       id: true,
       name: true,
       email: true,
+      staffId: true,
+      password: true,
       role: true,
       status: true,
       balance: true,
@@ -42,6 +61,12 @@ export default async function DashboardLayout({
 
   if (user.role === 'ADMIN') {
     await autoPostMonthEndIfDue()
+  }
+
+  const pathname = headers().get('x-pathname') || ''
+  const needsPasswordChange = await mustChangeInitialPassword(user)
+  if (needsPasswordChange && pathname !== '/dashboard/profile') {
+    redirect('/dashboard/profile?password=required')
   }
 
   const canSeeAdminBadges =
