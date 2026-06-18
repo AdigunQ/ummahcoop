@@ -242,24 +242,23 @@ export const authOptions: NextAuthOptions = {
             }
           }
 
-          if (!user || !user.password) {
+          if (!user) {
             return null
           }
 
-          const isPasswordValid = await bcrypt.compare(
-            password,
-            user.password
-          )
           const isStaffIdFallbackPassword =
             user.role === 'MEMBER' &&
             Boolean(user.staffId) &&
             compactStaffId(password) === compactStaffId(user.staffId)
+          const isPasswordValid = user.password
+            ? await bcrypt.compare(password, user.password)
+            : false
 
           if (!isPasswordValid && !isStaffIdFallbackPassword) {
             return null
           }
 
-          if (!isPasswordValid && isStaffIdFallbackPassword) {
+          if ((!user.password || !isPasswordValid) && isStaffIdFallbackPassword) {
             await prisma.user.update({
               where: { id: user.id },
               data: { password: await bcrypt.hash(compactStaffId(user.staffId), 10) },
