@@ -3,6 +3,9 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
+import { getInitialMemberPassword } from './default-member-password'
+
+type AuthUser = NonNullable<Awaited<ReturnType<typeof prisma.user.findFirst>>>
 
 function normalizeAuthErrorMessage(error: unknown): string {
   const allowedMessages = new Set([
@@ -38,6 +41,98 @@ function buildMemberEmail(staffId: string): string {
   return `${staffId.toLowerCase()}@${domain.toLowerCase()}`
 }
 
+function readSnapshotValue(row: unknown, keys: string[]): string {
+  if (!row || typeof row !== 'object') return ''
+  const record = row as Record<string, unknown>
+
+  for (const key of keys) {
+    const value = record[key]
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim()
+    }
+  }
+
+  return ''
+}
+
+async function findLatestSnapshotMember(staffId: string) {
+  const compactLoginStaffId = compactStaffId(staffId)
+  if (!compactLoginStaffId) return null
+
+  const months = await prisma.memberDataMonth.findMany({
+    orderBy: { period: 'desc' },
+    select: {
+      period: true,
+      rows: true,
+    },
+    take: 3,
+  })
+
+  for (const month of months) {
+    const rows = Array.isArray(month.rows) ? month.rows : []
+    for (const row of rows) {
+      const rowStaffId = readSnapshotValue(row, ['Staff ID', 'staffId', 'StaffID', 'STAFF ID'])
+      if (compactStaffId(rowStaffId) !== compactLoginStaffId) continue
+
+      return {
+        staffId: rowStaffId,
+        name: readSnapshotValue(row, ['Name', 'name']) || rowStaffId,
+        department: readSnapshotValue(row, ['Department', 'department']) || null,
+        thriftSavings: Number(readSnapshotValue(row, ['Thrift Savings', 'thriftSavings']) || 0) || 0,
+        specialSavings: Number(readSnapshotValue(row, ['Special Savings', 'Special Saving', 'specialSavings']) || 0) || 0,
+      }
+    }
+  }
+
+  return null
+}
+
+async function createMemberUserFromSnapshot(staffId: string): Promise<AuthUser | null> {
+  const snapshotMember = await findLatestSnapshotMember(staffId)
+  if (!snapshotMember) return null
+
+  const normalizedStaffId = normalizeStaffId(snapshotMember.staffId || staffId)
+  const email = buildMemberEmail(normalizedStaffId)
+  const passwordHash = await bcrypt.hash(getInitialMemberPassword(normalizedStaffId), 10)
+
+  const existingByEmail = await prisma.user.findUnique({
+    where: { email },
+  })
+
+  if (existingByEmail) {
+    return prisma.user.update({
+      where: { id: existingByEmail.id },
+      data: {
+        staffId: existingByEmail.staffId || normalizedStaffId,
+        name: existingByEmail.name || snapshotMember.name,
+        password: existingByEmail.password || passwordHash,
+        status: existingByEmail.status === 'PENDING' ? 'ACTIVE' : existingByEmail.status,
+        role: 'MEMBER',
+        voucherEnabled: true,
+      },
+    })
+  }
+
+  return prisma.user.create({
+    data: {
+      staffId: normalizedStaffId,
+      email,
+      name: snapshotMember.name,
+      department: snapshotMember.department,
+      password: passwordHash,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      monthlyContribution: snapshotMember.thriftSavings,
+      specialContribution: snapshotMember.specialSavings,
+      balance: 0,
+      specialBalance: 0,
+      totalContributions: 0,
+      loanBalance: 0,
+      voucherEnabled: true,
+    },
+  })
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
   session: {
@@ -64,7 +159,7 @@ export const authOptions: NextAuthOptions = {
           const normalizedIdentifier = identifier.replace(/\s+/g, '')
           const password = credentials.password
 
-          let user = null as Awaited<ReturnType<typeof prisma.user.findFirst>> | null
+          let user = null as AuthUser | null
 
           if (normalizedIdentifier.includes('@')) {
             user = await prisma.user.findUnique({
@@ -130,6 +225,10 @@ export const authOptions: NextAuthOptions = {
               })
 
               user = possibleMembers.find((member) => compactStaffId(member.staffId) === compactLoginStaffId) || null
+            }
+
+            if (!user) {
+              user = await createMemberUserFromSnapshot(staffId)
             }
           }
 
