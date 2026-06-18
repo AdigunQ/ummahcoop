@@ -26,7 +26,11 @@ function normalizeStaffId(value: string): string {
 }
 
 function compactStaffId(value: string | null | undefined): string {
-  return String(value || '').trim().replace(/\s+/g, '').toUpperCase()
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^a-zA-Z0-9-]/g, '')
+    .toUpperCase()
 }
 
 function buildMemberEmail(staffId: string): string {
@@ -87,6 +91,45 @@ export const authOptions: NextAuthOptions = {
               user = await prisma.user.findUnique({
                 where: { email: buildMemberEmail(staffId) },
               })
+            }
+
+            if (!user) {
+              const compactLoginStaffId = compactStaffId(staffId)
+              const possibleMembers = await prisma.user.findMany({
+                where: {
+                  role: 'MEMBER',
+                  staffId: { not: null },
+                },
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                  staffId: true,
+                  password: true,
+                  role: true,
+                  status: true,
+                  image: true,
+                  emailVerified: true,
+                  phone: true,
+                  department: true,
+                  bankName: true,
+                  bankAccountName: true,
+                  bankAccountNumber: true,
+                  monthlyContribution: true,
+                  specialContribution: true,
+                  balance: true,
+                  specialBalance: true,
+                  totalContributions: true,
+                  loanBalance: true,
+                  partialWithdrawalUsed: true,
+                  voucherEnabled: true,
+                  closureDate: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
+              })
+
+              user = possibleMembers.find((member) => compactStaffId(member.staffId) === compactLoginStaffId) || null
             }
           }
 
