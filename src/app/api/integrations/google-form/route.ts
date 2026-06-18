@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
-import { getDefaultMemberPassword } from '@/lib/default-member-password'
+import { getInitialMemberPassword } from '@/lib/default-member-password'
 
 const integrationPayloadSchema = z.object({
   fullName: z.string().trim().min(1),
@@ -180,15 +180,7 @@ export async function POST(req: Request) {
       )
     }
 
-    let defaultPassword: string
-    try {
-      defaultPassword = getDefaultMemberPassword()
-    } catch {
-      return NextResponse.json(
-        { error: 'Webhook processing is temporarily unavailable.' },
-        { status: 503 }
-      )
-    }
+    const defaultPassword = getInitialMemberPassword(normalizedStaffId)
     const passwordHash = await bcrypt.hash(defaultPassword, 10)
 
     const now = new Date()

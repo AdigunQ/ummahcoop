@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
-import { getDefaultMemberPassword } from '@/lib/default-member-password'
+import { getInitialMemberPassword } from '@/lib/default-member-password'
 import { prisma } from '@/lib/prisma'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
@@ -61,12 +61,7 @@ async function createMember(formData: FormData) {
   })
   if (existingByEmail) redirect('/dashboard/directory/add?error=duplicate_email')
 
-  let defaultPassword: string
-  try {
-    defaultPassword = getDefaultMemberPassword()
-  } catch {
-    defaultPassword = staffId || 'member123'
-  }
+  const defaultPassword = getInitialMemberPassword(staffId)
   const passwordHash = await bcrypt.hash(defaultPassword, 10)
 
   const now = new Date()

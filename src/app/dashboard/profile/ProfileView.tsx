@@ -13,10 +13,11 @@ import {
   Pencil,
   PhoneCall,
   Save,
+  ShieldCheck,
   User,
   X,
 } from 'lucide-react'
-import { updateProfile } from './actions'
+import { changePassword, updateProfile } from './actions'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate, getInitials } from '@/lib/utils'
 
@@ -38,6 +39,7 @@ type MemberProfile = {
 export default function ProfileView({ member }: { member: MemberProfile }) {
   const [isEditingBank, setIsEditingBank] = useState(false)
   const [isEditingPhone, setIsEditingPhone] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   async function handleSave(formData: FormData) {
     const res = await updateProfile(formData)
@@ -47,6 +49,16 @@ export default function ProfileView({ member }: { member: MemberProfile }) {
       toast.success('Profile updated')
       setIsEditingBank(false)
       setIsEditingPhone(false)
+    }
+  }
+
+  async function handlePasswordChange(formData: FormData) {
+    const res = await changePassword(formData)
+    if (res?.error) {
+      toast.error(res.error)
+    } else {
+      toast.success('Password changed')
+      setIsChangingPassword(false)
     }
   }
 
@@ -244,6 +256,80 @@ export default function ProfileView({ member }: { member: MemberProfile }) {
           )}
         </section>
       </div>
+
+      <section className="card overflow-hidden">
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+          <div>
+            <p className="label-eyebrow">Security</p>
+            <h2 className="mt-1 text-base font-semibold tracking-tight">Password</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Members added manually can sign in first with Staff ID as password, then change it here.
+            </p>
+          </div>
+          {!isChangingPassword && (
+            <button
+              type="button"
+              onClick={() => setIsChangingPassword(true)}
+              className="btn-ghost !py-1.5 !px-3 !text-xs"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Change
+            </button>
+          )}
+        </div>
+
+        {isChangingPassword ? (
+          <form action={handlePasswordChange} className="grid gap-4 p-5 md:grid-cols-3">
+            <Field label="Current password">
+              <input
+                name="currentPassword"
+                type="password"
+                autoComplete="current-password"
+                className="input-base"
+                required
+              />
+            </Field>
+            <Field label="New password">
+              <input
+                name="newPassword"
+                type="password"
+                autoComplete="new-password"
+                minLength={6}
+                className="input-base"
+                required
+              />
+            </Field>
+            <Field label="Confirm password">
+              <input
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                minLength={6}
+                className="input-base"
+                required
+              />
+            </Field>
+            <div className="flex gap-2 md:col-span-3">
+              <button type="submit" className="btn-primary !py-2.5 !text-sm">
+                <Check className="h-4 w-4" />
+                Save password
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsChangingPassword(false)}
+                className="btn-ghost !py-2.5 !px-4 !text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center gap-3 px-5 py-4 text-sm text-muted-foreground">
+            <ShieldCheck className="h-4 w-4 flex-none text-muted-foreground" />
+            <span>Your password protects member dashboard access and loan request submission.</span>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
+import bcrypt from 'bcryptjs'
 import * as XLSX from 'xlsx'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
+import { getInitialMemberPassword } from '@/lib/default-member-password'
 
 export const runtime = 'nodejs'
 
@@ -668,13 +670,35 @@ async function syncMembersToLatestMonth(months: ParsedMonth[]) {
 
       const thriftBalance = thriftTotals.get(staffId) || 0
       const specialBalance = specialTotals.get(staffId) || 0
-
-      await tx.user.upsert({
+      const passwordHash = await bcrypt.hash(getInitialMemberPassword(staffId), 10)
+      const existingMember = await tx.user.findUnique({
         where: { staffId },
-        create: {
+        select: { id: true, password: true },
+      })
+
+      if (existingMember) {
+        await tx.user.update({
+          where: { id: existingMember.id },
+          data: {
+            name: row.Name,
+            monthlyContribution: row['Thrift Savings'],
+            specialContribution: row['Special Savings'],
+            balance: thriftBalance,
+            specialBalance,
+            totalContributions: thriftBalance + specialBalance,
+            voucherEnabled: true,
+            status: 'ACTIVE',
+            ...(existingMember.password ? {} : { password: passwordHash }),
+            ...(joinDate ? { createdAt: joinDate } : {}),
+          },
+        })
+      } else {
+        await tx.user.create({
+          data: {
           staffId,
           name: row.Name,
           email,
+          password: passwordHash,
           role: 'MEMBER',
           status: 'ACTIVE',
           monthlyContribution: row['Thrift Savings'],
@@ -684,19 +708,9 @@ async function syncMembersToLatestMonth(months: ParsedMonth[]) {
           totalContributions: thriftBalance + specialBalance,
           voucherEnabled: true,
           ...(joinDate ? { createdAt: joinDate } : {}),
-        },
-        update: {
-          name: row.Name,
-          monthlyContribution: row['Thrift Savings'],
-          specialContribution: row['Special Savings'],
-          balance: thriftBalance,
-          specialBalance,
-          totalContributions: thriftBalance + specialBalance,
-          voucherEnabled: true,
-          status: 'ACTIVE',
-          ...(joinDate ? { createdAt: joinDate } : {}),
-        },
-      })
+          },
+        })
+      }
 
       syncedMembers += 1
     }

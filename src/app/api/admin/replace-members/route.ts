@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import * as XLSX from 'xlsx'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
-import { getDefaultMemberPassword } from '@/lib/default-member-password'
+import { getInitialMemberPassword } from '@/lib/default-member-password'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 export const runtime = 'nodejs'
@@ -390,31 +390,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Confirmation text must be exactly: REPLACE MEMBERS' }, { status: 400 })
   }
 
-  let passwordPlain: string
-  try {
-    passwordPlain = getDefaultMemberPassword()
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Member password configuration is missing.' }, { status: 503 })
-  }
-  const passwordHash = await bcrypt.hash(passwordPlain, 10)
   const fallbackCreatedAt = new Date('2025-10-01T00:00:00.000Z')
 
-  const data = merged.map((member) => ({
-    email: buildEmail(member.staffId),
-    name: member.name,
-    staffId: member.staffId,
-    password: passwordHash,
-    role: 'MEMBER' as const,
-    status: 'ACTIVE' as const,
-    phone: member.phone || null,
-    department: null,
-    monthlyContribution: member.monthlySavings,
-    specialContribution: member.specialSavings,
-    balance: 0,
-    specialBalance: 0,
-    voucherEnabled: true,
-    createdAt: member.joinedAt ? new Date(`${member.joinedAt}T00:00:00.000Z`) : fallbackCreatedAt,
-  }))
+  const data = await Promise.all(
+    merged.map(async (member) => ({
+      email: buildEmail(member.staffId),
+      name: member.name,
+      staffId: member.staffId,
+      password: await bcrypt.hash(getInitialMemberPassword(member.staffId), 10),
+      role: 'MEMBER' as const,
+      status: 'ACTIVE' as const,
+      phone: member.phone || null,
+      department: null,
+      monthlyContribution: member.monthlySavings,
+      specialContribution: member.specialSavings,
+      balance: 0,
+      specialBalance: 0,
+      voucherEnabled: true,
+      createdAt: member.joinedAt ? new Date(`${member.joinedAt}T00:00:00.000Z`) : fallbackCreatedAt,
+    }))
+  )
 
   // hard-fail on duplicate emails or staff IDs before deleting anything
   const staffIdSet = new Set<string>()

@@ -1,10 +1,11 @@
-export function getDefaultMemberPassword(): string {
+export function getInitialMemberPassword(staffId: string): string {
   const configured = process.env.DEFAULT_MEMBER_PASSWORD?.trim()
   if (configured) return configured
 
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('DEFAULT_MEMBER_PASSWORD is not configured.')
-  }
+  const normalizedStaffId = staffId.trim().replace(/\s+/g, '').toUpperCase()
+  if (normalizedStaffId) return normalizedStaffId
 
-  return 'member123'
+  throw new Error('Staff ID is required to create an initial member password.')
 }
+
+export const getDefaultMemberPassword = getInitialMemberPassword
