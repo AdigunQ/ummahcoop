@@ -5,7 +5,27 @@ import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import { getInitialMemberPassword } from './default-member-password'
 
-type AuthUser = NonNullable<Awaited<ReturnType<typeof prisma.user.findFirst>>>
+type AuthUser = {
+  id: string
+  email: string
+  name: string | null
+  staffId: string | null
+  password: string | null
+  role: string
+  status: string
+  image: string | null
+}
+
+const AUTH_USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  staffId: true,
+  password: true,
+  role: true,
+  status: true,
+  image: true,
+} as const
 
 function normalizeAuthErrorMessage(error: unknown): string {
   const allowedMessages = new Set([
@@ -97,6 +117,7 @@ async function createMemberUserFromSnapshot(staffId: string): Promise<AuthUser |
 
   const existingByEmail = await prisma.user.findUnique({
     where: { email },
+    select: AUTH_USER_SELECT,
   })
 
   if (existingByEmail) {
@@ -164,11 +185,13 @@ export const authOptions: NextAuthOptions = {
           if (normalizedIdentifier.includes('@')) {
             user = await prisma.user.findUnique({
               where: { email: normalizedIdentifier.toLowerCase() },
+              select: AUTH_USER_SELECT,
             })
           } else {
             const staffId = normalizeStaffId(normalizedIdentifier)
             user = await prisma.user.findUnique({
               where: { staffId },
+              select: AUTH_USER_SELECT,
             })
 
             if (!user) {
@@ -179,12 +202,14 @@ export const authOptions: NextAuthOptions = {
                     mode: 'insensitive',
                   },
                 },
+                select: AUTH_USER_SELECT,
               })
             }
 
             if (!user) {
               user = await prisma.user.findUnique({
                 where: { email: buildMemberEmail(staffId) },
+                select: AUTH_USER_SELECT,
               })
             }
 
@@ -195,33 +220,7 @@ export const authOptions: NextAuthOptions = {
                   role: 'MEMBER',
                   staffId: { not: null },
                 },
-                select: {
-                  id: true,
-                  email: true,
-                  name: true,
-                  staffId: true,
-                  password: true,
-                  role: true,
-                  status: true,
-                  image: true,
-                  emailVerified: true,
-                  phone: true,
-                  department: true,
-                  bankName: true,
-                  bankAccountName: true,
-                  bankAccountNumber: true,
-                  monthlyContribution: true,
-                  specialContribution: true,
-                  balance: true,
-                  specialBalance: true,
-                  totalContributions: true,
-                  loanBalance: true,
-                  partialWithdrawalUsed: true,
-                  voucherEnabled: true,
-                  closureDate: true,
-                  createdAt: true,
-                  updatedAt: true,
-                },
+                select: AUTH_USER_SELECT,
               })
 
               user = possibleMembers.find((member) => compactStaffId(member.staffId) === compactLoginStaffId) || null
@@ -238,6 +237,7 @@ export const authOptions: NextAuthOptions = {
             if (staffId) {
               user = await prisma.user.findUnique({
                 where: { staffId },
+                select: AUTH_USER_SELECT,
               })
             }
           }
