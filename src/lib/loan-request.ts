@@ -1,5 +1,7 @@
+import { differenceInMonths } from 'date-fns'
+
 export const LOAN_REQUEST_POLICY = {
-  minTenureMonths: 0,
+  minTenureMonths: 6,
   maxSavingsMultiplier: 2,
   adminChargePercent: 5,
 } as const
@@ -47,7 +49,7 @@ export function getLoanLimit(thriftSavings: number): number {
 }
 
 export function hasLoanTenureElapsed(createdAt: Date, now = new Date()): boolean {
-  return true
+  return differenceInMonths(now, createdAt) >= LOAN_REQUEST_POLICY.minTenureMonths
 }
 
 export function normalizeGuarantorStaffId(value: string): string {
