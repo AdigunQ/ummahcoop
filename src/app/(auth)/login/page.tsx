@@ -89,7 +89,7 @@ export default function LoginPage() {
       }
 
       toast.success('Welcome back')
-      window.location.assign(result.url || '/dashboard')
+      window.location.assign('/dashboard')
     } catch (error) {
       toast.error('An error occurred during login')
     } finally {
