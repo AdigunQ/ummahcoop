@@ -34,6 +34,7 @@ interface NavProps {
     id: string
     name: string | null
     email: string
+    staffId?: string | null
     role: string
     status: string
     balance: number
@@ -105,6 +106,19 @@ const privilegedNavItems: Array<NavItem & { privilege: PrivilegeCode }> = [
   { privilege: PRIVILEGE_CODES.MANAGE_ACCESS, href: '/dashboard/admin-access', label: 'Admin Access', icon: ShieldAlert, group: 'Granted access' },
 ]
 
+function isGeneratedMemberEmail(email: string, staffId?: string | null) {
+  const normalizedEmail = email.trim().toLowerCase()
+  if (normalizedEmail.endsWith('@internal.ummahcoop')) return true
+  if (!staffId) return false
+  const normalizedStaffId = staffId.trim().replace(/\s+/g, '').toLowerCase()
+
+  return (
+    normalizedEmail === `${normalizedStaffId}@faan-ummah.coop` ||
+    normalizedEmail === `${normalizedStaffId}@ummahcoop.org` ||
+    normalizedEmail.startsWith(`member-${normalizedStaffId}@`)
+  )
+}
+
 export function DashboardNav({ user, adminBadges }: NavProps) {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -120,6 +134,9 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
     payments: adminBadges?.pendingPayments ?? 0,
     loans: adminBadges?.pendingLoans ?? 0,
   } as const
+  const displayEmail = user.role === 'MEMBER' && isGeneratedMemberEmail(user.email, user.staffId)
+    ? 'Email not set'
+    : user.email
 
   // group items
   const groups = navItems.reduce<Record<string, NavItem[]>>((acc, item) => {
@@ -189,7 +206,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{user.name || 'Member'}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{displayEmail}</p>
                 </div>
               </div>
 

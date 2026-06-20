@@ -47,7 +47,9 @@ export default function ProfileView({
   const router = useRouter()
   const [isEditingBank, setIsEditingBank] = useState(false)
   const [isEditingPhone, setIsEditingPhone] = useState(false)
+  const [isEditingEmail, setIsEditingEmail] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(mustChangePassword)
+  const displayEmail = isGeneratedMemberEmail(member.email, member.staffId) ? 'Not set' : member.email
 
   async function handleSave(formData: FormData) {
     const res = await updateProfile(formData)
@@ -57,6 +59,8 @@ export default function ProfileView({
       toast.success('Profile updated')
       setIsEditingBank(false)
       setIsEditingPhone(false)
+      setIsEditingEmail(false)
+      router.refresh()
     }
   }
 
@@ -87,7 +91,7 @@ export default function ProfileView({
             <div>
               <p className="label-eyebrow">Profile</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">{member.name || 'Member'}</h1>
-              <p className="mt-0.5 text-sm text-muted-foreground">{member.email}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{displayEmail}</p>
             </div>
           </div>
 
@@ -140,7 +144,54 @@ export default function ProfileView({
 
           <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
             <Row icon={User} label="Name" value={member.name || 'N/A'} />
-            <Row icon={Mail} label="Email" value={member.email} mono />
+            <form action={handleSave}>
+              <div className="flex items-center gap-3 px-5 py-3.5">
+                <Mail className="h-4 w-4 flex-none text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Email</span>
+                <div className="ml-auto flex flex-1 items-center justify-end gap-2">
+                  {isEditingEmail ? (
+                    <>
+                      <input
+                        name="email"
+                        type="email"
+                        data-testid="profile-email-input"
+                        defaultValue={displayEmail === 'Not set' ? '' : member.email}
+                        placeholder="name@example.com"
+                        className="input-base !py-2 !text-sm sm:max-w-[240px]"
+                        required
+                      />
+                      <button
+                        type="submit"
+                        data-testid="profile-email-save"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingEmail(false)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="truncate text-sm font-semibold">{displayEmail}</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingEmail(true)}
+                        data-testid="profile-email-edit"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
+                        style={{ borderColor: 'rgb(var(--border))' }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </form>
             <Row icon={Hash} label="Staff ID" value={member.staffId || 'N/A'} />
             <Row icon={Building2} label="Department" value={member.department || 'N/A'} />
 
@@ -351,6 +402,18 @@ export default function ProfileView({
         )}
       </section>
     </div>
+  )
+}
+
+function isGeneratedMemberEmail(email: string, staffId: string | null) {
+  if (!staffId) return false
+  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedStaffId = staffId.trim().replace(/\s+/g, '').toLowerCase()
+
+  return (
+    normalizedEmail === `${normalizedStaffId}@faan-ummah.coop` ||
+    normalizedEmail === `${normalizedStaffId}@ummahcoop.org` ||
+    normalizedEmail.startsWith(`member-${normalizedStaffId}@`)
   )
 }
 

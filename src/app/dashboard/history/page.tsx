@@ -7,7 +7,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 export default async function HistoryPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     redirect('/login')
   }
 
@@ -16,7 +16,7 @@ export default async function HistoryPage() {
   }
 
   const member = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: session.user.id },
     select: {
       id: true,
       payments: {
