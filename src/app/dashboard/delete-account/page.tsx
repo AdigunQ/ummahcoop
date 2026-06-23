@@ -119,7 +119,7 @@ export default async function DeleteAccountPage() {
   return (
     <div className="animate-fadeIn space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Delete Account</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Close Account</h1>
         <p className="mt-1 text-gray-500">
           Request full membership withdrawal. You must clear all outstanding loans first.
         </p>
@@ -142,7 +142,7 @@ export default async function DeleteAccountPage() {
           </p>
           {outstandingLoan && (
             <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              You cannot submit account deletion while loan balance is outstanding.
+              you cannot submit account closure while loan balance is outstanding.
             </p>
           )}
           {hasPendingClosure && (
@@ -219,7 +219,7 @@ export default async function DeleteAccountPage() {
               disabled={outstandingLoan || hasPendingClosure}
               className="w-full rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
             >
-              Submit Account Deletion Request
+              Submit Account Closure Request
             </button>
           </form>
         </div>

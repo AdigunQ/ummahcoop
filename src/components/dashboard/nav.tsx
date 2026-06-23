@@ -98,7 +98,7 @@ const privilegedNavItems: Array<NavItem & { privilege: PrivilegeCode }> = [
   { privilege: PRIVILEGE_CODES.IMPORT_MEMBERS, href: '/dashboard/import-members', label: 'Import Members', icon: ClipboardList, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_PAYMENTS, href: '/dashboard/payments', label: 'Payments', icon: ReceiptText, badge: 'payments', group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_WITHDRAWALS, href: '/dashboard/withdrawals', label: 'Withdrawals', icon: ArrowDownUp, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.REVIEW_COMMODITY, href: '/dashboard/commodity', label: 'Commodity', icon: ShoppingBag, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.REVIEW_COMMODITY, href: '/dashboard/commodity?review=true', label: 'Commodity', icon: ShoppingBag, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_LOANS, href: '/dashboard/loans', label: 'Loans', icon: HandCoins, badge: 'loans', group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/vouchers', label: 'Reports', icon: ScrollText, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/finance-report', label: 'Monthly Report', icon: ClipboardList, group: 'Granted access' },
@@ -164,7 +164,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
           <ThemeToggle />
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            data-testid="mobile-menu-toggle"
+            data-testid="mobile-menu-toggle" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-surface"
             style={{ borderColor: 'rgb(var(--border))' }}
           >
@@ -184,7 +184,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
         <div className="flex h-full flex-col">
           {/* Brand */}
           <div className="flex items-center justify-between border-b px-5 py-5" style={{ borderColor: 'rgb(var(--border))' }}>
-            <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
+            <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)} aria-label="Close navigation">
               <UmmahLogo
                 markClassName="h-9 w-9"
                 textClassName="text-foreground"
@@ -252,7 +252,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
                         key={item.href}
                         href={item.href}
                         data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                        onClick={() => setIsMobileMenuOpen(false)}
+                        onClick={() => setIsMobileMenuOpen(false)} aria-label="Close navigation"
                         className={cn(
                           'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
                           active
@@ -298,7 +298,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
             {user.role === 'MEMBER' && (
               <Link
                 href="/dashboard/delete-account"
-                onClick={() => setIsMobileMenuOpen(false)}
+                onClick={() => setIsMobileMenuOpen(false)} aria-label="Close navigation"
                 data-testid="nav-delete-account"
                 className={cn(
                   'mb-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
@@ -308,7 +308,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
                 )}
               >
                 <ShieldAlert className="h-4 w-4" />
-                <span>Delete account</span>
+                <span>Close account</span>
               </Link>
             )}
 
@@ -328,7 +328,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
+          onClick={() => setIsMobileMenuOpen(false)} aria-label="Close navigation"
         />
       )}
     </>
