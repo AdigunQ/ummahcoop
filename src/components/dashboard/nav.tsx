@@ -98,7 +98,7 @@ const privilegedNavItems: Array<NavItem & { privilege: PrivilegeCode }> = [
   { privilege: PRIVILEGE_CODES.IMPORT_MEMBERS, href: '/dashboard/import-members', label: 'Import Members', icon: ClipboardList, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_PAYMENTS, href: '/dashboard/payments', label: 'Payments', icon: ReceiptText, badge: 'payments', group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_WITHDRAWALS, href: '/dashboard/withdrawals', label: 'Withdrawals', icon: ArrowDownUp, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.REVIEW_COMMODITY, href: '/dashboard/commodity', label: 'Commodity', icon: ShoppingBag, group: 'Granted access' },
+  { privilege: PRIVILEGE_CODES.REVIEW_COMMODITY, href: '/dashboard/commodity?review=true', label: 'Commodity', icon: ShoppingBag, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.REVIEW_LOANS, href: '/dashboard/loans', label: 'Loans', icon: HandCoins, badge: 'loans', group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/vouchers', label: 'Reports', icon: ScrollText, group: 'Granted access' },
   { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/finance-report', label: 'Monthly Report', icon: ClipboardList, group: 'Granted access' },
@@ -308,7 +308,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
                 )}
               >
                 <ShieldAlert className="h-4 w-4" />
-                <span>Delete account</span>
+                <span>Close account</span>
               </Link>
             )}
 
