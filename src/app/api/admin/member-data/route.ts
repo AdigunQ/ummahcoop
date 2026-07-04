@@ -563,7 +563,21 @@ function parseLegacyRows(
     const snText = toText(snRaw)
 
     if (!snText) {
-      if (parsedRows.length > 0) break
+      const rowIsTotallyEmpty =
+        !toText(row[map.staffId]) &&
+        !toText(row[map.name]) &&
+        !toText(row[map.thriftSavings]) &&
+        !toText(row[map.specialSaving]) &&
+        !toText(row[map.monthlyCharges]) &&
+        !toText(row[map.newMemberFee]) &&
+        !toText(row[map.total]) &&
+        !toText(row[map.monthJoined])
+
+      if (rowIsTotallyEmpty) {
+        if (parsedRows.length > 0) continue
+        continue
+      }
+
       continue
     }
 
@@ -627,8 +641,20 @@ function parseCombinedRows(
     const monthValue = toText(row[map.month])
 
     if (!staffValue && !monthValue) {
-      if (parsedRows.length > 0) break
-      continue
+      const rowIsTotallyEmpty =
+        !toText(row[map.amount]) &&
+        !toText(row[map.thriftSavings]) &&
+        !toText(row[map.specialSaving]) &&
+        !toText(row[map.loan]) &&
+        !toText(row[map.managementFee]) &&
+        !toText(row[map.commodity]) &&
+        !toText(row[map.monthlyCharges]) &&
+        !toText(row[map.newMemberFee]) &&
+        !toText(row[map.total])
+
+      if (rowIsTotallyEmpty) {
+        continue
+      }
     }
     if (isLikelyHeaderRow(row, map)) continue
 
