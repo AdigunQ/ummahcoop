@@ -109,7 +109,7 @@ export default function ImportMembersClient() {
             className="block w-full text-sm"
           />
           <p className="mt-2 text-xs text-gray-500">
-            Required columns: Staff ID, Name, Thrift Savings. Optional: Special Saving, Month Joined, Phone. If multiple
+            Required columns: Employee No., Employee Name, Monthly Saving. Optional: Special Saving, Month Joined, Phone. If multiple
             sheets exist, the importer uses the most complete sheet (prefers “feb 2026”).
           </p>
         </div>
@@ -175,11 +175,11 @@ export default function ImportMembersClient() {
               <table className="w-full min-w-[920px] text-sm">
                 <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                   <tr>
-                    <th className="px-6 py-3">Staff ID</th>
-                    <th className="px-6 py-3">Name</th>
-                    <th className="px-6 py-3">Monthly Savings</th>
+                    <th className="px-6 py-3">Employee No.</th>
+                    <th className="px-6 py-3">Employee Name</th>
+                    <th className="px-6 py-3">Monthly Saving</th>
                     <th className="px-6 py-3">Special Savings</th>
-                    <th className="px-6 py-3">Joined</th>
+                    <th className="px-6 py-3">Month Joined</th>
                     <th className="px-6 py-3">Warnings</th>
                   </tr>
                 </thead>

@@ -14,10 +14,49 @@ function escapeCsv(value: unknown): string {
   return escapedForSpreadsheet
 }
 
-function buildThreeColumnCsv(rows: Array<{ staffId: string; name: string; monthlyDeduction: number }>): string {
+type ExportRow = {
+  staffId: string
+  name: string
+  monthlySavings: number
+  specialSavings: number
+  monthlyFee: number
+  formFee: number
+}
+
+function buildAbanoRows(rows: ExportRow[], periodLabel: string): string {
   const lines: Array<Array<string | number>> = [
-    ['Staff ID', 'Name', 'Monthly Deduction'],
-    ...rows.map((row) => [row.staffId, row.name, row.monthlyDeduction]),
+    [
+      'Employee No.',
+      'Employee Name',
+      'Amount',
+      'Month',
+      'Monthly Saving',
+      'Special Saving',
+      'Loan',
+      'Management Fee',
+      'Commodity',
+      'Monthly Fee',
+      'Form Fee',
+      'Total',
+    ],
+    ...rows.map((row) => {
+      const amount = row.monthlySavings + row.specialSavings
+      const total = amount + row.monthlyFee + row.formFee
+      return [
+        row.staffId,
+        row.name,
+        amount,
+        periodLabel,
+        row.monthlySavings,
+        row.specialSavings,
+        0,
+        0,
+        0,
+        row.monthlyFee,
+        row.formFee,
+        total,
+      ]
+    }),
   ]
 
   return lines.map((row) => row.map((cell) => escapeCsv(cell)).join(',')).join('\n')
@@ -39,13 +78,18 @@ export async function GET(req: Request) {
   const dataset = resolved.period >= currentPeriod
     ? await getCurrentMemberReportDataset(resolved.period)
     : await buildVoucherDataset(resolved.period)
-  const csv = buildThreeColumnCsv(
-    dataset.rows.map((row) => ({
-      staffId: row.staffId,
-      name: row.name,
-      monthlyDeduction: row.totalSavings,
-    }))
-  )
+
+  const rows: ExportRow[] = dataset.rows.map((row) => ({
+    staffId: row.staffId,
+    name: row.name,
+    monthlySavings: row.monthlySavings,
+    specialSavings: row.specialSavings,
+    monthlyFee: row.monthlyCharges,
+    formFee: row.newMemberFee,
+  }))
+
+  const periodLabel = resolved.period
+  const csv = buildAbanoRows(rows, periodLabel)
   const filename = `monthly-deduction-${dataset.period}.csv`
 
   return new NextResponse(`\uFEFF${csv}`, {

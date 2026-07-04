@@ -430,7 +430,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
 
   const currentLiveNote =
     isCurrentLiveView && latestUploadedMonth
-      ? `${formatPeriodLabel(currentPeriod)} keeps the same member list as ${latestUploadedMonth.label}. Rows carried forward from the previous snapshot show as OLD with Charges = 100 and New Member Fee blank until fresh registrations are added.`
+      ? `${formatPeriodLabel(currentPeriod)} keeps the same member list as ${latestUploadedMonth.label}. Rows carried forward from the previous snapshot show as OLD with Monthly Fee = 100 and Form Fee blank until fresh registrations are added.`
       : null
 
   return (
@@ -493,7 +493,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
           <p className="mt-1 text-sm text-slate-500">
             {usingSnapshot
               ? `Showing uploaded rows for this month only (${displayRows.length.toLocaleString()} rows). Uploaded ${new Date(uploadedMonth!.uploadedAt).toLocaleString()}.`
-              : 'The live month uses ABano-style workbook columns, and rows carried forward from the previous snapshot are shown as OLD with a 100 charge.'}
+              : 'The live month uses ABano-style workbook columns, and rows carried forward from the previous snapshot are shown as OLD with Monthly Fee = 100.'}
           </p>
         </div>
 

@@ -39,6 +39,22 @@ export default async function VouchersPage({
     },
   })
 
+  const abanoColumns = [
+    'Employee No.',
+    'Employee Name',
+    'Amount',
+    'Month',
+    'Monthly Saving',
+    'Special Saving',
+    'Loan',
+    'Management Fee',
+    'Commodity',
+    'Monthly Fee',
+    'Form Fee',
+    'Total',
+    'Member Type',
+  ] as const
+
   return (
     <div className="animate-fadeIn space-y-8">
       <div>
@@ -119,29 +135,28 @@ export default async function VouchersPage({
             <table className="w-full min-w-[1280px] text-sm">
               <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="px-6 py-3">S/N</th>
-                  <th className="px-6 py-3">Staff ID</th>
-                  <th className="px-6 py-3">Name</th>
-                  <th className="px-6 py-3">Savings</th>
-                  <th className="px-6 py-3">Special Savings</th>
-                  <th className="px-6 py-3">Monthly Charges</th>
-                  <th className="px-6 py-3">New Member FEE</th>
-                  <th className="px-6 py-3">Member Fee</th>
-                  <th className="px-6 py-3">Member Type</th>
-                  <th className="px-6 py-3">Total Savings</th>
+                  {abanoColumns.map((column) => (
+                    <th key={column} className="px-6 py-3">
+                      {column}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {dataset.rows.map((row) => (
                   <tr key={`${row.staffId}-${row.serial}`}>
-                    <td className="px-6 py-3 text-gray-800">{row.serial}</td>
-                    <td className="px-6 py-3 font-medium text-gray-800">{row.staffId}</td>
-                    <td className="px-6 py-3 text-gray-900">{row.name}</td>
+                    <td className="px-6 py-3 text-gray-800">{row.staffId || '-'}</td>
+                    <td className="px-6 py-3 font-medium text-gray-800">{row.name || 'Unnamed Member'}</td>
+                    <td className="px-6 py-3 text-gray-800">{formatCurrency(row.monthlySavings + row.specialSavings)}</td>
+                    <td className="px-6 py-3 text-gray-800">{formatPeriodLabel(dataset.period)}</td>
                     <td className="px-6 py-3 text-gray-800">{formatCurrency(row.monthlySavings)}</td>
                     <td className="px-6 py-3 text-gray-800">{formatCurrency(row.specialSavings)}</td>
+                    <td className="px-6 py-3 text-gray-800">{formatCurrency(0)}</td>
+                    <td className="px-6 py-3 text-gray-800">{formatCurrency(0)}</td>
+                    <td className="px-6 py-3 text-gray-800">{formatCurrency(0)}</td>
                     <td className="px-6 py-3 text-gray-800">{formatMaybeCurrency(row.monthlyCharges)}</td>
                     <td className="px-6 py-3 text-gray-800">{formatMaybeCurrency(row.newMemberFee)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatCurrency(row.memberFee)}</td>
+                    <td className="px-6 py-3 font-semibold text-gray-900">{formatCurrency(row.totalSavings)}</td>
                     <td className="px-6 py-3">
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-semibold ${
@@ -153,7 +168,6 @@ export default async function VouchersPage({
                         {row.memberType}
                       </span>
                     </td>
-                    <td className="px-6 py-3 font-semibold text-gray-900">{formatCurrency(row.totalSavings)}</td>
                   </tr>
                 ))}
               </tbody>

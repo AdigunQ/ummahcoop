@@ -104,23 +104,23 @@ export default async function DirectoryPage({ searchParams }: { searchParams?: S
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <MetricCard label="Current Members" value={members.length.toString()} tone="blue" />
-        <MetricCard label="With Thrift Savings" value={members.filter((m) => m.monthlySavings > 0).length.toString()} tone="green" />
+        <MetricCard label="With Monthly Saving" value={members.filter((m) => m.monthlySavings > 0).length.toString()} tone="green" />
         <MetricCard label="With Special Savings" value={members.filter((m) => m.specialSavings > 0).length.toString()} tone="amber" />
-        <MetricCard label="Savings Pool" value={formatCurrency(savingsPool)} tone="purple" />
+        <MetricCard label="Amount Pool" value={formatCurrency(savingsPool)} tone="purple" />
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full min-w-[960px]">
           <thead className="bg-gray-50">
             <tr>
-              <HeadCell label="Member" />
-              <HeadCell label="Staff ID" />
-              <HeadCell label="Type" />
-              <HeadCell label="Thrift Savings" />
-              <HeadCell label="Special Savings" />
-              <HeadCell label="Monthly Charges" />
-              <HeadCell label="New Member Fee" />
-              <HeadCell label="Total" />
+              <HeadCell label="Employee No." />
+              <HeadCell label="Employee Name" />
+              <HeadCell label="Member Type" />
+              <HeadCell label="Monthly Saving" />
+              <HeadCell label="Special Saving" />
+              <HeadCell label="Monthly Fee" />
+              <HeadCell label="Form Fee" />
+              <HeadCell label="Amount" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
