@@ -282,6 +282,30 @@ function formatPeriodLabel(period: string): string {
   })
 }
 
+function comparePeriods(left: string, right: string): number {
+  return left.localeCompare(right)
+}
+
+function nextMonthPeriod(period: string): string {
+  const match = period.trim().match(/^(20\d{2})-(0[1-9]|1[0-2])$/)
+  if (!match) return period
+
+  const year = Number(match[1])
+  let month = Number(match[2])
+
+  month += 1
+  if (month > 12) {
+    month = 1
+    return `${year + 1}-01`
+  }
+
+  return `${year}-${String(month).padStart(2, '0')}`
+}
+
+function isValidMonthPeriod(period: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(period)
+}
+
 function formatBlankableCurrency(value: number): string {
   return value > 0 ? formatCurrency(value) : ''
 }
@@ -367,10 +391,17 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
   })
 
   const usingSnapshot = Boolean(uploadedMonth)
-  const liveDataset =
-    !usingSnapshot && selectedPeriod === currentPeriod
-      ? await getCurrentMemberLiveDataset(selectedPeriod)
-      : await buildVoucherDataset(selectedPeriod)
+  const shouldUseLiveProjection =
+    !usingSnapshot &&
+    Boolean(latestUploadedMonth) &&
+    isValidMonthPeriod(selectedPeriod) &&
+    isValidMonthPeriod(currentPeriod) &&
+    comparePeriods(selectedPeriod, latestUploadedMonth?.period || '') > 0 &&
+    comparePeriods(selectedPeriod, currentPeriod) <= 0
+
+  const liveDataset = shouldUseLiveProjection
+    ? await getCurrentMemberLiveDataset(selectedPeriod)
+    : await buildVoucherDataset(selectedPeriod)
 
   const monthOptions: MonthOption[] = months.map((month) => ({
     period: month.period,
@@ -378,7 +409,21 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
     isUploaded: true,
   }))
 
-  if (!monthOptions.some((month) => month.period === currentPeriod)) {
+  if (latestUploadedMonth && isValidMonthPeriod(latestUploadedMonth.period) && isValidMonthPeriod(currentPeriod)) {
+    const uploadedPeriods = new Set(months.map((month) => month.period))
+    let periodCursor = nextMonthPeriod(latestUploadedMonth.period)
+    while (comparePeriods(periodCursor, currentPeriod) <= 0) {
+      if (!uploadedPeriods.has(periodCursor)) {
+        monthOptions.push({
+          period: periodCursor,
+          label: `${formatPeriodLabel(periodCursor)} (Live)`,
+          isUploaded: false,
+        })
+      }
+      periodCursor = nextMonthPeriod(periodCursor)
+      if (periodCursor === latestUploadedMonth.period) break
+    }
+  } else if (!monthOptions.some((month) => month.period === currentPeriod)) {
     monthOptions.push({
       period: currentPeriod,
       label: `${formatPeriodLabel(currentPeriod)} (Live)`,
@@ -392,7 +437,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
   const uploadedColumns = asStringArray(uploadedMonth?.columns as unknown)
   const firstSnapshotKeys = snapshotRows.length > 0 ? Object.keys(snapshotRows[0] as Record<string, unknown>) : []
   const snapshotStyle: SnapshotStyle = detectSnapshotStyle(uploadedColumns.length ? uploadedColumns : firstSnapshotKeys)
-  const isCurrentLiveView = !usingSnapshot && selectedPeriod === currentPeriod
+  const isCurrentLiveView = shouldUseLiveProjection
   let displayRows: DisplayRow[] = usingSnapshot
     ? snapshotRows.map((row, index) => toDisplayRowFromSnapshot(row, index, snapshotStyle, selectedPeriod))
     : liveDataset.rows.map((row) => toDisplayRowFromVoucher(row, selectedPeriod))
@@ -430,7 +475,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
 
   const currentLiveNote =
     isCurrentLiveView && latestUploadedMonth
-      ? `${formatPeriodLabel(currentPeriod)} keeps the same member list as ${latestUploadedMonth.label}. Rows carried forward from the previous snapshot show as OLD with Monthly Fee = 100 and Form Fee blank until fresh registrations are added.`
+      ? `${formatPeriodLabel(selectedPeriod)} keeps the same member list as ${latestUploadedMonth.label}. Rows carried forward from the previous snapshot show as OLD with Monthly Fee = 100 and Form Fee blank until fresh registrations are added.`
       : null
 
   return (
@@ -488,7 +533,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
           <h2 className="text-lg font-semibold text-slate-900">
             {usingSnapshot
               ? `Uploaded Snapshot (${uploadedMonth?.label})`
-              : `Current Data (${formatPeriodLabel(currentPeriod)}${isCurrentLiveView ? ' Live' : ''})`}
+              : `Current Data (${formatPeriodLabel(selectedPeriod)}${isCurrentLiveView ? ' Live' : ''})`}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             {usingSnapshot
