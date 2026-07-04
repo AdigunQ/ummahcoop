@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import bcrypt from 'bcryptjs'
+import type { Prisma, PrismaClient } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
@@ -550,7 +551,10 @@ function parseCombinedRows(
     const staffValue = toText(row[map.staffId])
     const monthValue = toText(row[map.month])
 
-    if (!staffValue && !monthValue) continue
+    if (!staffValue && !monthValue) {
+      if (parsedRows.length > 0) break
+      continue
+    }
     if (isLikelyHeaderRow(row, map)) continue
 
     const staffId = normalizeStaffId(staffValue)
@@ -628,8 +632,6 @@ function canonicalFromParsedRows(rows: ParsedWorkbookRow[], month: string, style
           row.managementFee +
           row.commodity
 
-        const variance = row.excelTotal > 0 ? Number((row.excelTotal - total).toFixed(2)) : 0
-
         return {
           'Employee No.': row.staffId,
           'Employee Name': row.name || '-',
@@ -643,7 +645,6 @@ function canonicalFromParsedRows(rows: ParsedWorkbookRow[], month: string, style
           'Monthly Fee': row.monthlyCharges,
           'Form Fee': row.newMemberFee,
           Total: row.excelTotal > 0 ? row.excelTotal : total,
-          'Total Variance': variance,
         } satisfies CanonicalMemberRow
       })
       
@@ -872,9 +873,7 @@ function parseJoinPeriodFromCanonicalRow(row: CanonicalMemberRow): string | null
     const monthJoined = parsePeriodFromText(monthJoinedText)
     if (monthJoined) return monthJoined
   }
-
-  const monthText = toText((row as any).Month)
-  return parsePeriodFromText(monthText)
+  return null
 }
 
 function firstNonEmptyText(row: CanonicalMemberRow, keys: string[]): string {
@@ -896,7 +895,7 @@ function firstNumber(row: CanonicalMemberRow, keys: string[]): number {
   return 0
 }
 
-async function syncMembersToLatestMonth(months: ParsedMonth[]) {
+async function syncMembersToLatestMonth(months: ParsedMonth[], tx: Prisma.TransactionClient | PrismaClient = prisma) {
   const sorted = [...months].sort((a, b) => a.period.localeCompare(b.period))
   const latest = sorted[sorted.length - 1]
   if (!latest) {
@@ -929,91 +928,89 @@ async function syncMembersToLatestMonth(months: ParsedMonth[]) {
   let syncedMembers = 0
   let suspendedMembers = 0
 
-  await prisma.$transaction(async (tx) => {
-    for (const row of latest.rows) {
-      const staffId = firstNonEmptyText(row, ['Staff ID', 'Employee No.'])
-      if (!staffId) continue
+  for (const row of latest.rows) {
+    const staffId = firstNonEmptyText(row, ['Staff ID', 'Employee No.'])
+    if (!staffId) continue
 
-      const name = firstNonEmptyText(row, ['Name', 'Employee Name']) || '-' 
-      const monthlyContribution = firstNumber(row, ['Thrift Savings', 'Monthly Saving'])
-      const specialContribution = firstNumber(row, ['Special Savings', 'Special Saving'])
+    const name = firstNonEmptyText(row, ['Name', 'Employee Name']) || '-'
+    const monthlyContribution = firstNumber(row, ['Thrift Savings', 'Monthly Saving'])
+    const specialContribution = firstNumber(row, ['Special Savings', 'Special Saving'])
 
-      const thriftBalance = thriftTotals.get(staffId) || 0
-      const specialBalance = specialTotals.get(staffId) || 0
-      const passwordHash = await bcrypt.hash(getInitialMemberPassword(staffId), 10)
+    const thriftBalance = thriftTotals.get(staffId) || 0
+    const specialBalance = specialTotals.get(staffId) || 0
+    const passwordHash = await bcrypt.hash(getInitialMemberPassword(staffId), 10)
 
-      const joinPeriod = parseJoinPeriodFromCanonicalRow(row) || firstSeenMonth.get(staffId) || null
-      const joinDate = joinPeriod ? new Date(`${joinPeriod}-01T00:00:00.000Z`) : null
+    const joinPeriod = parseJoinPeriodFromCanonicalRow(row) || firstSeenMonth.get(staffId) || null
+    const joinDate = joinPeriod ? new Date(`${joinPeriod}-01T00:00:00.000Z`) : null
 
-      const baseEmail = buildMemberEmail(staffId)
-      const existingEmailOwner = await tx.user.findUnique({
-        where: { email: baseEmail },
-        select: { id: true, staffId: true },
-      })
-
-      const email =
-        existingEmailOwner && existingEmailOwner.staffId !== staffId
-          ? `member-${staffId.toLowerCase()}@${(process.env.MEMBER_EMAIL_DOMAIN || 'faan-ummah.coop').trim().replace(/^@/, '')}`
-          : baseEmail
-
-      const existingMember = await tx.user.findUnique({
-        where: { staffId },
-        select: { id: true, password: true },
-      })
-
-      if (existingMember) {
-        await tx.user.update({
-          where: { id: existingMember.id },
-          data: {
-            name,
-            monthlyContribution,
-            specialContribution,
-            balance: thriftBalance,
-            specialBalance,
-            totalContributions: thriftBalance + specialBalance,
-            voucherEnabled: true,
-            status: 'ACTIVE',
-            ...(existingMember.password ? {} : { password: passwordHash }),
-            ...(joinDate ? { createdAt: joinDate } : {}),
-          },
-        })
-      } else {
-        await tx.user.create({
-          data: {
-            staffId,
-            name,
-            email,
-            password: passwordHash,
-            role: 'MEMBER',
-            status: 'ACTIVE',
-            monthlyContribution,
-            specialContribution,
-            balance: thriftBalance,
-            specialBalance,
-            totalContributions: thriftBalance + specialBalance,
-            voucherEnabled: true,
-            ...(joinDate ? { createdAt: joinDate } : {}),
-          },
-        })
-      }
-
-      syncedMembers += 1
-    }
-
-    const suspended = await tx.user.updateMany({
-      where: {
-        role: 'MEMBER',
-        status: 'ACTIVE',
-        OR: [{ staffId: null }, { staffId: { notIn: latestStaffIds } }],
-      },
-      data: {
-        status: 'SUSPENDED',
-        voucherEnabled: false,
-      },
+    const baseEmail = buildMemberEmail(staffId)
+    const existingEmailOwner = await tx.user.findUnique({
+      where: { email: baseEmail },
+      select: { id: true, staffId: true },
     })
 
-    suspendedMembers = suspended.count
+    const email =
+      existingEmailOwner && existingEmailOwner.staffId !== staffId
+        ? `member-${staffId.toLowerCase()}@${(process.env.MEMBER_EMAIL_DOMAIN || 'faan-ummah.coop').trim().replace(/^@/, '')}`
+        : baseEmail
+
+    const existingMember = await tx.user.findUnique({
+      where: { staffId },
+      select: { id: true, password: true },
+    })
+
+    if (existingMember) {
+      await tx.user.update({
+        where: { id: existingMember.id },
+        data: {
+          name,
+          monthlyContribution,
+          specialContribution,
+          balance: thriftBalance,
+          specialBalance,
+          totalContributions: thriftBalance + specialBalance,
+          voucherEnabled: true,
+          status: 'ACTIVE',
+          ...(existingMember.password ? {} : { password: passwordHash }),
+          ...(joinDate ? { createdAt: joinDate } : {}),
+        },
+      })
+    } else {
+      await tx.user.create({
+        data: {
+          staffId,
+          name,
+          email,
+          password: passwordHash,
+          role: 'MEMBER',
+          status: 'ACTIVE',
+          monthlyContribution,
+          specialContribution,
+          balance: thriftBalance,
+          specialBalance,
+          totalContributions: thriftBalance + specialBalance,
+          voucherEnabled: true,
+          ...(joinDate ? { createdAt: joinDate } : {}),
+        },
+      })
+    }
+
+    syncedMembers += 1
+  }
+
+  const suspended = await tx.user.updateMany({
+    where: {
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      OR: [{ staffId: null }, { staffId: { notIn: latestStaffIds } }],
+    },
+    data: {
+      status: 'SUSPENDED',
+      voucherEnabled: false,
+    },
   })
+
+  suspendedMembers = suspended.count
 
   return {
     syncedMembers,
@@ -1083,48 +1080,49 @@ export async function POST(req: Request) {
     })
   }
 
-  const savedMonths: Array<{ period: string; label: string; rowCount: number; uploadedAt: Date; sheetName: string; columns: string[] }> = []
+  type ImportedMonth = { period: string; label: string; rowCount: number; uploadedAt: Date; sheetName: string; columns: string[] }
 
-  for (const month of parsed.months) {
-    const saved = await prisma.memberDataMonth.upsert({
-      where: { period: month.period },
-      create: {
-        period: month.period,
-        label: month.label,
-        rowCount: month.rows.length,
-        columns: month.columns as any,
-        rows: month.rows as any,
-        uploadedById: session.user.id,
-        uploadedAt: new Date(),
-      },
-      update: {
-        label: month.label,
-        rowCount: month.rows.length,
-        columns: month.columns as any,
-        rows: month.rows as any,
-        uploadedById: session.user.id,
-        uploadedAt: new Date(),
-      },
-      select: { period: true, label: true, rowCount: true, uploadedAt: true },
-    })
+  const { savedMonths, syncResult } = await prisma.$transaction(async (tx) => {
+    await tx.memberDataMonth.deleteMany({})
+    const createdMonths: ImportedMonth[] = []
 
-    savedMonths.push({
-      ...saved,
-      sheetName: month.sheetName,
-      columns: month.columns,
-    })
-  }
+    for (const month of parsed.months) {
+      const created = await tx.memberDataMonth.create({
+        data: {
+          period: month.period,
+          label: month.label,
+          rowCount: month.rows.length,
+          columns: month.columns as any,
+          rows: month.rows as any,
+          uploadedById: session.user.id,
+          uploadedAt: new Date(),
+        },
+        select: { period: true, label: true, rowCount: true, uploadedAt: true },
+      })
 
-  const sync = await syncMembersToLatestMonth(parsed.months)
+      createdMonths.push({
+        ...created,
+        sheetName: month.sheetName,
+        columns: month.columns,
+      })
+    }
+
+    const syncResult = await syncMembersToLatestMonth(parsed.months, tx)
+
+    return {
+      savedMonths: createdMonths,
+      syncResult,
+    }
+  })
 
   return NextResponse.json({
     ok: true,
     mode: 'import',
     importedMonths: savedMonths.length,
     importedRows: savedMonths.reduce((sum, month) => sum + month.rowCount, 0),
-    syncedMembers: sync.syncedMembers,
-    suspendedMembers: sync.suspendedMembers,
-    latestPeriod: sync.latestPeriod,
+    syncedMembers: syncResult.syncedMembers,
+    suspendedMembers: syncResult.suspendedMembers,
+    latestPeriod: syncResult.latestPeriod,
     months: savedMonths,
     warnings: parsed.warnings,
   })
