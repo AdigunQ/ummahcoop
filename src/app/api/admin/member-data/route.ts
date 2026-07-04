@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth/next'
 import bcrypt from 'bcryptjs'
 import type { Prisma, PrismaClient } from '@prisma/client'
 import * as XLSX from 'xlsx'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
@@ -108,6 +110,10 @@ const LEGACY_HEADER_ALIASES = {
   total: ['total'],
   monthJoined: ['month joined'],
 } as const
+
+type WorkbookSource = 'upload' | 'server'
+
+const DEFAULT_SERVER_WORKBOOK_PATH = path.resolve(process.cwd(), 'data', 'ABano.xlsx')
 
 const COMBINED_HEADER_ALIASES = {
   serial: ['s/n', 'sn', 's no'],
@@ -1089,6 +1095,27 @@ async function syncMembersToLatestMonth(months: ParsedMonth[], tx: Prisma.Transa
   }
 }
 
+async function readServerWorkbook(
+  workbookPath: string | undefined,
+): Promise<{ buffer: Buffer; sourceLabel: string }> {
+  const trimmed = String(workbookPath || '').trim()
+  const resolvedPath = trimmed
+    ? path.isAbsolute(trimmed)
+      ? trimmed
+      : path.resolve(process.cwd(), trimmed)
+    : DEFAULT_SERVER_WORKBOOK_PATH
+
+  try {
+    const buffer = await fs.readFile(resolvedPath)
+    return {
+      buffer,
+      sourceLabel: resolvedPath,
+    }
+  } catch (error) {
+    throw new Error(`Unable to read server workbook at "${resolvedPath}". Please place the file at this location or set WORKBOOK_IMPORT_PATH.`)
+  }
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.VIEW_MEMBER_DATA))) {
@@ -1111,13 +1138,31 @@ export async function POST(req: Request) {
 
   const formData = await req.formData()
   const mode = String(formData.get('mode') || 'preview').trim().toLowerCase()
-  const file = formData.get('file')
+  const sourceRaw = String(formData.get('source') || 'upload').trim().toLowerCase()
+  const source: WorkbookSource = sourceRaw === 'server' ? 'server' : 'upload'
 
-  if (!(file instanceof File)) {
-    return NextResponse.json({ ok: false, error: 'Please upload the Excel workbook.' }, { status: 400 })
+  let buffer: Buffer
+  let sourceLabel: string
+
+  if (source === 'server') {
+    const workbookPath = String(formData.get('workbookPath') || process.env.WORKBOOK_IMPORT_PATH || '')
+    try {
+      const loaded = await readServerWorkbook(workbookPath)
+      buffer = loaded.buffer
+      sourceLabel = `Server: ${loaded.sourceLabel}`
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not load server workbook.'
+      return NextResponse.json({ ok: false, error: message }, { status: 400 })
+    }
+  } else {
+    const file = formData.get('file')
+    if (!(file instanceof File)) {
+      return NextResponse.json({ ok: false, error: 'Please upload the Excel workbook.' }, { status: 400 })
+    }
+    buffer = Buffer.from(await file.arrayBuffer())
+    sourceLabel = `Upload: ${file.name}`
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer())
   const parsed = parseWorkbook(buffer)
 
   if (parsed.months.length === 0) {
@@ -1144,7 +1189,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       mode: 'preview',
+      source: sourceLabel,
       columns: parsed.columns,
+      validation: parsed.validation,
       months: preview,
       warnings: parsed.warnings,
     })
@@ -1188,6 +1235,8 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     mode: 'import',
+    source: sourceLabel,
+    validation: parsed.validation,
     importedMonths: savedMonths.length,
     importedRows: savedMonths.reduce((sum, month) => sum + month.rowCount, 0),
     syncedMembers: syncResult.syncedMembers,

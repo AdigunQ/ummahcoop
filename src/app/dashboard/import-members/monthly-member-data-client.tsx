@@ -84,6 +84,7 @@ type ApiError = {
 }
 
 const IMPORT_CONFIRM_TEXT = 'IMPORT MONTHLY DATA'
+const SERVER_WORKBOOK_TEXT = 'IMPORT SERVER WORKBOOK'
 
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
@@ -99,8 +100,10 @@ export default function MonthlyMemberDataClient() {
   const [confirmText, setConfirmText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [action, setAction] = useState<'preview' | 'import' | null>(null)
+  const [lastSource, setLastSource] = useState<'upload' | 'server'>('upload')
 
-  const canPreview = Boolean(file && !isLoading)
+  const canUploadPreview = Boolean(file && !isLoading)
+  const canServerPreview = !isLoading
   const canImport = Boolean(preview && confirmText === IMPORT_CONFIRM_TEXT && !isLoading)
 
   const previewTotals = useMemo(() => {
@@ -126,14 +129,15 @@ export default function MonthlyMemberDataClient() {
     refreshMonths()
   }, [])
 
-  async function run(mode: 'preview' | 'import') {
-    if (!file) {
+  async function run(mode: 'preview' | 'import', source: 'upload' | 'server' = 'upload') {
+    if (source === 'upload' && !file) {
       toast.error('Please choose an Excel workbook first.')
       return
     }
 
     setIsLoading(true)
     setAction(mode)
+    setLastSource(source)
     if (mode === 'preview') {
       setPreview(null)
       setImportResult(null)
@@ -143,7 +147,10 @@ export default function MonthlyMemberDataClient() {
     try {
       const formData = new FormData()
       formData.append('mode', mode)
-      formData.append('file', file)
+      formData.append('source', source)
+      if (source === 'upload' && file) {
+        formData.append('file', file)
+      }
 
       const res = await fetch('/api/admin/member-data', {
         method: 'POST',
@@ -201,12 +208,23 @@ export default function MonthlyMemberDataClient() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              disabled={!canPreview}
-              onClick={() => run('preview')}
+              disabled={!canUploadPreview}
+              onClick={() => run('preview', 'upload')}
               className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isLoading && action === 'preview' ? 'Preparing Preview…' : 'Preview Workbook'}
+              {isLoading && action === 'preview' && lastSource === 'upload' ? 'Preparing Preview…' : 'Preview Workbook'}
             </button>
+            <button
+              type="button"
+              disabled={!canServerPreview}
+              onClick={() => run('preview', 'server')}
+              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoading && action === 'preview' && lastSource === 'server' ? 'Preparing Preview…' : SERVER_WORKBOOK_TEXT}
+            </button>
+            <p className="mt-1 w-full text-xs text-gray-500">
+              The server import reads <span className="font-mono">data/ABano.xlsx</span> from the app root unless WORKBOOK_IMPORT_PATH is set.
+            </p>
             <Link
               href="/dashboard/member-data"
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -278,7 +296,8 @@ export default function MonthlyMemberDataClient() {
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
               <p className="text-sm font-semibold text-gray-900">Confirm Import</p>
               <p className="mt-1 text-sm text-gray-600">
-                Type <span className="font-mono">{IMPORT_CONFIRM_TEXT}</span> to replace the uploaded monthly data and sync member records.
+                Type <span className="font-mono">{IMPORT_CONFIRM_TEXT}</span> to replace current monthly snapshots and sync member records.
+                {lastSource === 'server' ? ` Current source: ${SERVER_WORKBOOK_TEXT}.` : ''}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <input
@@ -290,7 +309,7 @@ export default function MonthlyMemberDataClient() {
                 <button
                   type="button"
                   disabled={!canImport}
-                  onClick={() => run('import')}
+                  onClick={() => run('import', lastSource)}
                   className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isLoading && action === 'import' ? 'Importing…' : 'Import All Months'}
