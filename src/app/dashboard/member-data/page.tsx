@@ -21,21 +21,26 @@ type MonthOption = {
 
 type UploadedSnapshotRow = Record<string, unknown>
 
-const LEGACY_SNAPSHOT_COLUMNS = [
-  'S/N',
-  'Staff ID',
-  'Name',
-  'Thrift Savings',
-  'Special Savings',
-  'Charges',
-  'New Member Fee',
+const ABANO_COLUMNS = [
+  'Employee No.',
+  'Employee Name',
+  'Amount',
+  'Month',
+  'Monthly Saving',
+  'Special Saving',
+  'Loan',
+  'Management Fee',
+  'Commodity',
+  'Monthly Fee',
+  'Form Fee',
   'Total',
-  'Member Type',
 ] as const
 
 type SnapshotStyle = 'legacy' | 'combined'
 
 const CURRENCY_COLUMNS = {
+  'Employee No.': false,
+  'Employee Name': false,
   Amount: true,
   Month: false,
   'Monthly Saving': true,
@@ -45,7 +50,7 @@ const CURRENCY_COLUMNS = {
   Commodity: true,
   'Monthly Fee': true,
   'Form Fee': true,
-  'Total': true,
+  Total: true,
   'Thrift Savings': true,
   'Special Savings': true,
   Charges: true,
@@ -65,6 +70,7 @@ type DisplayRow = {
   commodityRequests: number
   loanOriginated: number
   maintenanceFee: number
+  abanoColumns: Record<string, unknown>
   raw?: UploadedSnapshotRow
 }
 
@@ -118,6 +124,66 @@ function pickNumber(row: UploadedSnapshotRow, keys: string[]): number {
     if (Number.isFinite(parsed)) return parsed
   }
   return 0
+}
+
+function formatMonthColumn(period: string): string {
+  const parsed = formatPeriodLabel(period)
+  return parsed || period
+}
+
+function buildAbanoFromSnapshotRow(
+  row: UploadedSnapshotRow,
+  selectedPeriod: string,
+): Record<string, unknown> {
+  const staffId = pickText(row, ['Staff ID', 'Employee No.']) || '-'
+  const name = pickText(row, ['Name', 'Employee Name']) || '-'
+  const amount =
+    pickNumber(row, ['Amount']) ||
+    pickNumber(row, ['Total']) ||
+    pickNumber(row, ['Thrift Savings', 'Monthly Saving']) + pickNumber(row, ['Special Savings', 'Special Saving'])
+  const month = pickText(row, ['Month', 'Month Joined']) || formatMonthColumn(selectedPeriod)
+  const monthlySaving = pickNumber(row, ['Thrift Savings', 'Monthly Saving'])
+  const specialSaving = pickNumber(row, ['Special Savings', 'Special Saving'])
+  const loan = pickNumber(row, ['Loan'])
+  const managementFee = pickNumber(row, ['Management Fee'])
+  const commodity = pickNumber(row, ['Commodity'])
+  const monthlyFee = pickNumber(row, ['Monthly Fee', 'Charges'])
+  const formFee = pickNumber(row, ['Form Fee', 'New Member Fee'])
+  const total = pickNumber(row, ['Total', 'Amount']) || monthlySaving + specialSaving + loan + managementFee + commodity + monthlyFee + formFee
+
+  return {
+    'Employee No.': staffId,
+    'Employee Name': name,
+    Amount: amount,
+    Month: month,
+    'Monthly Saving': monthlySaving,
+    'Special Saving': specialSaving,
+    Loan: loan,
+    'Management Fee': managementFee,
+    Commodity: commodity,
+    'Monthly Fee': monthlyFee,
+    'Form Fee': formFee,
+    Total: total,
+  }
+}
+
+function buildAbanoFromLiveRow(row: VoucherRow, selectedPeriod: string): Record<string, unknown> {
+  const amount = row.monthlySavings + row.specialSavings
+
+  return {
+    'Employee No.': row.staffId || '-',
+    'Employee Name': row.name || '-',
+    Amount: amount,
+    Month: formatMonthColumn(selectedPeriod),
+    'Monthly Saving': row.monthlySavings,
+    'Special Saving': row.specialSavings,
+    Loan: 0,
+    'Management Fee': 0,
+    Commodity: 0,
+    'Monthly Fee': row.monthlyCharges,
+    'Form Fee': row.newMemberFee,
+    Total: row.totalSavings,
+  }
 }
 
 async function getMemberMetrics(staffIds: string[]) {
@@ -220,7 +286,9 @@ function formatBlankableCurrency(value: number): string {
   return value > 0 ? formatCurrency(value) : ''
 }
 
-function toDisplayRowFromSnapshot(row: UploadedSnapshotRow, index: number, style: SnapshotStyle): DisplayRow {
+function toDisplayRowFromSnapshot(row: UploadedSnapshotRow, index: number, style: SnapshotStyle, selectedPeriod: string): DisplayRow {
+  const abanoColumns = buildAbanoFromSnapshotRow(row, selectedPeriod)
+
   return {
     serial:
       pickNumber(row, ['S/N', 'Serial']) > 0
@@ -245,10 +313,13 @@ function toDisplayRowFromSnapshot(row: UploadedSnapshotRow, index: number, style
     loanOriginated: 0,
     maintenanceFee: 0,
     raw: row,
+    abanoColumns,
   }
 }
 
-function toDisplayRowFromVoucher(row: VoucherRow): DisplayRow {
+function toDisplayRowFromVoucher(row: VoucherRow, selectedPeriod: string): DisplayRow {
+  const abanoColumns = buildAbanoFromLiveRow(row, selectedPeriod)
+
   return {
     serial: row.serial,
     staffId: row.staffId || '-',
@@ -262,6 +333,7 @@ function toDisplayRowFromVoucher(row: VoucherRow): DisplayRow {
     commodityRequests: 0,
     loanOriginated: 0,
     maintenanceFee: 0,
+    abanoColumns,
   }
 }
 
@@ -322,34 +394,10 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
   const snapshotStyle: SnapshotStyle = detectSnapshotStyle(uploadedColumns.length ? uploadedColumns : firstSnapshotKeys)
   const isCurrentLiveView = !usingSnapshot && selectedPeriod === currentPeriod
   let displayRows: DisplayRow[] = usingSnapshot
-    ? snapshotRows.map((row, index) => toDisplayRowFromSnapshot(row, index, snapshotStyle))
-    : liveDataset.rows.map((row) => toDisplayRowFromVoucher(row))
+    ? snapshotRows.map((row, index) => toDisplayRowFromSnapshot(row, index, snapshotStyle, selectedPeriod))
+    : liveDataset.rows.map((row) => toDisplayRowFromVoucher(row, selectedPeriod))
 
-  const tableColumns =
-    usingSnapshot && snapshotStyle === 'combined'
-      ? [...uploadedColumns, 'Commodity Requests', 'Loan Originated', 'Maintenance Fee']
-      : usingSnapshot
-        ? [...LEGACY_SNAPSHOT_COLUMNS, 'Commodity', 'Commodity Requests', 'Loan Originated', 'Maintenance Fee']
-        : [
-            'S/N',
-            'Staff ID',
-            'Name',
-            'Thrift Savings',
-            'Special Savings',
-            'Charges',
-            'New Member Fee',
-            'Total',
-            'Member Type',
-            'Commodity',
-            'Loan Originated',
-            'Maintenance Fee',
-          ]
-  const snapshotContentColumns =
-    snapshotStyle === 'combined'
-      ? uploadedColumns.length
-        ? uploadedColumns
-        : firstSnapshotKeys
-      : Array.from(LEGACY_SNAPSHOT_COLUMNS)
+  const tableColumns = [...ABANO_COLUMNS, 'Commodity Requests', 'Loan Originated', 'Maintenance Fee']
 
   const staffIds = Array.from(new Set(displayRows.map((row) => staffMetricKey(row.staffId)).filter(Boolean)))
   const memberMetrics = await getMemberMetrics(staffIds)
@@ -391,9 +439,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
         <div>
           <h1 className="text-3xl font-bold text-slate-950">Member Data</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">
-            {snapshotStyle === 'combined'
-              ? 'Uploaded snapshots preserve the combined workbook columns so you can review exactly what was imported.'
-              : 'Uploaded month snapshots and the current live month now use the same columns: S/N, Staff ID, Name, Thrift Savings, Special Savings, Charges, New Member Fee, Total, Member Type.'}
+            Imported data is now rendered with the ABano workbook column names.
           </p>
         </div>
 
@@ -447,7 +493,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
           <p className="mt-1 text-sm text-slate-500">
             {usingSnapshot
               ? `Showing uploaded rows for this month only (${displayRows.length.toLocaleString()} rows). Uploaded ${new Date(uploadedMonth!.uploadedAt).toLocaleString()}.`
-              : 'The live month uses the same columns as the workbook, and rows carried forward from the previous snapshot are shown as OLD with a 100 charge.'}
+              : 'The live month uses ABano-style workbook columns, and rows carried forward from the previous snapshot are shown as OLD with a 100 charge.'}
           </p>
         </div>
 
@@ -475,53 +521,23 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
                 ) : (
                   displayRows.map((row) => (
                     <tr key={`${selectedPeriod}-${row.staffId}-${row.serial}`} className="hover:bg-slate-50">
-                      {usingSnapshot && row.raw && (
-                        <>
-                          {snapshotContentColumns.map((column) => {
-                            const value = row.raw?.[column]
-                            const isCurrency = Boolean((CURRENCY_COLUMNS as Record<string, boolean>)[column])
-                            const parsed = typeof value === 'number' ? value : toNumber(value)
-                            return (
-                              <td key={`${selectedPeriod}-${row.staffId}-${row.serial}-${column}`} className="px-6 py-3 text-slate-700">
-                                {value === null || value === undefined || String(value).trim() === ''
-                                  ? '—'
-                                  : isCurrency
-                                    ? formatBlankableCurrency(parsed)
-                                    : toText(value)}
-                              </td>
-                            )
-                          })}
-                          <td className="px-6 py-3 text-slate-700">{row.commodityRequests.toLocaleString()}</td>
-                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.loanOriginated)}</td>
-                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.maintenanceFee)}</td>
-                        </>
-                      )}
-                      {!usingSnapshot ? (
-                        <>
-                          <td className="px-6 py-3 text-slate-700">{row.serial}</td>
-                          <td className="px-6 py-3 font-medium text-slate-900">{row.staffId}</td>
-                          <td className="px-6 py-3 text-slate-900">{row.name}</td>
-                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.thriftSavings)}</td>
-                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.specialSavings)}</td>
-                          <td className="px-6 py-3 text-slate-700">{formatBlankableCurrency(row.charges)}</td>
-                          <td className="px-6 py-3 text-slate-700">{formatBlankableCurrency(row.newMemberFee)}</td>
-                          <td className="px-6 py-3 font-semibold text-slate-950">{formatCurrency(row.total)}</td>
-                          <td className="px-6 py-3">
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                row.memberType === 'NEW'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}
-                            >
-                              {row.memberType}
-                            </span>
+                      {ABANO_COLUMNS.map((column) => {
+                        const value = row.abanoColumns?.[column as keyof typeof row.abanoColumns]
+                        const isCurrency = Boolean((CURRENCY_COLUMNS as Record<string, boolean>)[column])
+                        const parsed = typeof value === 'number' ? value : toNumber(value)
+                        return (
+                          <td key={`${selectedPeriod}-${row.staffId}-${row.serial}-${column}`} className="px-6 py-3 text-slate-700">
+                            {value === null || value === undefined || String(value).trim() === ''
+                              ? '—'
+                              : isCurrency
+                                ? formatBlankableCurrency(parsed)
+                                : toText(value)}
                           </td>
-                          <td className="px-6 py-3 text-slate-700">{row.commodityRequests.toLocaleString()}</td>
-                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.loanOriginated)}</td>
-                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.maintenanceFee)}</td>
-                        </>
-                      ) : null}
+                        )
+                      })}
+                      <td className="px-6 py-3 text-slate-700">{row.commodityRequests.toLocaleString()}</td>
+                      <td className="px-6 py-3 text-slate-700">{formatCurrency(row.loanOriginated)}</td>
+                      <td className="px-6 py-3 text-slate-700">{formatCurrency(row.maintenanceFee)}</td>
                     </tr>
                   ))
                 )}
