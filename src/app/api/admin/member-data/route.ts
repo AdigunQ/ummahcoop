@@ -48,6 +48,11 @@ type ParseWorkbookResult = {
   months: ParsedMonth[]
   columns: string[]
   warnings: string[]
+  validation: {
+    template: 'combined' | 'legacy' | 'mixed'
+    isAbanoStandard: boolean
+    issues: string[]
+  }
 }
 
 type HeaderMap = Record<string, number>
@@ -359,6 +364,70 @@ function normalizeMonthJoined(value: unknown): string | null {
 
 function isTotalContSheet(sheetName: string): boolean {
   return normalizeHeader(sheetName).includes('total cont')
+}
+
+function buildTemplateValidation(months: ParsedMonth[]): ParseWorkbookResult['validation'] {
+  if (months.length === 0) {
+    return {
+      template: 'mixed',
+      isAbanoStandard: false,
+      issues: ['No readable month sheets detected.'],
+    }
+  }
+
+  const combinedCount = months.filter((month) => month.style === 'combined').length
+  const legacyCount = months.filter((month) => month.style === 'legacy').length
+
+  if (combinedCount === 0 && legacyCount > 0) {
+    return {
+      template: 'legacy',
+      isAbanoStandard: false,
+      issues: [
+        'ABano standard expects the combined format (with monthly rows in the same columns). This upload was detected as legacy format.',
+        'Continue only if you intentionally want legacy import behavior.',
+      ],
+    }
+  }
+
+  if (combinedCount > 0 && legacyCount === 0) {
+    const issues: string[] = []
+
+    if (months.length !== months.filter((month) => month.columns.length === COMBINED_CANONICAL_COLUMNS.length).length) {
+      issues.push('Some combined sheets are not fully aligned with the ABano column set.')
+    }
+
+    const expectedSet = new Set<string>(COMBINED_CANONICAL_COLUMNS)
+    for (const month of months) {
+      for (const requiredColumn of COMBINED_CANONICAL_COLUMNS) {
+        if (!month.columns.includes(requiredColumn)) {
+          issues.push(`${month.label} is missing "${requiredColumn}".`)
+          break
+        }
+      }
+
+      for (const column of month.columns as string[]) {
+        if (!expectedSet.has(column)) {
+          issues.push(`${month.label} has unexpected column "${column}".`)
+          break
+        }
+      }
+    }
+
+    return {
+      template: 'combined',
+      isAbanoStandard: issues.length === 0,
+      issues,
+    }
+  }
+
+  return {
+    template: 'mixed',
+    isAbanoStandard: false,
+    issues: [
+      'This workbook contains mixed sheet styles (some combined and some legacy sheets).',
+      'ABano standard requires one consistent combined-style template across all monthly sheets.',
+    ],
+  }
 }
 
 function findHeaderIndex(indexByHeader: Record<string, number>, aliases: readonly string[]): number | null {
@@ -746,11 +815,13 @@ function buildCanonicalMonths(
   }
 
   const columns = Array.from(new Set(parsedMonths.flatMap((month) => month.columns)))
+  const validation = buildTemplateValidation(parsedMonths)
 
   return {
     months: parsedMonths,
     columns,
     warnings: globalWarnings,
+    validation,
   }
 }
 
@@ -856,6 +927,7 @@ function parseWorkbook(buffer: Buffer): ParseWorkbookResult {
     months: canonical.months,
     columns: canonical.columns,
     warnings: [...warnings, ...canonical.warnings],
+    validation: canonical.validation,
   }
 }
 

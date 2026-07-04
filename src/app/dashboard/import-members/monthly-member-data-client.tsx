@@ -32,6 +32,11 @@ type PreviewResponse = {
   columns: string[]
   months: PreviewMonth[]
   warnings: string[]
+  validation: {
+    template: 'combined' | 'legacy' | 'mixed'
+    isAbanoStandard: boolean
+    issues: string[]
+  }
 }
 
 type ImportResponse = {
@@ -44,6 +49,33 @@ type ImportResponse = {
   latestPeriod?: string | null
   months: Array<MonthListItem & { sheetName: string }>
   warnings: string[]
+  validation: {
+    template: 'combined' | 'legacy' | 'mixed'
+    isAbanoStandard: boolean
+    issues: string[]
+  }
+}
+
+function templateBadge(validation: PreviewResponse['validation']): { label: string; tone: 'green' | 'yellow' | 'red' } {
+  if (validation.template === 'combined' && validation.isAbanoStandard) {
+    return { label: 'ABano Standard (Combined) detected', tone: 'green' }
+  }
+
+  if (validation.template === 'combined') {
+    return { label: 'Combined format detected (not fully standard)', tone: 'yellow' }
+  }
+
+  if (validation.template === 'legacy') {
+    return { label: 'Legacy template detected', tone: 'yellow' }
+  }
+
+  return { label: 'Mixed/unsupported workbook format', tone: 'red' }
+}
+
+function badgeClass(tone: 'green' | 'yellow' | 'red') {
+  if (tone === 'green') return 'border-green-200 bg-green-50 text-green-900'
+  if (tone === 'yellow') return 'border-amber-200 bg-amber-50 text-amber-900'
+  return 'border-red-200 bg-red-50 text-red-900'
 }
 
 type ApiError = {
@@ -192,6 +224,16 @@ export default function MonthlyMemberDataClient() {
             <p className="mt-1 text-sm text-gray-500">
               {previewTotals.months} month(s) detected • {previewTotals.rows.toLocaleString()} total row(s)
             </p>
+            {preview.validation && (
+              <div className={`mt-2 rounded-lg border p-3 text-sm ${badgeClass(templateBadge(preview.validation).tone)}`}>
+                <p className="font-semibold">Template Check: {templateBadge(preview.validation).label}</p>
+                {preview.validation.issues.length > 0 ? (
+                  <p className="mt-1 text-xs">{preview.validation.issues.join(' • ')}</p>
+                ) : (
+                  <p className="mt-1 text-xs">All required columns match the ABano standard template.</p>
+                )}
+              </div>
+            )}
             {preview.warnings.length > 0 && (
               <p className="mt-2 text-xs text-amber-700">
                 Notes: the importer is normalizing joining-month charges and member fees to match the workbook rules.
