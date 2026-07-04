@@ -41,15 +41,30 @@ function nextPeriod(current: string): string {
 }
 
 function buildSavingsHeader(): string[] {
-  return ['Section', 'Period', 'Staff ID', 'Name', 'Thrift Savings', 'Special Savings', 'Charges', 'New Member Fee', 'Total', 'Member Type']
+  return [
+    'Section',
+    'Employee No.',
+    'Employee Name',
+    'Amount',
+    'Month',
+    'Monthly Saving',
+    'Special Saving',
+    'Loan',
+    'Management Fee',
+    'Commodity',
+    'Monthly Fee',
+    'Form Fee',
+    'Total',
+    'Member Type',
+  ]
 }
 
 function buildLoanHeader(): string[] {
   return [
     'Section',
     'Date',
-    'Staff ID',
-    'Name',
+    'Employee No.',
+    'Employee Name',
     'Loan Amount',
     'Purpose',
     'Duration Months',
@@ -64,8 +79,8 @@ function buildCommodityHeader(): string[] {
   return [
     'Section',
     'Date',
-    'Staff ID',
-    'Name',
+    'Employee No.',
+    'Employee Name',
     'Item',
     'Preferred Budget',
     'Status',
@@ -167,9 +182,13 @@ export async function GET() {
   if (savingsRows.length === 0) {
     lines.push([
       'Savings',
-      'No records found',
       staffId,
       targetName,
+      0,
+      '',
+      0,
+      0,
+      0,
       0,
       0,
       0,
@@ -181,11 +200,15 @@ export async function GET() {
     for (const row of savingsRows) {
       lines.push([
         'Savings',
-        row.period,
         staffId,
         targetName,
+        safeNumber(row.thriftSavings) + safeNumber(row.specialSavings),
+        row.period,
         safeNumber(row.thriftSavings),
         safeNumber(row.specialSavings),
+        0,
+        0,
+        0,
         safeNumber(row.charges),
         safeNumber(row.newMemberFee),
         safeNumber(row.total),
@@ -240,12 +263,12 @@ export async function GET() {
       '-',
       staffId,
       targetName,
-      'No commodity requests',
-      0,
       '-',
-      '',
-      '',
-      'No commodity request yet.',
+      0,
+      'No Request',
+      '-',
+      '-',
+      'No commodity requests yet.',
     ])
   } else {
     for (const commodity of commodities) {
