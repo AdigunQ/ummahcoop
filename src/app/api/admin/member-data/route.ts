@@ -563,14 +563,10 @@ function parseCombinedRows(
       continue
     }
 
-    if (!monthValue) {
-      warnings.push(`Skipped row ${i + 1} in "${sheetName}": missing month.`)
-      continue
-    }
-
-    const period = parsePeriodFromText(monthValue)
+    const rowPeriodText = monthValue || monthLabel(periodFromSheet)
+    const period = parsePeriodFromText(rowPeriodText)
     if (!period) {
-      warnings.push(`Skipped row ${i + 1} in "${sheetName}": could not parse month "${monthValue}".`)
+      warnings.push(`Skipped row ${i + 1} in "${sheetName}": could not parse month "${rowPeriodText}".`)
       continue
     }
 
@@ -590,7 +586,7 @@ function parseCombinedRows(
       name: toText(row[map.name]),
       rowNumber: i + 1,
       period,
-      monthText: monthValue,
+      monthText: monthValue || monthLabel(period),
       thriftSavings,
       specialSaving,
       monthlyCharges: monthlyFee,
@@ -605,9 +601,11 @@ function parseCombinedRows(
       style: 'combined',
     })
 
-    // Prefer sheet period for validation only if needed. No hard failure here because month column is authoritative.
+    // Prefer sheet period for validation only if needed. No hard failure here unless there is no usable month.
     if (periodFromSheet && periodFromSheet !== period) {
-      warnings.push(`Row ${i + 1} in "${sheetName}": month value "${monthValue}" does not match sheet period; using row month.`)
+      warnings.push(
+        `Row ${i + 1} in "${sheetName}": month value "${monthValue || rowPeriodText}" does not match sheet period; using parsed month.`
+      )
     }
   }
 
