@@ -10,7 +10,9 @@ import {
   CheckCircle2,
   Clock,
   HandCoins,
+  PackageSearch,
   Landmark,
+  FileText,
   PiggyBank,
   TrendingUp,
   Wallet,
@@ -42,6 +44,13 @@ interface MemberDashboardProps {
   }
   recentPayments: any[]
   recentLoans: any[]
+  recentCommodities: {
+    id: string
+    itemCategory: string | null
+    itemModel: string | null
+    status: string
+    createdAt: string | Date
+  }[]
 }
 
 export function MemberDashboard({
@@ -50,6 +59,7 @@ export function MemberDashboard({
   loanSummary,
   recentPayments,
   recentLoans,
+  recentCommodities,
 }: MemberDashboardProps) {
   const isPending = user.status === 'PENDING'
 
@@ -194,6 +204,18 @@ export function MemberDashboard({
               disabled={loanEligibility < LOAN_POLICY.minAmount || user.loanBalance > 0}
             />
             <QuickActionCard
+              href="/api/member-statement/export"
+              title="Download statement (CSV)"
+              description="Includes savings, loan and commodity history"
+              icon={FileText}
+            />
+            <QuickActionCard
+              href="/dashboard/commodity"
+              title="Track commodity requests"
+              description="Submit and view request updates"
+              icon={PackageSearch}
+            />
+            <QuickActionCard
               href="/dashboard/history"
               title="Transaction history"
               description="See your activity"
@@ -204,7 +226,7 @@ export function MemberDashboard({
       </div>
 
       {/* Recent activity */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <PanelCard title="Recent payments" eyebrow="Activity" padded={false}>
           <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
             {recentPayments.length === 0 ? (
@@ -242,6 +264,24 @@ export function MemberDashboard({
                   <div className="flex flex-col items-end gap-1">
                     <p className="text-sm font-semibold">{formatCurrency(loan.amount)}</p>
                     <StatusPill status={loan.status} />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </PanelCard>
+
+        <PanelCard title="Commodity tracking" eyebrow="Requests" padded={false}>
+          <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
+            {recentCommodities.length === 0 ? (
+              <EmptyState icon={PackageSearch} text="No commodity requests yet" />
+            ) : (
+              recentCommodities.map((request) => (
+                <div key={request.id} className="px-5 py-3.5">
+                  <div className="truncate text-sm font-semibold text-gray-900">{request.itemCategory || 'Commodity request'}</div>
+                  <p className="text-xs text-muted-foreground">{formatDate(request.createdAt)} · {request.itemModel || 'No details'}</p>
+                  <div className="mt-2">
+                    <StatusPill status={request.status} />
                   </div>
                 </div>
               ))

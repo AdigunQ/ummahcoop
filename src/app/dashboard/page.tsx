@@ -38,6 +38,17 @@ export default async function DashboardPage() {
         orderBy: { createdAt: 'desc' },
         take: 5,
       },
+      commodityRequests: {
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          itemCategory: true,
+          itemModel: true,
+          status: true,
+          createdAt: true,
+        },
+      },
     },
   })
 
@@ -86,6 +97,7 @@ export default async function DashboardPage() {
       }}
       recentPayments={user.payments}
       recentLoans={user.loans}
+      recentCommodities={user.commodityRequests}
     />
   )
 }

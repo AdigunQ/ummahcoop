@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
+import { LOAN_REQUEST_POLICY } from '@/lib/loan-request'
 import { buildVoucherDataset, resolveVoucherPeriod, type VoucherRow } from '@/lib/vouchers'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
@@ -40,6 +41,93 @@ type DisplayRow = {
   newMemberFee: number
   total: number
   memberType: 'NEW' | 'OLD'
+  commodityRequests: number
+  loanOriginated: number
+  maintenanceFee: number
+}
+
+type MemberMetrics = {
+  commodityRequests: number
+  loanOriginated: number
+  maintenanceFee: number
+}
+
+function normalizeStaffId(value: unknown): string {
+  const raw = String(value ?? '').trim().replace(/\s+/g, '')
+  if (!raw) return ''
+  if (/^\d+$/.test(raw)) {
+    return raw.padStart(6, '0')
+  }
+  return raw
+}
+
+function staffMetricKey(value: string): string {
+  return normalizeStaffId(value).toLowerCase()
+}
+
+async function getMemberMetrics(staffIds: string[]) {
+  if (staffIds.length === 0) return new Map<string, MemberMetrics>()
+
+  const members = await prisma.user.findMany({
+    where: { staffId: { in: staffIds } },
+    select: {
+      id: true,
+      staffId: true,
+    },
+  })
+
+  const userIds = members.map((member) => member.id)
+  if (userIds.length === 0) return new Map<string, MemberMetrics>()
+
+    const [commodityCounts, loans] = await Promise.all([
+      prisma.commodityRequest.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds } },
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.loan.findMany({
+      where: {
+        userId: { in: userIds },
+      },
+      select: {
+        userId: true,
+        amount: true,
+        interestRate: true,
+      },
+    }),
+  ])
+
+  const commodityByUser = new Map<string, number>()
+  for (const item of commodityCounts) {
+    commodityByUser.set(item.userId, item._count._all)
+  }
+
+  const loanByUser = new Map<string, { amount: number; maintenanceFee: number }>()
+  for (const loan of loans) {
+    const value = loanByUser.get(loan.userId) || { amount: 0, maintenanceFee: 0 }
+    const adminChargeRate = loan.interestRate || LOAN_REQUEST_POLICY.adminChargePercent
+    value.amount += loan.amount
+    value.maintenanceFee += (loan.amount * adminChargeRate) / 100
+    loanByUser.set(loan.userId, value)
+  }
+
+  const metricsByStaff = new Map<string, MemberMetrics>()
+  for (const member of members) {
+    const key = staffMetricKey(member.staffId || '')
+    if (!key) continue
+
+    const commodityRequests = commodityByUser.get(member.id) || 0
+    const loan = loanByUser.get(member.id)
+    metricsByStaff.set(key, {
+      commodityRequests,
+      loanOriginated: loan?.amount || 0,
+      maintenanceFee: loan?.maintenanceFee || 0,
+    })
+  }
+
+  return metricsByStaff
 }
 
 function toNumber(value: unknown): number {
@@ -88,6 +176,9 @@ function toDisplayRowFromSnapshot(row: UploadedSnapshotRow, index: number): Disp
     newMemberFee: toNumber(row['New Member Fee']),
     total: toNumber(row.Total),
     memberType: String(row['Member Type'] ?? 'OLD').toUpperCase() === 'NEW' ? 'NEW' : 'OLD',
+    commodityRequests: 0,
+    loanOriginated: 0,
+    maintenanceFee: 0,
   }
 }
 
@@ -102,6 +193,9 @@ function toDisplayRowFromVoucher(row: VoucherRow): DisplayRow {
     newMemberFee: row.newMemberFee,
     total: row.totalSavings,
     memberType: row.memberType,
+    commodityRequests: 0,
+    loanOriginated: 0,
+    maintenanceFee: 0,
   }
 }
 
@@ -157,9 +251,27 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
 
   const snapshotRows = uploadedMonth ? toSnapshotRows(uploadedMonth.rows) : []
   const isCurrentLiveView = !usingSnapshot && selectedPeriod === currentPeriod
-  const displayRows: DisplayRow[] = usingSnapshot
+  let displayRows: DisplayRow[] = usingSnapshot
     ? snapshotRows.map((row, index) => toDisplayRowFromSnapshot(row, index))
     : liveDataset.rows.map((row) => toDisplayRowFromVoucher(row))
+
+  const staffIds = Array.from(new Set(displayRows.map((row) => staffMetricKey(row.staffId)).filter(Boolean)))
+  const memberMetrics = await getMemberMetrics(staffIds)
+
+  displayRows = displayRows.map((row) => {
+    const metrics = memberMetrics.get(staffMetricKey(row.staffId)) || {
+      commodityRequests: 0,
+      loanOriginated: 0,
+      maintenanceFee: 0,
+    }
+
+    return {
+      ...row,
+      commodityRequests: metrics.commodityRequests,
+      loanOriginated: metrics.loanOriginated,
+      maintenanceFee: metrics.maintenanceFee,
+    }
+  })
 
   const totals = {
     rows: displayRows.length,
@@ -167,6 +279,9 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
     oldMembers: displayRows.filter((row) => row.memberType === 'OLD').length,
     fees: displayRows.reduce((sum, row) => sum + row.charges + row.newMemberFee, 0),
     savings: displayRows.reduce((sum, row) => sum + row.thriftSavings + row.specialSavings, 0),
+    commodityRequests: displayRows.reduce((sum, row) => sum + row.commodityRequests, 0),
+    loanOriginated: displayRows.reduce((sum, row) => sum + row.loanOriginated, 0),
+    maintenanceFee: displayRows.reduce((sum, row) => sum + row.maintenanceFee, 0),
   }
 
   const currentLiveNote =
@@ -252,12 +367,15 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
                 <th className="px-6 py-3">New Member Fee</th>
                 <th className="px-6 py-3">Total</th>
                 <th className="px-6 py-3">Member Type</th>
+                <th className="px-6 py-3">Commodity</th>
+                <th className="px-6 py-3">Loan Originated</th>
+                <th className="px-6 py-3">Maintenance Fee</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-10 text-center text-slate-500">
+                  <td colSpan={12} className="px-6 py-10 text-center text-slate-500">
                     No rows found for this period.
                   </td>
                 </tr>
@@ -283,6 +401,9 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
                         {row.memberType}
                       </span>
                     </td>
+                    <td className="px-6 py-3 text-slate-700">{row.commodityRequests.toLocaleString()}</td>
+                    <td className="px-6 py-3 text-slate-700">{formatCurrency(row.loanOriginated)}</td>
+                    <td className="px-6 py-3 text-slate-700">{formatCurrency(row.maintenanceFee)}</td>
                   </tr>
                 ))
               )}
