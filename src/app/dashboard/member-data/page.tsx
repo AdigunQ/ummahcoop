@@ -19,17 +19,38 @@ type MonthOption = {
   isUploaded: boolean
 }
 
-type UploadedSnapshotRow = {
-  'S/N'?: number
-  'Staff ID'?: string
-  Name?: string
-  'Thrift Savings'?: number
-  'Special Savings'?: number
-  Charges?: number
-  'New Member Fee'?: number
-  Total?: number
-  'Member Type'?: 'NEW' | 'OLD' | string
-}
+type UploadedSnapshotRow = Record<string, unknown>
+
+const LEGACY_SNAPSHOT_COLUMNS = [
+  'S/N',
+  'Staff ID',
+  'Name',
+  'Thrift Savings',
+  'Special Savings',
+  'Charges',
+  'New Member Fee',
+  'Total',
+  'Member Type',
+] as const
+
+type SnapshotStyle = 'legacy' | 'combined'
+
+const CURRENCY_COLUMNS = {
+  Amount: true,
+  Month: false,
+  'Monthly Saving': true,
+  'Special Saving': true,
+  Loan: true,
+  'Management Fee': true,
+  Commodity: true,
+  'Monthly Fee': true,
+  'Form Fee': true,
+  'Total': true,
+  'Thrift Savings': true,
+  'Special Savings': true,
+  Charges: true,
+  'New Member Fee': true,
+} as const
 
 type DisplayRow = {
   serial: number
@@ -44,6 +65,7 @@ type DisplayRow = {
   commodityRequests: number
   loanOriginated: number
   maintenanceFee: number
+  raw?: UploadedSnapshotRow
 }
 
 type MemberMetrics = {
@@ -63,6 +85,39 @@ function normalizeStaffId(value: unknown): string {
 
 function staffMetricKey(value: string): string {
   return normalizeStaffId(value).toLowerCase()
+}
+
+function toText(value: unknown): string {
+  return String(value ?? '').trim()
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item) => item.length > 0)
+}
+
+function detectSnapshotStyle(columns: string[]): SnapshotStyle {
+  return columns.includes('Employee No.') || columns.includes('Employee Name') ? 'combined' : 'legacy'
+}
+
+function pickText(row: UploadedSnapshotRow, keys: string[]): string {
+  for (const key of keys) {
+    const value = toText(row[key])
+    if (value) return value
+  }
+  return ''
+}
+
+function pickNumber(row: UploadedSnapshotRow, keys: string[]): number {
+  for (const key of keys) {
+    const value = row[key]
+    if (value === undefined) continue
+    const parsed = toNumber(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
 }
 
 async function getMemberMetrics(staffIds: string[]) {
@@ -165,20 +220,31 @@ function formatBlankableCurrency(value: number): string {
   return value > 0 ? formatCurrency(value) : ''
 }
 
-function toDisplayRowFromSnapshot(row: UploadedSnapshotRow, index: number): DisplayRow {
+function toDisplayRowFromSnapshot(row: UploadedSnapshotRow, index: number, style: SnapshotStyle): DisplayRow {
   return {
-    serial: toNumber(row['S/N']) || index + 1,
-    staffId: String(row['Staff ID'] ?? '').trim() || '-',
-    name: String(row.Name ?? '-'),
-    thriftSavings: toNumber(row['Thrift Savings']),
-    specialSavings: toNumber(row['Special Savings']),
-    charges: toNumber(row.Charges),
-    newMemberFee: toNumber(row['New Member Fee']),
-    total: toNumber(row.Total),
-    memberType: String(row['Member Type'] ?? 'OLD').toUpperCase() === 'NEW' ? 'NEW' : 'OLD',
+    serial:
+      pickNumber(row, ['S/N', 'Serial']) > 0
+        ? pickNumber(row, ['S/N', 'Serial'])
+        : index + 1,
+    staffId: pickText(row, ['Staff ID', 'Employee No.']) || '-',
+    name: pickText(row, ['Name', 'Employee Name']) || '-',
+    thriftSavings: pickNumber(row, ['Thrift Savings', 'Monthly Saving']),
+    specialSavings: pickNumber(row, ['Special Savings', 'Special Saving']),
+    charges: pickNumber(row, ['Charges', 'Monthly Fee']),
+    newMemberFee: pickNumber(row, ['New Member Fee', 'Form Fee']),
+    total: pickNumber(row, ['Total', 'Amount']),
+    memberType:
+      style === 'combined'
+        ? pickNumber(row, ['Form Fee', 'New Member Fee']) > 0
+          ? 'NEW'
+          : 'OLD'
+        : pickText(row, ['Member Type'])?.toUpperCase() === 'NEW'
+          ? 'NEW'
+          : 'OLD',
     commodityRequests: 0,
     loanOriginated: 0,
     maintenanceFee: 0,
+    raw: row,
   }
 }
 
@@ -223,6 +289,7 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
       label: true,
       rowCount: true,
       rows: true,
+      columns: true,
       uploadedAt: true,
     },
   })
@@ -250,10 +317,39 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
   monthOptions.sort((a, b) => a.period.localeCompare(b.period))
 
   const snapshotRows = uploadedMonth ? toSnapshotRows(uploadedMonth.rows) : []
+  const uploadedColumns = asStringArray(uploadedMonth?.columns as unknown)
+  const firstSnapshotKeys = snapshotRows.length > 0 ? Object.keys(snapshotRows[0] as Record<string, unknown>) : []
+  const snapshotStyle: SnapshotStyle = detectSnapshotStyle(uploadedColumns.length ? uploadedColumns : firstSnapshotKeys)
   const isCurrentLiveView = !usingSnapshot && selectedPeriod === currentPeriod
   let displayRows: DisplayRow[] = usingSnapshot
-    ? snapshotRows.map((row, index) => toDisplayRowFromSnapshot(row, index))
+    ? snapshotRows.map((row, index) => toDisplayRowFromSnapshot(row, index, snapshotStyle))
     : liveDataset.rows.map((row) => toDisplayRowFromVoucher(row))
+
+  const tableColumns =
+    usingSnapshot && snapshotStyle === 'combined'
+      ? [...uploadedColumns, 'Commodity Requests', 'Loan Originated', 'Maintenance Fee']
+      : usingSnapshot
+        ? [...LEGACY_SNAPSHOT_COLUMNS, 'Commodity', 'Commodity Requests', 'Loan Originated', 'Maintenance Fee']
+        : [
+            'S/N',
+            'Staff ID',
+            'Name',
+            'Thrift Savings',
+            'Special Savings',
+            'Charges',
+            'New Member Fee',
+            'Total',
+            'Member Type',
+            'Commodity',
+            'Loan Originated',
+            'Maintenance Fee',
+          ]
+  const snapshotContentColumns =
+    snapshotStyle === 'combined'
+      ? uploadedColumns.length
+        ? uploadedColumns
+        : firstSnapshotKeys
+      : Array.from(LEGACY_SNAPSHOT_COLUMNS)
 
   const staffIds = Array.from(new Set(displayRows.map((row) => staffMetricKey(row.staffId)).filter(Boolean)))
   const memberMetrics = await getMemberMetrics(staffIds)
@@ -295,8 +391,9 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
         <div>
           <h1 className="text-3xl font-bold text-slate-950">Member Data</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">
-            Uploaded month snapshots and the current live month now use the same columns: S/N, Staff ID, Name, Thrift
-            Savings, Special Savings, Charges, New Member Fee, Total, Member Type.
+            {snapshotStyle === 'combined'
+              ? 'Uploaded snapshots preserve the combined workbook columns so you can review exactly what was imported.'
+              : 'Uploaded month snapshots and the current live month now use the same columns: S/N, Staff ID, Name, Thrift Savings, Special Savings, Charges, New Member Fee, Total, Member Type.'}
           </p>
         </div>
 
@@ -354,59 +451,80 @@ export default async function MemberDataPage({ searchParams }: { searchParams?: 
           </p>
         </div>
 
-        <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
           <table className="w-full min-w-[1080px] text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-6 py-3">S/N</th>
-                <th className="px-6 py-3">Staff ID</th>
-                <th className="px-6 py-3">Name</th>
-                <th className="px-6 py-3">Thrift Savings</th>
-                <th className="px-6 py-3">Special Savings</th>
-                <th className="px-6 py-3">Charges</th>
-                <th className="px-6 py-3">New Member Fee</th>
-                <th className="px-6 py-3">Total</th>
-                <th className="px-6 py-3">Member Type</th>
-                <th className="px-6 py-3">Commodity</th>
-                <th className="px-6 py-3">Loan Originated</th>
-                <th className="px-6 py-3">Maintenance Fee</th>
+                {tableColumns.map((column) => (
+                  <th key={column} className="px-6 py-3">
+                    {column}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-6 py-10 text-center text-slate-500">
-                    No rows found for this period.
-                  </td>
-                </tr>
-              ) : (
-                displayRows.map((row) => (
-                  <tr key={`${selectedPeriod}-${row.staffId}-${row.serial}`} className="hover:bg-slate-50">
-                    <td className="px-6 py-3 text-slate-700">{row.serial}</td>
-                    <td className="px-6 py-3 font-medium text-slate-900">{row.staffId}</td>
-                    <td className="px-6 py-3 text-slate-900">{row.name}</td>
-                    <td className="px-6 py-3 text-slate-700">{formatCurrency(row.thriftSavings)}</td>
-                    <td className="px-6 py-3 text-slate-700">{formatCurrency(row.specialSavings)}</td>
-                    <td className="px-6 py-3 text-slate-700">{formatBlankableCurrency(row.charges)}</td>
-                    <td className="px-6 py-3 text-slate-700">{formatBlankableCurrency(row.newMemberFee)}</td>
-                    <td className="px-6 py-3 font-semibold text-slate-950">{formatCurrency(row.total)}</td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          row.memberType === 'NEW'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {row.memberType}
-                      </span>
+                    <td
+                      colSpan={tableColumns.length}
+                      className="px-6 py-10 text-center text-slate-500"
+                    >
+                      No rows found for this period.
                     </td>
-                    <td className="px-6 py-3 text-slate-700">{row.commodityRequests.toLocaleString()}</td>
-                    <td className="px-6 py-3 text-slate-700">{formatCurrency(row.loanOriginated)}</td>
-                    <td className="px-6 py-3 text-slate-700">{formatCurrency(row.maintenanceFee)}</td>
                   </tr>
-                ))
-              )}
+                ) : (
+                  displayRows.map((row) => (
+                    <tr key={`${selectedPeriod}-${row.staffId}-${row.serial}`} className="hover:bg-slate-50">
+                      {usingSnapshot && row.raw && (
+                        <>
+                          {snapshotContentColumns.map((column) => {
+                            const value = row.raw?.[column]
+                            const isCurrency = Boolean((CURRENCY_COLUMNS as Record<string, boolean>)[column])
+                            const parsed = typeof value === 'number' ? value : toNumber(value)
+                            return (
+                              <td key={`${selectedPeriod}-${row.staffId}-${row.serial}-${column}`} className="px-6 py-3 text-slate-700">
+                                {value === null || value === undefined || String(value).trim() === ''
+                                  ? '—'
+                                  : isCurrency
+                                    ? formatBlankableCurrency(parsed)
+                                    : toText(value)}
+                              </td>
+                            )
+                          })}
+                          <td className="px-6 py-3 text-slate-700">{row.commodityRequests.toLocaleString()}</td>
+                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.loanOriginated)}</td>
+                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.maintenanceFee)}</td>
+                        </>
+                      )}
+                      {!usingSnapshot ? (
+                        <>
+                          <td className="px-6 py-3 text-slate-700">{row.serial}</td>
+                          <td className="px-6 py-3 font-medium text-slate-900">{row.staffId}</td>
+                          <td className="px-6 py-3 text-slate-900">{row.name}</td>
+                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.thriftSavings)}</td>
+                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.specialSavings)}</td>
+                          <td className="px-6 py-3 text-slate-700">{formatBlankableCurrency(row.charges)}</td>
+                          <td className="px-6 py-3 text-slate-700">{formatBlankableCurrency(row.newMemberFee)}</td>
+                          <td className="px-6 py-3 font-semibold text-slate-950">{formatCurrency(row.total)}</td>
+                          <td className="px-6 py-3">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                row.memberType === 'NEW'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {row.memberType}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-slate-700">{row.commodityRequests.toLocaleString()}</td>
+                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.loanOriginated)}</td>
+                          <td className="px-6 py-3 text-slate-700">{formatCurrency(row.maintenanceFee)}</td>
+                        </>
+                      ) : null}
+                    </tr>
+                  ))
+                )}
             </tbody>
           </table>
         </div>

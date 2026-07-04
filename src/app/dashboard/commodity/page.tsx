@@ -53,6 +53,21 @@ async function cancelCommodityRequest(formData: FormData) {
   revalidatePath('/dashboard/commodity')
 }
 
+
+async function deleteCommodityRequest(formData: FormData) {
+  'use server'
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect('/dashboard')
+
+  const requestId = String(formData.get('requestId') || '')
+  if (!requestId) return
+
+  await prisma.commodityRequest.deleteMany({
+    where: { id: requestId, userId: session.user.id, status: { not: 'PENDING' } },
+  })
+  revalidatePath('/dashboard/commodity')
+}
+
 async function reviewCommodityRequest(formData: FormData) {
   'use server'
 
@@ -516,7 +531,7 @@ export default async function CommodityPage({
                   )}
                   <div className="mt-2 flex items-center justify-between">
                     <p className="text-xs text-gray-400">Submitted: {formatDateTime(request.createdAt)}</p>
-                    {request.status === 'PENDING' && (
+                    {request.status === 'PENDING' ? (
                       <form action={cancelCommodityRequest}>
                         <input type="hidden" name="requestId" value={request.id} />
                         <button
@@ -524,6 +539,16 @@ export default async function CommodityPage({
                           className="text-xs text-rose-600 hover:text-rose-800 underline"
                         >
                           Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <form action={deleteCommodityRequest}>
+                        <input type="hidden" name="requestId" value={request.id} />
+                        <button
+                          type="submit"
+                          className="text-xs text-rose-600 hover:text-rose-800 underline"
+                        >
+                          Delete
                         </button>
                       </form>
                     )}

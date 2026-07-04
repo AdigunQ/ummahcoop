@@ -61,16 +61,7 @@ export type VoucherDataset = {
 }
 
 type SnapshotRow = {
-  'S/N'?: number
-  'Staff ID'?: string
-  Name?: string
-  'Thrift Savings'?: number
-  'Special Savings'?: number
-  'Month Joined'?: string
-  Charges?: number
-  'New Member Fee'?: number
-  Total?: number
-  'Member Type'?: 'NEW' | 'OLD' | string
+  [key: string]: unknown
 }
 
 export function resolveVoucherPeriod(periodInput?: string) {
@@ -103,6 +94,28 @@ function toNumber(value: unknown): number {
 function toSnapshotRows(value: unknown): SnapshotRow[] {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is SnapshotRow => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+}
+
+function toText(value: unknown): string {
+  return String(value ?? '').trim()
+}
+
+function pickText(row: SnapshotRow, keys: string[]): string {
+  for (const key of keys) {
+    const value = toText(row[key])
+    if (value) return value
+  }
+  return ''
+}
+
+function pickNumber(row: SnapshotRow, keys: string[]): number {
+  for (const key of keys) {
+    const value = row[key]
+    if (value === undefined) continue
+    const parsed = toNumber(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
 }
 
 function comparePeriods(left: string, right: string): number {
@@ -205,6 +218,7 @@ type VoucherSourceRow = {
   rawNewMemberFee: number
   rawTotal: number
   rawMemberType: string
+  hasMonthJoined: boolean
 }
 
 function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow | null {
@@ -213,16 +227,34 @@ function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow |
   }
 
   const hasJoinedPeriod = Boolean(source.joinedPeriod)
+  const hasJoinMetadata = source.hasMonthJoined
+
   const isNew = hasJoinedPeriod ? comparePeriods(source.joinedPeriod as string, period) === 0 : source.rawMemberType === 'NEW' || source.rawNewMemberFee >= VOUCHER_NEW_MEMBER_FEE
 
-  const monthlyCharges = hasJoinedPeriod ? (isNew ? 0 : VOUCHER_MONTHLY_CHARGE) : source.rawCharges
-  const newMemberFee = hasJoinedPeriod ? (isNew ? VOUCHER_NEW_MEMBER_FEE : 0) : source.rawNewMemberFee
+  if (!hasJoinMetadata) {
+    const monthlyCharges = source.rawCharges
+    const newMemberFee = source.rawNewMemberFee
+    const memberFee = monthlyCharges + newMemberFee
+    const totalSavings = source.rawTotal > 0 ? source.rawTotal : source.monthlySavings + source.specialSavings + memberFee
+
+    return {
+      serial: source.serial,
+      staffId: source.staffId,
+      name: source.name,
+      monthlySavings: source.monthlySavings,
+      specialSavings: source.specialSavings,
+      monthlyCharges,
+      newMemberFee,
+      memberFee,
+      totalSavings,
+      memberType: isNew ? 'NEW' : 'OLD',
+    }
+  }
+
+  const monthlyCharges = isNew ? 0 : VOUCHER_MONTHLY_CHARGE
+  const newMemberFee = isNew ? VOUCHER_NEW_MEMBER_FEE : 0
   const memberFee = monthlyCharges + newMemberFee
-  const totalSavings = hasJoinedPeriod
-    ? source.monthlySavings + source.specialSavings + memberFee
-    : source.rawTotal > 0
-      ? source.rawTotal
-      : source.monthlySavings + source.specialSavings + memberFee
+  const totalSavings = source.monthlySavings + source.specialSavings + memberFee
 
   return {
     serial: source.serial,
@@ -244,15 +276,16 @@ function buildRowsFromSnapshot(snapshotRows: SnapshotRow[], period: string): Vou
       buildVoucherRow(
         {
           serial: toNumber(row['S/N']) > 0 ? toNumber(row['S/N']) : index + 1,
-          staffId: String(row['Staff ID'] ?? '').trim() || 'N/A',
-          name: String(row.Name ?? '').trim() || 'Unnamed Member',
-          monthlySavings: toNumber(row['Thrift Savings']),
-          specialSavings: toNumber(row['Special Savings']),
-          joinedPeriod: normalizePeriodLike(row['Month Joined']),
-          rawCharges: toNumber(row.Charges),
-          rawNewMemberFee: toNumber(row['New Member Fee']),
-          rawTotal: toNumber(row.Total),
-          rawMemberType: String(row['Member Type'] ?? '').trim().toUpperCase(),
+          staffId: pickText(row, ['Staff ID', 'Employee No.']) || 'N/A',
+          name: pickText(row, ['Name', 'Employee Name']) || 'Unnamed Member',
+          monthlySavings: pickNumber(row, ['Thrift Savings', 'Monthly Saving']),
+          specialSavings: pickNumber(row, ['Special Savings', 'Special Saving']),
+          joinedPeriod: normalizePeriodLike(pickText(row, ['Month Joined', 'Month'])),
+          rawCharges: pickNumber(row, ['Charges', 'Monthly Fee']),
+          rawNewMemberFee: pickNumber(row, ['New Member Fee', 'Form Fee']),
+          rawTotal: pickNumber(row, ['Total', 'Amount']),
+          rawMemberType: pickText(row, ['Member Type']).toUpperCase(),
+          hasMonthJoined: Boolean(pickText(row, ['Month Joined'])),
         },
         period
       )
@@ -311,6 +344,7 @@ export async function buildVoucherDataset(periodInput?: string): Promise<Voucher
           rawNewMemberFee: 0,
           rawTotal: 0,
           rawMemberType: 'OLD',
+          hasMonthJoined: false,
         },
         period
       )
