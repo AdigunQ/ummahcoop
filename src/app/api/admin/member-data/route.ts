@@ -101,12 +101,15 @@ const FEE_START: MonthParts = { year: 2026, month: 2 }
 
 const LEGACY_HEADER_ALIASES = {
   sn: ['s/n', 'sn', 's no', 'serial no', 'serial number'],
-  staffId: ['staff id'],
-  name: ['name'],
+  staffId: ['staff id', 'employee no.', 'employee no', 'employee number', 'employee id'],
+  name: ['name', 'employee name'],
   thriftSavings: ['thrift savings', 'monthly savings'],
   specialSaving: ['special saving', 'special savings'],
   monthlyCharges: ['monthly charges', 'charges', 'monthly fee'],
-  newMemberFee: ['new member fee', 'form fee'],
+  newMemberFee: ['new member fee', 'new member', 'form fee'],
+  loan: ['loan', 'loan amount'],
+  managementFee: ['management fee', 'maintainer fee', 'maintenance fee'],
+  commodity: ['commodity', 'comodity', 'commodity amount', 'comodity amount'],
   total: ['total'],
   monthJoined: ['month joined'],
 } as const
@@ -139,6 +142,9 @@ const LEGACY_CANONICAL_COLUMNS = [
   'Special Savings',
   'Charges',
   'New Member Fee',
+  'Loan',
+  'Management Fee',
+  'Commodity',
   'Total',
   'Expected Total',
   'Variance',
@@ -167,7 +173,7 @@ function normalizeHeader(value: unknown): string {
     .toLowerCase()
     .replace(/^0ctober/, 'october')
     .replace(/^0ct/, 'oct')
-    .replace(/[_.]+/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
 }
 
@@ -457,13 +463,16 @@ function detectHeaderMap(rows: any[][]): HeaderResult | null {
     })
 
     const legacyMap: HeaderMap = {
-      sn: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.sn) ?? -1,
+      sn: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.sn) ?? (!toText(row[0]) ? 0 : -1),
       staffId: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.staffId) ?? -1,
       name: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.name) ?? -1,
       thriftSavings: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.thriftSavings) ?? -1,
       specialSaving: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.specialSaving) ?? -1,
       monthlyCharges: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.monthlyCharges) ?? -1,
       newMemberFee: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.newMemberFee) ?? -1,
+      loan: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.loan) ?? -1,
+      managementFee: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.managementFee) ?? -1,
+      commodity: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.commodity) ?? -1,
       total: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.total) ?? -1,
       monthJoined: findHeaderIndex(indexByHeader, LEGACY_HEADER_ALIASES.monthJoined) ?? -1,
     }
@@ -570,6 +579,9 @@ function parseLegacyRows(
         !toText(row[map.specialSaving]) &&
         !toText(row[map.monthlyCharges]) &&
         !toText(row[map.newMemberFee]) &&
+        !toText(row[map.loan]) &&
+        !toText(row[map.managementFee]) &&
+        !toText(row[map.commodity]) &&
         !toText(row[map.total]) &&
         !toText(row[map.monthJoined])
 
@@ -611,9 +623,9 @@ function parseLegacyRows(
       monthlyCharges: toNumber(row[map.monthlyCharges]),
       newMemberFee: toNumber(row[map.newMemberFee]),
       amount: toNumber(row[map.thriftSavings]) + toNumber(row[map.specialSaving]),
-      loan: 0,
-      managementFee: 0,
-      commodity: 0,
+      loan: map.loan >= 0 ? toNumber(row[map.loan]) : 0,
+      managementFee: map.managementFee >= 0 ? toNumber(row[map.managementFee]) : 0,
+      commodity: map.commodity >= 0 ? toNumber(row[map.commodity]) : 0,
       excelTotal: toNumber(row[map.total]),
       monthJoinedRaw: map.monthJoined < 0 ? '' : toText(row[map.monthJoined]),
       monthJoinedPeriod: map.monthJoined < 0 ? null : normalizeMonthJoined(row[map.monthJoined]),
@@ -798,7 +810,10 @@ function canonicalFromParsedRows(rows: ParsedWorkbookRow[], month: string, style
         row.thriftSavings +
         row.specialSaving +
         amountOrZero(feeRow.monthlyCharges) +
-        amountOrZero(feeRow.newMemberFee)
+        amountOrZero(feeRow.newMemberFee) +
+        row.loan +
+        row.managementFee +
+        row.commodity
 
       const variance = row.excelTotal > 0 ? Number((row.excelTotal - total).toFixed(2)) : 0
       const monthJoinedDisplay = joinParts ? monYear(memberJoinedMonth as string) : rawMonthJoined
@@ -811,6 +826,9 @@ function canonicalFromParsedRows(rows: ParsedWorkbookRow[], month: string, style
         'Special Savings': row.specialSaving,
         Charges: feeRow.monthlyCharges,
         'New Member Fee': feeRow.newMemberFee,
+        Loan: row.loan,
+        'Management Fee': row.managementFee,
+        Commodity: row.commodity,
         Total: total,
         'Expected Total': total,
         Variance: variance,
