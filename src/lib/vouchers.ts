@@ -222,12 +222,12 @@ type VoucherSourceRow = {
 }
 
 function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow | null {
-  if (source.joinedPeriod && comparePeriods(source.joinedPeriod, period) > 0) {
+  const hasJoinMetadata = Boolean(source.hasMonthJoined)
+  const hasJoinedPeriod = hasJoinMetadata && Boolean(source.joinedPeriod)
+
+  if (hasJoinedPeriod && comparePeriods(source.joinedPeriod as string, period) > 0) {
     return null
   }
-
-  const hasJoinedPeriod = Boolean(source.joinedPeriod)
-  const hasJoinMetadata = source.hasMonthJoined
 
   const isNew = hasJoinedPeriod ? comparePeriods(source.joinedPeriod as string, period) === 0 : source.rawMemberType === 'NEW' || source.rawNewMemberFee >= VOUCHER_NEW_MEMBER_FEE
 
@@ -272,24 +272,25 @@ function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow |
 
 function buildRowsFromSnapshot(snapshotRows: SnapshotRow[], period: string): VoucherRow[] {
   return snapshotRows
-    .map((row, index) =>
-      buildVoucherRow(
+    .map((row, index) => {
+      const monthJoined = pickText(row, ['Month Joined'])
+      return buildVoucherRow(
         {
           serial: toNumber(row['S/N']) > 0 ? toNumber(row['S/N']) : index + 1,
           staffId: pickText(row, ['Staff ID', 'Employee No.']) || 'N/A',
           name: pickText(row, ['Name', 'Employee Name']) || 'Unnamed Member',
           monthlySavings: pickNumber(row, ['Thrift Savings', 'Monthly Saving']),
           specialSavings: pickNumber(row, ['Special Savings', 'Special Saving']),
-          joinedPeriod: normalizePeriodLike(pickText(row, ['Month Joined', 'Month'])),
+          joinedPeriod: monthJoined ? normalizePeriodLike(monthJoined) : null,
           rawCharges: pickNumber(row, ['Charges', 'Monthly Fee']),
           rawNewMemberFee: pickNumber(row, ['New Member Fee', 'Form Fee']),
           rawTotal: pickNumber(row, ['Total', 'Amount']),
           rawMemberType: pickText(row, ['Member Type']).toUpperCase(),
-          hasMonthJoined: Boolean(pickText(row, ['Month Joined'])),
+          hasMonthJoined: Boolean(monthJoined),
         },
         period
       )
-    )
+    })
     .filter((row): row is VoucherRow => Boolean(row))
 }
 

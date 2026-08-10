@@ -21,16 +21,16 @@ const monthMap = new Map([
 ])
 
 const sourceColumns = [
-  'S/No',
-  'Employee No.',
-  'Employee Name',
-  'Thrift Savings',
-  'Special Saving',
-  'Charges',
-  'New Member',
-  'Loan',
-  'Commodity',
-  'Total',
+  's no',
+  'employee no',
+  'employee name',
+  'thrift savings',
+  'special saving',
+  'charges',
+  'new member',
+  'loan',
+  'commodity',
+  'total',
 ]
 
 const canonicalColumns = [
@@ -50,6 +50,28 @@ const canonicalColumns = [
 
 function text(value) {
   return String(value ?? '').trim()
+}
+
+function headerKey(value) {
+  return text(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function resolveSourceColumns(header, sheetName) {
+  const indexes = new Map()
+  for (const [index, value] of header.entries()) {
+    const key = headerKey(value)
+    if (!key) continue
+    const canonical = key === 'comodity' ? 'commodity' : key
+    if (!indexes.has(canonical)) indexes.set(canonical, index)
+  }
+
+  // Some client sheets leave the S/No header blank even though the data is in
+  // column A. Keep validation strict for every other source field.
+  if (!indexes.has('s no') && !text(header[0])) indexes.set('s no', 0)
+
+  const missing = sourceColumns.filter((column) => !indexes.has(column))
+  if (missing.length) throw new Error(`Header mismatch in ${sheetName}: missing ${missing.join(', ')}`)
+  return indexes
 }
 
 function number(value) {
@@ -77,32 +99,28 @@ function buildEmail(id, suffix = '') {
   return `${suffix}${id.toLowerCase()}@${domain.toLowerCase()}`
 }
 
-function makeSnapshotRow(row, monthLabel, period, joinedPeriod) {
-  // The source workbook packs optional values left-to-right. Column D is S/No,
-  // while the real savings amount begins in column E. Reconstruct the canonical
-  // fields instead of trusting the misleading header position for every row.
-  const thrift = number(row[4])
-  const packedFirst = number(row[5])
-  const packedSecond = number(row[6])
-  const packedThird = number(row[7])
-  const packedFourth = number(row[8])
-  const isJoiningMonth = joinedPeriod === period
-  const feeEligible = isJoiningMonth && period >= '2026-02'
-  const special = packedFirst > 1000 ? packedFirst : 0
-  const charges = isJoiningMonth ? 0 : 100
-  const newMember = feeEligible ? 1000 : 0
-  const loan = packedThird > 1000 ? packedThird : packedSecond > 1000 && packedSecond !== 1000 ? packedSecond : 0
-  const commodity = packedFourth > 0 ? packedFourth : 0
+function makeSnapshotRow(row, monthLabel, columnIndex) {
+  // Sheets differ by a blank spacer column, so optional fields must be read by
+  // normalized header name rather than a fixed position.
+  const value = (column) => row[columnIndex.get(column)]
+  const thrift = number(value('thrift savings'))
+  const special = number(value('special saving'))
+  const charges = number(value('charges'))
+  const newMember = number(value('new member'))
+  const loan = number(value('loan'))
+  const commodity = number(value('commodity'))
   const total = thrift + special + charges + newMember + loan + commodity
-  const id = staffId(row[1])
-  const name = text(row[2])
+  const id = staffId(value('employee no'))
+  const name = text(value('employee name'))
 
   return {
     'Employee No.': id,
     'Employee Name': name,
     Amount: thrift + special,
     Month: monthLabel,
-    'Month Joined': joinedPeriod ? monthMap.get(joinedPeriod)?.label || joinedPeriod : '',
+    // The source workbook does not provide Month Joined. Do not infer it from
+    // first appearance because downstream report logic uses it to normalize fees.
+    'Month Joined': '',
     'Monthly Saving': thrift,
     'Special Saving': special,
     Loan: loan,
@@ -138,22 +156,20 @@ function readWorkbook() {
       raw: true,
       defval: '',
     })
-    const header = (rows[0] || []).slice(0, sourceColumns.length).map(text)
-    if (sourceColumns.some((value, index) => header[index] !== value)) {
-      throw new Error(`Header mismatch in ${sheetName}: ${header.join(' | ')}`)
-    }
+    const header = rows[0] || []
+    const columnIndex = resolveSourceColumns(header, sheetName)
 
     const seen = new Set()
     const rawRows = []
     for (let index = 1; index < rows.length; index += 1) {
       const row = rows[index] || []
-      const serialText = text(row[0])
-      const rawStaffId = text(row[1])
-      const name = text(row[2])
+      const serialText = text(row[columnIndex.get('s no')])
+      const rawStaffId = text(row[columnIndex.get('employee no')])
+      const name = text(row[columnIndex.get('employee name')])
       if (!serialText && !rawStaffId && !name) continue
       if (!/^\d+$/.test(serialText)) throw new Error(`${sheetName} row ${index + 1}: S/No must be an integer.`)
 
-      const id = staffId(row[1])
+      const id = staffId(row[columnIndex.get('employee no')])
       if (!id) throw new Error(`${sheetName} row ${index + 1}: Staff ID is empty.`)
       if (!name) throw new Error(`${sheetName} row ${index + 1}: Employee Name is empty.`)
       if (seen.has(id)) throw new Error(`${sheetName} row ${index + 1}: duplicate Staff ID ${id}.`)
@@ -165,7 +181,7 @@ function readWorkbook() {
     }
 
     if (rawRows.length === 0) throw new Error(`No member rows found in ${sheetName}.`)
-    rawMonths.push({ ...meta, sheetName, rows: rawRows })
+    rawMonths.push({ ...meta, sheetName, rows: rawRows, columnIndex })
   }
 
   rawMonths.sort((a, b) => a.period.localeCompare(b.period))
@@ -173,8 +189,8 @@ function readWorkbook() {
 
   for (const month of rawMonths) {
     const parsedRows = month.rows.map((row) => {
-      const id = staffId(row[1])
-      const snapshotRow = makeSnapshotRow(row, month.label, month.period, firstSeen.get(id))
+      const id = staffId(row[month.columnIndex.get('employee no')])
+      const snapshotRow = makeSnapshotRow(row, month.label, month.columnIndex)
       thriftTotals.set(id, (thriftTotals.get(id) || 0) + snapshotRow['Monthly Saving'])
       specialTotals.set(id, (specialTotals.get(id) || 0) + snapshotRow['Special Saving'])
       return snapshotRow
@@ -183,17 +199,12 @@ function readWorkbook() {
   }
 
   const latest = months[months.length - 1]
-  const augustRows = latest.rows.map((row) => {
-    const total = row['Monthly Saving'] + row['Special Saving'] + 100 + row.Loan + row.Commodity
-    return {
-      ...row,
-      Month: 'Aug 2026',
-      'Monthly Fee': 100,
-      'Form Fee': 0,
-      Total: total,
-      'Member Type': 'OLD',
-    }
-  })
+  const augustRows = latest.rows.map((row) => ({
+    // August is an exact carry-forward of July. Only the period label changes
+    // so the app can display it as its own month.
+    ...row,
+    Month: 'Aug 2026',
+  }))
   months.push({
     period: '2026-08',
     label: 'Aug 2026',
