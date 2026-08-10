@@ -33,6 +33,21 @@ const sourceColumns = [
   'Total',
 ]
 
+const canonicalColumns = [
+  'Employee No.',
+  'Employee Name',
+  'Amount',
+  'Month',
+  'Monthly Saving',
+  'Special Saving',
+  'Loan',
+  'Management Fee',
+  'Commodity',
+  'Monthly Fee',
+  'Form Fee',
+  'Total',
+]
+
 function text(value) {
   return String(value ?? '').trim()
 }
@@ -62,42 +77,48 @@ function buildEmail(id, suffix = '') {
   return `${suffix}${id.toLowerCase()}@${domain.toLowerCase()}`
 }
 
-function makeSnapshotRow(row, monthLabel) {
-  const thrift = number(row[3])
-  const special = number(row[4])
-  const charges = number(row[5])
-  const newMember = number(row[6])
-  const loan = number(row[7])
-  const commodity = number(row[8])
+function makeSnapshotRow(row, monthLabel, period, joinedPeriod) {
+  // The source workbook packs optional values left-to-right. Column D is S/No,
+  // while the real savings amount begins in column E. Reconstruct the canonical
+  // fields instead of trusting the misleading header position for every row.
+  const thrift = number(row[4])
+  const packedFirst = number(row[5])
+  const packedSecond = number(row[6])
+  const packedThird = number(row[7])
+  const packedFourth = number(row[8])
+  const isJoiningMonth = joinedPeriod === period
+  const feeEligible = isJoiningMonth && period >= '2026-02'
+  const special = packedFirst > 1000 ? packedFirst : 0
+  const charges = isJoiningMonth ? 0 : 100
+  const newMember = feeEligible ? 1000 : 0
+  const loan = packedThird > 1000 ? packedThird : packedSecond > 1000 && packedSecond !== 1000 ? packedSecond : 0
+  const commodity = packedFourth > 0 ? packedFourth : 0
   const total = thrift + special + charges + newMember + loan + commodity
   const id = staffId(row[1])
   const name = text(row[2])
 
   return {
-    // Original workbook fields.
-    'S/No': Number(text(row[0])),
     'Employee No.': id,
     'Employee Name': name,
-    'Thrift Savings': thrift,
-    'Special Saving': special,
-    Charges: charges,
-    'New Member': newMember,
-    Loan: loan,
-    Commodity: commodity,
-    Total: total,
-    // Compatibility aliases used by the existing reports and member views.
     Amount: thrift + special,
     Month: monthLabel,
+    'Month Joined': joinedPeriod ? monthMap.get(joinedPeriod)?.label || joinedPeriod : '',
     'Monthly Saving': thrift,
+    'Special Saving': special,
+    Loan: loan,
     'Management Fee': 0,
+    Commodity: commodity,
     'Monthly Fee': charges,
     'Form Fee': newMember,
+    Total: total,
+    'Member Type': newMember > 0 ? 'NEW' : 'OLD',
   }
 }
 
 function readWorkbook() {
   if (!fs.existsSync(workbookPath)) throw new Error(`Workbook not found: ${workbookPath}`)
   const workbook = XLSX.readFile(workbookPath, { cellFormula: true, cellDates: true, raw: true })
+  const rawMonths = []
   const months = []
   const allIds = new Set()
   const firstSeen = new Map()
@@ -123,7 +144,7 @@ function readWorkbook() {
     }
 
     const seen = new Set()
-    const parsedRows = []
+    const rawRows = []
     for (let index = 1; index < rows.length; index += 1) {
       const row = rows[index] || []
       const serialText = text(row[0])
@@ -138,23 +159,41 @@ function readWorkbook() {
       if (seen.has(id)) throw new Error(`${sheetName} row ${index + 1}: duplicate Staff ID ${id}.`)
       seen.add(id)
 
-      const snapshotRow = makeSnapshotRow(row, meta.label)
-      parsedRows.push(snapshotRow)
+      rawRows.push(row)
       allIds.add(id)
       if (!firstSeen.has(id)) firstSeen.set(id, meta.period)
-      thriftTotals.set(id, (thriftTotals.get(id) || 0) + snapshotRow['Thrift Savings'])
-      specialTotals.set(id, (specialTotals.get(id) || 0) + snapshotRow['Special Saving'])
     }
 
-    if (parsedRows.length === 0) throw new Error(`No member rows found in ${sheetName}.`)
-    months.push({ ...meta, sheetName, rows: parsedRows })
+    if (rawRows.length === 0) throw new Error(`No member rows found in ${sheetName}.`)
+    rawMonths.push({ ...meta, sheetName, rows: rawRows })
   }
 
-  months.sort((a, b) => a.period.localeCompare(b.period))
-  if (months.length !== 10) throw new Error(`Expected 10 populated source sheets, found ${months.length}.`)
+  rawMonths.sort((a, b) => a.period.localeCompare(b.period))
+  if (rawMonths.length !== 10) throw new Error(`Expected 10 populated source sheets, found ${rawMonths.length}.`)
+
+  for (const month of rawMonths) {
+    const parsedRows = month.rows.map((row) => {
+      const id = staffId(row[1])
+      const snapshotRow = makeSnapshotRow(row, month.label, month.period, firstSeen.get(id))
+      thriftTotals.set(id, (thriftTotals.get(id) || 0) + snapshotRow['Monthly Saving'])
+      specialTotals.set(id, (specialTotals.get(id) || 0) + snapshotRow['Special Saving'])
+      return snapshotRow
+    })
+    months.push({ ...month, rows: parsedRows })
+  }
 
   const latest = months[months.length - 1]
-  const augustRows = latest.rows.map((row) => ({ ...row, Month: 'Aug 2026' }))
+  const augustRows = latest.rows.map((row) => {
+    const total = row['Monthly Saving'] + row['Special Saving'] + 100 + row.Loan + row.Commodity
+    return {
+      ...row,
+      Month: 'Aug 2026',
+      'Monthly Fee': 100,
+      'Form Fee': 0,
+      Total: total,
+      'Member Type': 'OLD',
+    }
+  })
   months.push({
     period: '2026-08',
     label: 'Aug 2026',
@@ -186,6 +225,16 @@ async function main() {
       latestMemberCount: latestIds.size,
       skipSheets: ['Summary', 'August'],
       preservedTables: ['admins', 'loans', 'repayments', 'payments', 'transactions', 'commodity_requests', 'withdrawals', 'member_privileges', 'vouchers', 'payroll_cycles', 'payroll_lines'],
+      feeAudit: parsed.months.map((month) => ({
+        period: month.period,
+        rows: month.rows.length,
+        monthlyFees: [...new Set(month.rows.map((row) => row['Monthly Fee']))].sort((a, b) => a - b),
+        formFees: [...new Set(month.rows.map((row) => row['Form Fee']))].sort((a, b) => a - b),
+        memberTypes: {
+          new: month.rows.filter((row) => row['Member Type'] === 'NEW').length,
+          old: month.rows.filter((row) => row['Member Type'] === 'OLD').length,
+        },
+      })),
     }
 
     if (dryRun) {
@@ -202,7 +251,7 @@ async function main() {
           period: month.period,
           label: month.label,
           rowCount: month.rows.length,
-          columns: sourceColumns,
+          columns: canonicalColumns,
           rows: month.rows,
           uploadedById: admin.id,
           uploadedAt,
@@ -217,7 +266,7 @@ async function main() {
         const joinPeriod = parsed.firstSeen.get(id)
         const memberData = {
           name: row['Employee Name'],
-          monthlyContribution: row['Thrift Savings'],
+          monthlyContribution: row['Monthly Saving'],
           specialContribution: row['Special Saving'],
           balance: parsed.thriftTotals.get(id) || 0,
           specialBalance: parsed.specialTotals.get(id) || 0,
