@@ -46,16 +46,20 @@ function rowsFromJson(value: unknown): SnapshotRow[] {
 async function readMemberPrincipals(userId: string) {
   // Read through JSON so an older production database can still render the
   // dashboard while the additive principal-column migration is being applied.
-  const rows = await prisma.$queryRaw<Array<{ loanPrincipal: number | null; commodityPrincipal: number | null }>>`
-    SELECT
-      COALESCE((to_jsonb(u)->>'loan_principal')::double precision, 0) AS "loanPrincipal",
-      COALESCE((to_jsonb(u)->>'commodity_principal')::double precision, 0) AS "commodityPrincipal"
-    FROM "users" AS u
-    WHERE u.id = ${userId}
-    LIMIT 1
-  `
+  try {
+    const rows = await prisma.$queryRaw<Array<{ loanPrincipal: number | null; commodityPrincipal: number | null }>>`
+      SELECT
+        COALESCE((to_jsonb(u)->>'loan_principal')::double precision, 0) AS "loanPrincipal",
+        COALESCE((to_jsonb(u)->>'commodity_principal')::double precision, 0) AS "commodityPrincipal"
+      FROM "users" AS u
+      WHERE u.id = ${userId}
+      LIMIT 1
+    `
 
-  return rows[0] || { loanPrincipal: 0, commodityPrincipal: 0 }
+    return rows[0] || { loanPrincipal: 0, commodityPrincipal: 0 }
+  } catch {
+    return { loanPrincipal: 0, commodityPrincipal: 0 }
+  }
 }
 
 /**
@@ -67,6 +71,13 @@ export async function getMemberFinanceSummary(
   userId: string,
   staffId: string | null | undefined
 ): Promise<MemberFinanceSummary> {
+  const commodityRepaymentAggregate = prisma.commodityRepayment
+    .aggregate({
+      where: { userId },
+      _sum: { amount: true },
+    })
+    .catch(() => ({ _sum: { amount: 0 } }))
+
   const [member, approvedLoans, loanRepaymentPayments, approvedCommodities, commodityRepayments, snapshots] =
     await Promise.all([
       readMemberPrincipals(userId),
@@ -86,10 +97,7 @@ export async function getMemberFinanceSummary(
         where: { userId, status: 'APPROVED' },
         select: { adminQuotedPrice: true, preferredBudget: true },
       }),
-      prisma.commodityRepayment.aggregate({
-        where: { userId },
-        _sum: { amount: true },
-      }),
+      commodityRepaymentAggregate,
       prisma.memberDataMonth.findMany({
         orderBy: { period: 'asc' },
         select: { period: true, rows: true },
