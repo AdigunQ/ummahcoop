@@ -67,7 +67,7 @@ async function readMemberPrincipals(userId: string) {
  * imported Loan and Commodity columns are deductions, not original amounts;
  * the original amounts are stored on User and entered by an admin.
  */
-export async function getMemberFinanceSummary(
+async function loadMemberFinanceSummary(
   userId: string,
   staffId: string | null | undefined
 ): Promise<MemberFinanceSummary> {
@@ -168,5 +168,31 @@ export async function getMemberFinanceSummary(
     commodityOutstanding: Math.max(commodityCollected - commodityPaid, 0),
     commodityRepaymentStartPeriod,
     ledgerPeriod: snapshots[snapshots.length - 1]?.period || null,
+  }
+}
+
+export async function getMemberFinanceSummary(
+  userId: string,
+  staffId: string | null | undefined
+): Promise<MemberFinanceSummary> {
+  try {
+    return await loadMemberFinanceSummary(userId, staffId)
+  } catch (error) {
+    console.error('[member-finance] summary unavailable', error)
+    return {
+      loanCount: 0,
+      loanPrincipal: 0,
+      loanCollected: 0,
+      loanPaid: 0,
+      loanOutstanding: 0,
+      loanRepaymentStartPeriod: null,
+      commodityCount: 0,
+      commodityPrincipal: 0,
+      commodityCollected: 0,
+      commodityPaid: 0,
+      commodityOutstanding: 0,
+      commodityRepaymentStartPeriod: null,
+      ledgerPeriod: null,
+    }
   }
 }
