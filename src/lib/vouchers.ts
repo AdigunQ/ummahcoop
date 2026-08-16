@@ -43,6 +43,8 @@ export type VoucherRow = {
   memberFee: number
   totalSavings: number
   memberType: 'NEW' | 'OLD'
+  loanAmount: number
+  commodityAmount: number
 }
 
 export type VoucherDataset = {
@@ -218,6 +220,8 @@ type VoucherSourceRow = {
   rawNewMemberFee: number
   rawTotal: number
   rawMemberType: string
+  rawLoan: number
+  rawCommodity: number
   hasMonthJoined: boolean
 }
 
@@ -248,6 +252,8 @@ function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow |
       memberFee,
       totalSavings,
       memberType: isNew ? 'NEW' : 'OLD',
+      loanAmount: source.rawLoan,
+      commodityAmount: source.rawCommodity,
     }
   }
 
@@ -267,6 +273,8 @@ function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow |
     memberFee,
     totalSavings,
     memberType: isNew ? 'NEW' : 'OLD',
+    loanAmount: source.rawLoan,
+    commodityAmount: source.rawCommodity,
   }
 }
 
@@ -286,6 +294,8 @@ function buildRowsFromSnapshot(snapshotRows: SnapshotRow[], period: string): Vou
           rawNewMemberFee: pickNumber(row, ['New Member Fee', 'Form Fee']),
           rawTotal: pickNumber(row, ['Total', 'Amount']),
           rawMemberType: pickText(row, ['Member Type']).toUpperCase(),
+          rawLoan: pickNumber(row, ['Loan', 'Loan Originated']),
+          rawCommodity: pickNumber(row, ['Commodity', 'Commodity Requests', 'Comodity']),
           hasMonthJoined: Boolean(monthJoined),
         },
         period
@@ -345,6 +355,8 @@ export async function buildVoucherDataset(periodInput?: string): Promise<Voucher
           rawNewMemberFee: 0,
           rawTotal: 0,
           rawMemberType: 'OLD',
+          rawLoan: 0,
+          rawCommodity: 0,
           hasMonthJoined: false,
         },
         period

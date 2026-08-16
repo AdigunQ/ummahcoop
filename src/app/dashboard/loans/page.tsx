@@ -5,9 +5,11 @@ import { differenceInMonths } from 'date-fns'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils'
-import { LOAN_POLICY } from '@/lib/constants'
-import { LOAN_REQUEST_POLICY, sanitizeLoanApplicationData } from '@/lib/loan-request'
+import { LOAN_REQUEST_POLICY, getLoanLimit, sanitizeLoanApplicationData } from '@/lib/loan-request'
 import { PRIVILEGE_CODES, canAccessWithPrivileges } from '@/lib/access'
+import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
+import { resolveVoucherPeriod } from '@/lib/vouchers'
+import { getMemberFinanceSummary } from '@/lib/member-finance'
 
 async function reviewLoan(formData: FormData) {
   'use server'
@@ -32,6 +34,7 @@ async function reviewLoan(formData: FormData) {
           balance: true,
           loanBalance: true,
           createdAt: true,
+          staffId: true,
         },
       },
     },
@@ -42,8 +45,9 @@ async function reviewLoan(formData: FormData) {
   }
 
   const approved = action === 'approve'
-  const eligibility = (loan.user?.balance || 0) * LOAN_POLICY.maxSavingsMultiplier
-  const hasOutstandingLoan = (loan.user?.loanBalance || 0) > 0
+  const eligibility = getLoanLimit(loan.user?.balance || 0)
+  const financeSummary = await getMemberFinanceSummary(loan.userId, loan.user?.staffId)
+  const hasOutstandingLoan = (loan.user?.loanBalance || 0) > 0 || financeSummary.loanOutstanding > 0
   const tenureOk = loan.user?.createdAt ? differenceInMonths(new Date(), loan.user.createdAt) >= LOAN_REQUEST_POLICY.minTenureMonths : false
   const cannotApprove = loan.amount > eligibility || hasOutstandingLoan || !tenureOk
 
@@ -115,7 +119,7 @@ export default async function LoansPage() {
     redirect('/dashboard')
   }
 
-  const [pendingLoans, recentLoans] = await Promise.all([
+  const [pendingLoans, recentLoans, currentDataset] = await Promise.all([
     prisma.loan.findMany({
       where: { status: 'PENDING' },
       orderBy: { createdAt: 'asc' },
@@ -150,7 +154,10 @@ export default async function LoansPage() {
         },
       },
     }),
+    getCurrentMemberLiveDataset(resolveVoucherPeriod().period),
   ])
+  const ledgerLoans = currentDataset.rows.filter((row) => row.loanAmount > 0)
+  const ledgerLoanByStaffId = new Map(ledgerLoans.map((row) => [row.staffId.trim().toUpperCase(), row.loanAmount]))
   const hasTenureRequirement = LOAN_REQUEST_POLICY.minTenureMonths > 0
 
   return (
@@ -168,7 +175,7 @@ export default async function LoansPage() {
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <MetricCard
           label="Pending requests"
           value={pendingLoans.length.toString()}
@@ -187,6 +194,12 @@ export default async function LoansPage() {
           tone="green"
           caption="Last 10 decisions"
         />
+        <MetricCard
+          label="Ledger active loans"
+          value={ledgerLoans.length.toString()}
+          tone="blue"
+          caption={formatCurrency(ledgerLoans.reduce((sum, row) => sum + row.loanAmount, 0))}
+        />
       </div>
 
       <section className="card overflow-hidden">
@@ -203,9 +216,11 @@ export default async function LoansPage() {
           <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
             {pendingLoans.map((loan) => {
               const application = sanitizeLoanApplicationData(loan.applicationData)
-              const maxEligible = loan.user?.balance ? loan.user.balance * LOAN_POLICY.maxSavingsMultiplier : 0
+              const maxEligible = getLoanLimit(loan.user?.balance || 0)
               const tenureMonths = loan.user?.createdAt ? differenceInMonths(new Date(), loan.user.createdAt) : 0
-              const hasOutstandingLoan = (loan.user?.loanBalance || 0) > 0
+              const hasOutstandingLoan =
+                (loan.user?.loanBalance || 0) > 0 ||
+                (ledgerLoanByStaffId.get((loan.user?.staffId || '').trim().toUpperCase()) || 0) > 0
               const canApprove = !hasOutstandingLoan && loan.amount <= maxEligible && tenureMonths >= LOAN_REQUEST_POLICY.minTenureMonths
 
               return (
@@ -334,6 +349,29 @@ export default async function LoansPage() {
                 </div>
               )
             })}
+          </div>
+        )}
+      </section>
+
+      <section className="card overflow-hidden">
+        <div className="border-b px-6 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+          <p className="label-eyebrow">Imported member data</p>
+          <h2 className="mt-1 text-base font-semibold tracking-tight">Current ledger loan exposure</h2>
+          <p className="mt-1 text-xs text-muted-foreground">These facilities came from the latest Member Data upload and are now included in active totals.</p>
+        </div>
+        {ledgerLoans.length === 0 ? (
+          <div className="px-6 py-8 text-center text-sm text-muted-foreground">No loan amounts in the current ledger.</div>
+        ) : (
+          <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
+            {ledgerLoans.map((row) => (
+              <div key={row.staffId} className="flex flex-col gap-2 px-6 py-4 text-sm md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="font-semibold">{row.name}</p>
+                  <p className="text-muted-foreground">Staff ID: {row.staffId}</p>
+                </div>
+                <p className="font-semibold">{formatCurrency(row.loanAmount)}</p>
+              </div>
+            ))}
           </div>
         )}
       </section>

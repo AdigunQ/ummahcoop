@@ -11,5 +11,5 @@ export default async function AnalyticsPage() {
     redirect('/dashboard')
   }
 
-  return <AdminAnalytics />
+  return <AdminAnalytics canSwitchToMember={session.user.role === 'MEMBER'} />
 }

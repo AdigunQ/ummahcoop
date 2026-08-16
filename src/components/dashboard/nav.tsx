@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard,
@@ -121,14 +122,24 @@ function isGeneratedMemberEmail(email: string, staffId?: string | null) {
 
 export function DashboardNav({ user, adminBadges }: NavProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const privilegeCodes = new Set((user.privileges || []).map((privilege) => privilege.code))
   const hasGrantedAccess = privilegeCodes.size > 0
+  const isMemberView = searchParams.get('view') === 'member'
   const specialItems = user.role === 'ADMIN'
     ? []
     : privilegedNavItems.filter((item, index, list) => privilegeCodes.has(item.privilege) && list.findIndex((candidate) => candidate.href === item.href) === index)
-  const navItems = user.role === 'ADMIN' ? adminNavItems : [...memberNavItems, ...specialItems]
+  const privilegedAdminItems: NavItem[] = [
+    { href: '/dashboard', label: 'Admin overview', icon: LayoutDashboard, group: 'Admin' },
+    ...specialItems,
+  ]
+  const navItems = user.role === 'ADMIN'
+    ? adminNavItems
+      : hasGrantedAccess && !isMemberView
+      ? privilegedAdminItems
+      : memberNavItems
   const badgeCounts = {
     pending: adminBadges?.pendingMembers ?? 0,
     payments: adminBadges?.pendingPayments ?? 0,
@@ -234,6 +245,16 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
                   </p>
                 </div>
               </div>
+              {hasGrantedAccess && (
+                <Link
+                  href={isMemberView ? '/dashboard' : '/dashboard?view=member'}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="mt-3 flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+                  style={{ borderColor: 'rgb(var(--border))' }}
+                >
+                  {isMemberView ? 'Switch to admin view' : 'Switch to member view'}
+                </Link>
+              )}
             </div>
           )}
 
@@ -246,11 +267,12 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
                 </p>
                 <div className="space-y-0.5">
                   {items.map((item) => {
-                    const active = pathname === item.href
+                    const href = item.href === '/dashboard' && isMemberView ? '/dashboard?view=member' : item.href
+                    const active = pathname === item.href && (!isMemberView || item.href === '/dashboard')
                     return (
                       <Link
                         key={item.href}
-                        href={item.href}
+                        href={href}
                         data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                         onClick={() => setIsMobileMenuOpen(false)}
                         className={cn(

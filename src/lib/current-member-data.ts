@@ -95,6 +95,8 @@ function buildCurrentLiveRow(
     memberFee,
     totalSavings,
     memberType: isNew ? 'NEW' : 'OLD',
+    loanAmount: 0,
+    commodityAmount: 0,
   }
 }
 

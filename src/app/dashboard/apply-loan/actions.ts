@@ -14,6 +14,7 @@ import {
   normalizeGuarantorStaffId,
   type LoanApplicationData,
 } from '@/lib/loan-request'
+import { getMemberFinanceSummary } from '@/lib/member-finance'
 
 const loanRequestSchema = z.object({
   loanType: z.string().trim().min(1),
@@ -87,6 +88,8 @@ export async function submitLoanRequest(formData: FormData) {
     return { error: 'Member record could not be loaded.' }
   }
 
+  const financeSummary = await getMemberFinanceSummary(member.id, member.staffId)
+
   if (member.status !== 'ACTIVE') {
     return { error: 'Your account must be active before you can request a loan.' }
   }
@@ -104,7 +107,7 @@ export async function submitLoanRequest(formData: FormData) {
     return { error: 'Requested amount is too small.' }
   }
 
-  if (member.loanBalance > 0 || member.loans.length > 0) {
+  if (member.loanBalance > 0 || financeSummary.loanOutstanding > 0 || member.loans.length > 0) {
     return { error: 'You cannot submit another loan while a request or balance is outstanding.' }
   }
 

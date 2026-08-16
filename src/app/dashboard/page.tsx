@@ -4,9 +4,14 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
 import { MemberDashboard } from '@/components/dashboard/member-dashboard'
-import { LOAN_POLICY } from '@/lib/constants'
+import { getMemberFinanceSummary } from '@/lib/member-finance'
+import { getLoanLimit } from '@/lib/loan-request'
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: { view?: string }
+}) {
   const session = await getServerSession(authOptions)
   const email = session?.user?.email
 
@@ -22,8 +27,8 @@ export default async function DashboardPage() {
     ? await prisma.memberPrivilege.count({ where: { userId: session.user.id } })
     : 0
 
-  if (grantedAccessCount > 0) {
-    return <AdminAnalytics />
+  if (grantedAccessCount > 0 && searchParams?.view !== 'member') {
+    return <AdminAnalytics canSwitchToMember />
   }
 
   // Get member data
@@ -56,21 +61,10 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  const approvedLoanSummary = await prisma.loan.aggregate({
-    where: {
-      userId: user.id,
-      status: 'APPROVED',
-    },
-    _count: {
-      _all: true,
-    },
-    _sum: {
-      amount: true,
-    },
-  })
+  const financeSummary = await getMemberFinanceSummary(user.id, user.staffId)
 
   // Member dashboard data
-  const loanEligibility = user.balance * LOAN_POLICY.maxSavingsMultiplier
+  const loanEligibility = getLoanLimit(user.balance)
   const memberProfile = {
     id: user.id,
     name: user.name,
@@ -82,7 +76,7 @@ export default async function DashboardPage() {
     balance: user.balance,
     specialBalance: user.specialBalance,
     totalContributions: user.totalContributions,
-    loanBalance: user.loanBalance,
+    loanBalance: Math.max(user.loanBalance, financeSummary.loanOutstanding),
     monthlyContribution: user.monthlyContribution,
     specialContribution: user.specialContribution,
   }
@@ -92,9 +86,12 @@ export default async function DashboardPage() {
       user={memberProfile}
       loanEligibility={loanEligibility}
       loanSummary={{
-        approvedCount: approvedLoanSummary._count._all || 0,
-        approvedAmount: approvedLoanSummary._sum.amount || 0,
+        approvedCount: financeSummary.loanCount,
+        approvedAmount: financeSummary.loanCollected,
+        paidAmount: financeSummary.loanPaid,
+        outstandingAmount: financeSummary.loanOutstanding,
       }}
+      commoditySummary={financeSummary}
       recentPayments={user.payments}
       recentLoans={user.loans}
       recentCommodities={user.commodityRequests}

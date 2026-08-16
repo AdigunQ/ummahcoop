@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { LOAN_REQUEST_POLICY } from '@/lib/loan-request'
 import { buildVoucherDataset, firstVoucherPeriodForCreatedAt, resolveVoucherPeriod } from '@/lib/vouchers'
+import { getMemberFinanceSummary } from '@/lib/member-finance'
 
 function normalizeStaffId(value: unknown): string {
   return String(value || '')
@@ -71,6 +72,7 @@ function buildLoanHeader(): string[] {
     'Interest Rate (%)',
     'Admin Charge',
     'Status',
+    'Paid So Far',
     'Balance',
   ]
 }
@@ -86,6 +88,8 @@ function buildCommodityHeader(): string[] {
     'Status',
     'Admin Quote',
     'Repayment Plan (months)',
+    'Paid So Far',
+    'Outstanding',
     'Notes',
   ]
 }
@@ -115,6 +119,7 @@ export async function GET() {
   const staffId = user.staffId
   const normalizedStaffId = normalizeStaffId(staffId)
   const targetName = user.name || staffId
+  const financeSummary = await getMemberFinanceSummary(session.user.id, staffId)
 
   const startPeriod = firstVoucherPeriodForCreatedAt(user.createdAt)
   const endPeriod = resolveVoucherPeriod().period
@@ -158,6 +163,7 @@ export async function GET() {
       interestRate: true,
       status: true,
       balance: true,
+      repayments: { select: { amount: true } },
     },
   })
 
@@ -173,6 +179,7 @@ export async function GET() {
       adminQuotedPrice: true,
       adminApprovedMonths: true,
       adminFeedback: true,
+      repayments: { select: { amount: true } },
     },
   })
 
@@ -220,7 +227,7 @@ export async function GET() {
   lines.push([])
   lines.push(buildLoanHeader())
 
-  if (loans.length === 0) {
+  if (loans.length === 0 && financeSummary.loanCount === 0) {
     lines.push([
       'Loan',
       '-',
@@ -233,11 +240,28 @@ export async function GET() {
       0,
       '-',
       0,
+      0,
+    ])
+  } else if (loans.length === 0) {
+    lines.push([
+      'Loan',
+      financeSummary.ledgerPeriod || '-',
+      staffId,
+      targetName,
+      financeSummary.loanCollected,
+      'Imported member ledger',
+      0,
+      0,
+      0,
+      'APPROVED',
+      financeSummary.loanPaid,
+      financeSummary.loanOutstanding,
     ])
   } else {
     for (const loan of loans) {
       const adminChargeRate = loan.interestRate || LOAN_REQUEST_POLICY.adminChargePercent
       const adminCharge = (safeNumber(loan.amount) * safeNumber(adminChargeRate)) / 100
+      const paid = loan.repayments.reduce((sum, repayment) => sum + safeNumber(repayment.amount), 0)
       lines.push([
         'Loan',
         new Date(loan.createdAt).toISOString(),
@@ -249,6 +273,7 @@ export async function GET() {
         safeNumber(adminChargeRate),
         safeNumber(adminCharge),
         loan.status || 'PENDING',
+        paid,
         safeNumber(loan.balance),
       ])
     }
@@ -257,7 +282,7 @@ export async function GET() {
   lines.push([])
   lines.push(buildCommodityHeader())
 
-  if (commodities.length === 0) {
+  if (commodities.length === 0 && financeSummary.commodityCount === 0) {
     lines.push([
       'Commodity',
       '-',
@@ -268,10 +293,29 @@ export async function GET() {
       'No Request',
       '-',
       '-',
+      0,
+      0,
       'No commodity requests yet.',
+    ])
+  } else if (commodities.length === 0) {
+    lines.push([
+      'Commodity',
+      financeSummary.ledgerPeriod || '-',
+      staffId,
+      targetName,
+      'Imported member ledger',
+      financeSummary.commodityCollected,
+      'APPROVED',
+      financeSummary.commodityCollected,
+      '',
+      financeSummary.commodityPaid,
+      financeSummary.commodityOutstanding,
+      '',
     ])
   } else {
     for (const commodity of commodities) {
+      const paid = commodity.repayments.reduce((sum, repayment) => sum + safeNumber(repayment.amount), 0)
+      const collected = safeNumber(commodity.adminQuotedPrice || commodity.preferredBudget)
       lines.push([
         'Commodity',
         new Date(commodity.createdAt).toISOString(),
@@ -282,6 +326,8 @@ export async function GET() {
         commodity.status || 'PENDING',
         commodity.adminQuotedPrice || '',
         commodity.adminApprovedMonths || '',
+        paid,
+        Math.max(0, collected - paid),
         commodity.adminFeedback || '',
       ])
     }

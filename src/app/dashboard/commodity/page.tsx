@@ -140,6 +140,40 @@ async function reviewCommodityRequest(formData: FormData) {
   revalidatePath('/dashboard/commodity')
 }
 
+async function recordCommodityRepayment(formData: FormData) {
+  'use server'
+
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.REVIEW_COMMODITY))) {
+    redirect('/dashboard')
+  }
+
+  const requestId = String(formData.get('requestId') || '').trim()
+  const amount = Number(formData.get('amount') || 0)
+  const notes = String(formData.get('notes') || '').trim()
+
+  if (!requestId || !Number.isFinite(amount) || amount <= 0) return
+
+  const request = await prisma.commodityRequest.findUnique({
+    where: { id: requestId },
+    select: { userId: true, status: true },
+  })
+
+  if (!request || request.status !== 'APPROVED') return
+
+  await prisma.commodityRepayment.create({
+    data: {
+      userId: request.userId,
+      commodityRequestId: requestId,
+      amount,
+      notes: notes || null,
+    },
+  })
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/commodity')
+}
+
 export default async function CommodityPage({
   searchParams,
 }: {
@@ -183,6 +217,7 @@ export default async function CommodityPage({
         take: 12,
         include: {
           user: { select: { name: true, email: true } },
+          repayments: { orderBy: { date: 'desc' } },
         },
       }),
     ])
@@ -275,6 +310,19 @@ export default async function CommodityPage({
                     {request.adminFeedback && (
                       <p className="text-xs text-gray-500">{request.adminFeedback}</p>
                     )}
+                    {request.status === 'APPROVED' && (
+                      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <p className="text-xs text-gray-600">
+                          Paid so far: <span className="font-semibold text-gray-900">{formatCurrency(request.repayments.reduce((sum, repayment) => sum + repayment.amount, 0))}</span>
+                        </p>
+                        <form action={recordCommodityRepayment} className="mt-2 flex flex-wrap gap-2">
+                          <input type="hidden" name="requestId" value={request.id} />
+                          <input name="amount" type="number" min="1" step="100" placeholder="Repayment amount" className="w-40 rounded-lg border border-gray-300 px-3 py-2 text-xs" required />
+                          <input name="notes" type="text" placeholder="Optional note" className="min-w-[180px] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-xs" />
+                          <button type="submit" className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-700">Record repayment</button>
+                        </form>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <StatusBadge status={request.status} />
@@ -313,6 +361,7 @@ export default async function CommodityPage({
         take: 12,
         include: {
           user: { select: { name: true, email: true } },
+          repayments: { orderBy: { date: 'desc' } },
         },
       }),
     ])
@@ -424,6 +473,11 @@ export default async function CommodityPage({
                         {request.adminMonthlyRepayment ? ` (${formatCurrency(request.adminMonthlyRepayment)} monthly)` : ''}
                       </p>
                     )}
+                    {request.status === 'APPROVED' && (
+                      <p className="text-gray-500">
+                        Paid so far: {formatCurrency(request.repayments.reduce((sum, repayment) => sum + repayment.amount, 0))}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <StatusBadge status={request.status} />
@@ -443,6 +497,7 @@ export default async function CommodityPage({
     where: { userId: session.user.id },
     orderBy: { createdAt: 'desc' },
     take: 12,
+    include: { repayments: { orderBy: { date: 'desc' } } },
   })
 
   return (
@@ -525,6 +580,12 @@ export default async function CommodityPage({
                     <p className="mt-2 text-xs text-gray-600">
                       Admin offer: {formatCurrency(request.adminQuotedPrice)} over {request.adminApprovedMonths || '-'} months
                     </p>
+                  )}
+                  {request.status === 'APPROVED' && (
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600">
+                      <span>Paid: {formatCurrency(request.repayments.reduce((sum, repayment) => sum + repayment.amount, 0))}</span>
+                      <span>Outstanding: {formatCurrency(Math.max(0, (request.adminQuotedPrice || request.preferredBudget || 0) - request.repayments.reduce((sum, repayment) => sum + repayment.amount, 0)))}</span>
+                    </div>
                   )}
                   {request.adminFeedback && (
                     <p className="mt-1 text-xs text-gray-500">{request.adminFeedback}</p>

@@ -41,6 +41,15 @@ interface MemberDashboardProps {
   loanSummary: {
     approvedCount: number
     approvedAmount: number
+    paidAmount: number
+    outstandingAmount: number
+  }
+  commoditySummary: {
+    commodityCount: number
+    commodityCollected: number
+    commodityPaid: number
+    commodityOutstanding: number
+    ledgerPeriod: string | null
   }
   recentPayments: any[]
   recentLoans: any[]
@@ -57,6 +66,7 @@ export function MemberDashboard({
   user,
   loanEligibility,
   loanSummary,
+  commoditySummary,
   recentPayments,
   recentLoans,
   recentCommodities,
@@ -92,6 +102,8 @@ export function MemberDashboard({
   const specialPlan = user.specialContribution || 0
   const approvedLoanCount = loanSummary.approvedCount || 0
   const approvedLoanAmount = loanSummary.approvedAmount || 0
+  const loanPaidAmount = loanSummary.paidAmount || 0
+  const loanOutstandingAmount = loanSummary.outstandingAmount || 0
   const staffId = user.staffId || 'N/A'
   const department = user.department || 'N/A'
   const totalBalance = user.balance + user.specialBalance
@@ -166,7 +178,8 @@ export function MemberDashboard({
         <MetricCard title="Thrift savings" value={formatCurrency(user.balance)} icon={PiggyBank} tone="emerald" />
         <MetricCard title="Special savings" value={formatCurrency(user.specialBalance)} icon={Wallet} tone="indigo" />
         <MetricCard title="Total contributed" value={formatCurrency(user.totalContributions)} icon={Landmark} tone="slate" />
-        <MetricCard title="Loan balance" value={formatCurrency(user.loanBalance)} icon={HandCoins} tone="amber" />
+        <MetricCard title="Loan outstanding" value={formatCurrency(loanOutstandingAmount)} icon={HandCoins} tone="amber" />
+        <MetricCard title="Commodity balance" value={formatCurrency(commoditySummary.commodityOutstanding)} icon={PackageSearch} tone="indigo" />
       </div>
 
       {/* 3-column detail */}
@@ -186,11 +199,24 @@ export function MemberDashboard({
         <PanelCard title="Loan summary" eyebrow="Borrowing">
           <div className="space-y-3">
             <DetailLine label="Approved loans" value={`${approvedLoanCount}`} />
-            <DetailLine label="Approved amount" value={formatCurrency(approvedLoanAmount)} />
-            <DetailLine label="Outstanding" value={formatCurrency(user.loanBalance)} />
+            <DetailLine label="Loans collected" value={formatCurrency(approvedLoanAmount)} />
+            <DetailLine label="Paid so far" value={formatCurrency(loanPaidAmount)} />
+            <DetailLine label="Outstanding" value={formatCurrency(loanOutstandingAmount)} />
           </div>
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
             Loan requests are reviewed inside the admin portal before disbursement.
+          </p>
+        </PanelCard>
+
+        <PanelCard title="Commodity summary" eyebrow="Repayment tracking">
+          <div className="space-y-3">
+            <DetailLine label="Commodity collected" value={formatCurrency(commoditySummary.commodityCollected)} />
+            <DetailLine label="Paid so far" value={formatCurrency(commoditySummary.commodityPaid)} />
+            <DetailLine label="Outstanding" value={formatCurrency(commoditySummary.commodityOutstanding)} />
+            <DetailLine label="Facilities" value={`${commoditySummary.commodityCount}`} />
+          </div>
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+            Includes approved commodity facilities and the latest imported ledger ({commoditySummary.ledgerPeriod || 'current'}).
           </p>
         </PanelCard>
 
@@ -252,8 +278,21 @@ export function MemberDashboard({
 
         <PanelCard title="Recent loans" eyebrow="Borrowing history" padded={false}>
           <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
-            {recentLoans.length === 0 ? (
+            {recentLoans.length === 0 && approvedLoanCount === 0 ? (
               <EmptyState icon={CheckCircle2} text="No loans yet" />
+            ) : recentLoans.length === 0 ? (
+              <div className="px-5 py-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Imported ledger loan</p>
+                    <p className="text-xs text-muted-foreground">Current collected amount</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-sm font-semibold">{formatCurrency(approvedLoanAmount)}</p>
+                    <StatusPill status="APPROVED" />
+                  </div>
+                </div>
+              </div>
             ) : (
               recentLoans.slice(0, 5).map((loan) => (
                 <div key={loan.id} className="flex items-center justify-between px-5 py-3.5">
@@ -273,8 +312,21 @@ export function MemberDashboard({
 
         <PanelCard title="Commodity tracking" eyebrow="Requests" padded={false}>
           <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
-            {recentCommodities.length === 0 ? (
+            {recentCommodities.length === 0 && commoditySummary.commodityCount === 0 ? (
               <EmptyState icon={PackageSearch} text="No commodity requests yet" />
+            ) : recentCommodities.length === 0 ? (
+              <div className="px-5 py-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Imported ledger commodity</p>
+                    <p className="text-xs text-muted-foreground">Current collected amount</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-sm font-semibold">{formatCurrency(commoditySummary.commodityCollected)}</p>
+                    <StatusPill status="APPROVED" />
+                  </div>
+                </div>
+              </div>
             ) : (
               recentCommodities.map((request) => (
                 <div key={request.id} className="px-5 py-3.5">

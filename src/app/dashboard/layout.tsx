@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { DashboardNav } from '@/components/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { autoPostMonthEndIfDue } from '@/lib/payroll'
+import { getMemberFinanceSummary } from '@/lib/member-finance'
 
 export default async function DashboardLayout({
   children,
@@ -45,6 +46,10 @@ export default async function DashboardLayout({
     await autoPostMonthEndIfDue()
   }
 
+  const navLoanBalance = user.role === 'MEMBER'
+    ? Math.max(user.loanBalance, (await getMemberFinanceSummary(user.id, user.staffId)).loanOutstanding)
+    : user.loanBalance
+
   const canSeeAdminBadges =
     user.role === 'ADMIN' || (user.privileges?.length || 0) > 0
 
@@ -62,7 +67,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardNav user={user} adminBadges={adminBadges} />
+      <DashboardNav user={{ ...user, loanBalance: navLoanBalance }} adminBadges={adminBadges} />
       <main className="min-h-screen lg:ml-72">
         <div className="px-4 pb-10 pt-20 lg:px-8 lg:pt-10">
           <div className="mx-auto max-w-6xl animate-fadeIn">{children}</div>

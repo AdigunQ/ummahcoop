@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { getMemberFinanceSummary } from '@/lib/member-finance'
 
 export default async function MyLoansPage() {
   const session = await getServerSession(authOptions)
@@ -18,6 +19,7 @@ export default async function MyLoansPage() {
   const member = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
+      staffId: true,
       loanBalance: true,
       loans: {
         include: {
@@ -35,9 +37,11 @@ export default async function MyLoansPage() {
     redirect('/login')
   }
 
+  const financeSummary = await getMemberFinanceSummary(session.user.id, member.staffId)
+
   const activeLoans = member.loans.filter((loan) => loan.status === 'APPROVED')
   const pendingLoans = member.loans.filter((loan) => loan.status === 'PENDING')
-  const totalApproved = activeLoans.reduce((sum, loan) => sum + loan.amount, 0)
+  const totalApproved = Math.max(activeLoans.reduce((sum, loan) => sum + loan.amount, 0), financeSummary.loanCollected)
 
   return (
     <div className="animate-fadeIn space-y-8">
@@ -46,19 +50,33 @@ export default async function MyLoansPage() {
         <p className="mt-1 text-gray-500">Track active facilities, pending requests, and repayment progress.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <MetricCard label="Total Loan Requests" value={member.loans.length.toString()} tone="blue" />
-        <MetricCard label="Active Loans" value={activeLoans.length.toString()} tone="green" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <MetricCard label="Total Loan Records" value={Math.max(member.loans.length, financeSummary.loanCount).toString()} tone="blue" />
+        <MetricCard label="Active Loans" value={Math.max(activeLoans.length, financeSummary.loanCount).toString()} tone="green" />
         <MetricCard label="Pending Review" value={pendingLoans.length.toString()} tone="amber" />
-        <MetricCard label="Outstanding Balance" value={formatCurrency(member.loanBalance)} tone="purple" />
+        <MetricCard label="Paid So Far" value={formatCurrency(financeSummary.loanPaid)} tone="blue" />
+        <MetricCard label="Outstanding Balance" value={formatCurrency(financeSummary.loanOutstanding)} tone="purple" />
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">Loan Portfolio</h2>
         </div>
-        {member.loans.length === 0 ? (
+        {member.loans.length === 0 && financeSummary.loanCount === 0 ? (
           <div className="px-6 py-10 text-center text-gray-500">No loan records available.</div>
+        ) : member.loans.length === 0 ? (
+          <div className="px-6 py-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-gray-900">Imported ledger loan</p>
+                <p className="text-sm text-gray-500">Collected amount from {financeSummary.ledgerPeriod || 'the current'} member data</p>
+              </div>
+              <div className="text-right">
+                <p className="font-semibold text-gray-900">{formatCurrency(financeSummary.loanCollected)}</p>
+                <p className="text-xs text-gray-500">Paid: {formatCurrency(financeSummary.loanPaid)}</p>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="divide-y divide-gray-200">
             {member.loans.map((loan) => (
@@ -120,7 +138,7 @@ export default async function MyLoansPage() {
           Total approved facilities: <span className="font-semibold text-gray-900">{formatCurrency(totalApproved)}</span>
         </p>
         <p className="mt-1 text-sm text-gray-600">
-          Current exposure: <span className="font-semibold text-gray-900">{formatCurrency(member.loanBalance)}</span>
+          Current exposure: <span className="font-semibold text-gray-900">{formatCurrency(financeSummary.loanOutstanding)}</span>
         </p>
       </div>
     </div>

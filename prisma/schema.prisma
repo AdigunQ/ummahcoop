@@ -72,6 +72,7 @@ model User {
   vouchers      Voucher[]
   withdrawals   Withdrawal[]
   commodityRequests CommodityRequest[]
+  commodityRepayments CommodityRepayment[]
   privileges    MemberPrivilege[]
   privilegesGranted MemberPrivilege[] @relation("PrivilegeGrantedBy")
   payrollLines  PayrollLine[]
@@ -279,8 +280,26 @@ model CommodityRequest {
   updatedAt            DateTime        @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repayments CommodityRepayment[]
 
   @@map("commodity_requests")
+}
+
+model CommodityRepayment {
+  id                 String            @id @default(cuid())
+  userId             String            @map("user_id")
+  commodityRequestId String?           @map("commodity_request_id")
+  amount             Float
+  date               DateTime          @default(now())
+  notes              String?
+  createdAt          DateTime          @default(now()) @map("created_at")
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commodityRequest CommodityRequest?  @relation(fields: [commodityRequestId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+  @@index([commodityRequestId])
+  @@map("commodity_repayments")
 }
 
 model Repayment {

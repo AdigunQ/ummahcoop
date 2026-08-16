@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { BellRing, CreditCard, Landmark, TrendingUp, Users, Wallet } from 'lucide-react'
+import Link from 'next/link'
+import { BellRing, CreditCard, Landmark, PackageSearch, TrendingUp, Users, Wallet } from 'lucide-react'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
@@ -38,17 +39,28 @@ function sum(values: number[]) {
   return values.reduce((acc, value) => acc + value, 0)
 }
 
-export async function AdminAnalytics() {
+function normalizeStaffId(value: string | null | undefined): string {
+  return String(value || '').trim().replace(/\s+/g, '').toUpperCase()
+}
+
+export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchToMember?: boolean }) {
   const now = new Date()
   const currentMonth = resolveVoucherPeriod().period
   const currentLabel = formatPeriodLabel(currentMonth)
 
-  const [currentDataset, activeLoanAgg, queueCounts, trends] = await Promise.all([
+  const [currentDataset, activeLoanRecords, approvedCommodityRecords, queueCounts, trends] = await Promise.all([
     getCurrentMemberLiveDataset(currentMonth),
-    prisma.loan.aggregate({
+    prisma.loan.findMany({
       where: { status: 'APPROVED', balance: { gt: 0 } },
-      _count: { _all: true },
-      _sum: { balance: true },
+      select: { balance: true, user: { select: { id: true, staffId: true } } },
+    }),
+    prisma.commodityRequest.findMany({
+      where: { status: 'APPROVED' },
+      select: {
+        adminQuotedPrice: true,
+        preferredBudget: true,
+        user: { select: { id: true, staffId: true } },
+      },
     }),
     Promise.all([
       prisma.user.count({ where: { role: 'MEMBER', status: 'PENDING' } }),
@@ -119,8 +131,46 @@ export async function AdminAnalytics() {
   const currentFees = sum(currentRows.map((row) => row.memberFee))
   const currentNewMembers = currentRows.filter((row) => row.memberType === 'NEW').length
   const currentOldMembers = currentRows.length - currentNewMembers
-  const activeLoans = activeLoanAgg._count._all || 0
-  const outstandingLoanBalance = activeLoanAgg._sum.balance || 0
+  const ledgerLoanRows = currentRows.filter((row) => row.loanAmount > 0)
+  const ledgerCommodityRows = currentRows.filter((row) => row.commodityAmount > 0)
+  const operationalLoansByStaff = new Map(
+    activeLoanRecords.map((loan) => [normalizeStaffId(loan.user.staffId) || `user:${loan.user.id}`, loan])
+  )
+  const countedLoanKeys = new Set<string>()
+  let outstandingLoanBalance = 0
+
+  for (const row of ledgerLoanRows) {
+    const key = normalizeStaffId(row.staffId)
+    const operationalLoan = operationalLoansByStaff.get(key)
+    if (operationalLoan) {
+      outstandingLoanBalance += operationalLoan.balance
+      countedLoanKeys.add(key)
+    } else {
+      outstandingLoanBalance += row.loanAmount
+    }
+    countedLoanKeys.add(key)
+  }
+
+  operationalLoansByStaff.forEach((loan, key) => {
+    if (!countedLoanKeys.has(key)) outstandingLoanBalance += loan.balance
+  })
+
+  const activeLoans = new Set([
+    ...ledgerLoanRows.map((row) => normalizeStaffId(row.staffId)),
+    ...activeLoanRecords.map((loan) => normalizeStaffId(loan.user.staffId) || `user:${loan.user.id}`),
+  ]).size
+
+  const commodityAmounts = new Map<string, number>()
+  for (const row of ledgerCommodityRows) {
+    commodityAmounts.set(normalizeStaffId(row.staffId), row.commodityAmount)
+  }
+  for (const request of approvedCommodityRecords) {
+    const key = normalizeStaffId(request.user.staffId) || `user:${request.user.id}`
+    const amount = request.adminQuotedPrice || request.preferredBudget || 0
+    commodityAmounts.set(key, Math.max(commodityAmounts.get(key) || 0, amount))
+  }
+  const activeCommodities = commodityAmounts.size
+  const outstandingCommodityBalance = sum(Array.from(commodityAmounts.values()))
   const pendingApprovals = pendingMembers + pendingPayments + pendingLoans + pendingWithdrawals
 
   const totalChargesRevenue = sum(trends.map((row) => row.chargeRevenue))
@@ -142,18 +192,28 @@ export async function AdminAnalytics() {
             </p>
           </div>
 
-          <div
-            className="inline-flex items-center gap-2 self-start rounded-full border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted-foreground"
-            style={{ borderColor: 'rgb(var(--border))' }}
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Workbook · {currentLabel}
+          <div className="flex flex-wrap items-center gap-2 self-start">
+            <div
+              className="inline-flex items-center gap-2 rounded-full border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted-foreground"
+              style={{ borderColor: 'rgb(var(--border))' }}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Workbook · {currentLabel}
+            </div>
+            {canSwitchToMember && (
+              <Link
+                href="/dashboard?view=member"
+                className="rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent/90"
+              >
+                Switch to member view
+              </Link>
+            )}
           </div>
         </div>
       </section>
 
       {/* Top metric grid */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <MetricCard
           label="Members on record"
           value={currentRows.length.toLocaleString('en-NG')}
@@ -181,6 +241,13 @@ export async function AdminAnalytics() {
           icon={<CreditCard className="h-5 w-5" />}
           tone="amber"
           caption={formatCurrency(outstandingLoanBalance)}
+        />
+        <MetricCard
+          label="Active commodities"
+          value={activeCommodities.toLocaleString('en-NG')}
+          icon={<PackageSearch className="h-5 w-5" />}
+          tone="indigo"
+          caption={formatCurrency(outstandingCommodityBalance)}
         />
         <MetricCard
           label="Pending approvals"
