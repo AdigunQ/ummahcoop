@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
@@ -23,6 +24,56 @@ function mapSaveError(error?: string): string | null {
   if (error === 'duplicate_staff') return 'Staff ID already belongs to another member.'
   if (error === 'save_failed') return 'Could not save this profile. Please try again.'
   return 'Could not save this profile.'
+}
+
+function snapshotNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  const parsed = Number(String(value ?? '').replace(/[,₦\s]/g, ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function snapshotStaffId(value: unknown): string {
+  const raw = String(value ?? '').trim().replace(/\s+/g, '').toUpperCase()
+  return /^\d+$/.test(raw) ? raw.padStart(6, '0') : raw
+}
+
+function syncLatestSnapshotRows(
+  rows: unknown,
+  previousStaffId: string,
+  staffId: string,
+  monthlyContribution: number,
+  specialContribution: number,
+): Prisma.InputJsonValue {
+  if (!Array.isArray(rows)) return rows as Prisma.InputJsonValue
+
+  return rows.map((rawRow) => {
+    if (!rawRow || typeof rawRow !== 'object' || Array.isArray(rawRow)) return rawRow
+
+    const row = { ...(rawRow as Record<string, unknown>) }
+    const rowStaffId = snapshotStaffId(row['Employee No.'] ?? row['Staff ID'])
+    if (rowStaffId !== previousStaffId && rowStaffId !== staffId) return row
+
+    if ('Employee No.' in row || !('Staff ID' in row)) row['Employee No.'] = staffId
+    if ('Staff ID' in row) row['Staff ID'] = staffId
+    if ('Monthly Saving' in row) row['Monthly Saving'] = monthlyContribution
+    if ('Thrift Savings' in row) row['Thrift Savings'] = monthlyContribution
+    if ('Special Saving' in row) row['Special Saving'] = specialContribution
+    if ('Special Savings' in row) row['Special Savings'] = specialContribution
+    if ('Amount' in row) row.Amount = monthlyContribution + specialContribution
+
+    const total =
+      monthlyContribution +
+      specialContribution +
+      snapshotNumber(row.Loan) +
+      snapshotNumber(row['Management Fee']) +
+      snapshotNumber(row.Commodity) +
+      snapshotNumber(row['Monthly Fee'] ?? row.Charges) +
+      snapshotNumber(row['Form Fee'] ?? row['New Member Fee'])
+
+    if ('Total' in row) row.Total = total
+    if ('Expected Total' in row) row['Expected Total'] = total
+    return row
+  }) as Prisma.InputJsonValue
 }
 
 async function updateMemberRecord(formData: FormData) {
@@ -74,6 +125,12 @@ async function updateMemberRecord(formData: FormData) {
 
   try {
     await prisma.$transaction(async (tx) => {
+      const existingMember = await tx.user.findUnique({
+        where: { id: memberId },
+        select: { staffId: true },
+      })
+      if (!existingMember) throw new Error('Member not found')
+
       await tx.user.update({
         where: { id: memberId },
         data: {
@@ -97,6 +154,25 @@ async function updateMemberRecord(formData: FormData) {
           monthlyDeduction: monthlyContribution + specialContribution,
         },
       })
+
+      const latestSnapshot = await tx.memberDataMonth.findFirst({
+        orderBy: { period: 'desc' },
+        select: { id: true, rows: true },
+      })
+      if (latestSnapshot) {
+        await tx.memberDataMonth.update({
+          where: { id: latestSnapshot.id },
+          data: {
+            rows: syncLatestSnapshotRows(
+              latestSnapshot.rows,
+              snapshotStaffId(existingMember.staffId),
+              staffId,
+              monthlyContribution,
+              specialContribution,
+            ),
+          },
+        })
+      }
     })
   } catch {
     redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
