@@ -213,7 +213,7 @@ export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchT
       </section>
 
       {/* Top metric grid */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <MetricCard
           label="Members on record"
           value={currentRows.length.toLocaleString('en-NG')}
