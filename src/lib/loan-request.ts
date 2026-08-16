@@ -44,8 +44,11 @@ export type LoanApplicationData = {
   }
 }
 
-export function getLoanLimit(thriftSavings: number): number {
-  return Math.max(0, thriftSavings) * LOAN_REQUEST_POLICY.maxSavingsMultiplier
+export function getLoanLimit(totalThriftSavings: number): number {
+  // Loan eligibility is based on cumulative thrift savings only. Special savings
+  // is intentionally excluded from this calculation.
+  const thriftSavings = Number(totalThriftSavings)
+  return (Number.isFinite(thriftSavings) ? Math.max(0, thriftSavings) : 0) * LOAN_REQUEST_POLICY.maxSavingsMultiplier
 }
 
 export function hasLoanTenureElapsed(createdAt: Date, now = new Date()): boolean {

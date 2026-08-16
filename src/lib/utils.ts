@@ -53,9 +53,9 @@ export function calculateLoanDetails(principal: number, durationMonths: number, 
   }
 }
 
-export function getLoanEligibility(totalContributions: number): number {
-  // Members can borrow up to 2x their current savings balance.
-  return totalContributions * 2
+export function getLoanEligibility(totalThriftSavings: number): number {
+  // Keep this legacy helper aligned with the rule: thrift only, never special savings.
+  return Math.max(0, Number(totalThriftSavings) || 0) * 2
 }
 
 export function getInitials(name: string | null): string {

@@ -85,7 +85,7 @@ export function LoanRequestForm({
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Maximum request</p>
             <p className="mt-1 text-2xl font-bold text-emerald-950">{formatCurrency(loanEligibility)}</p>
-            <p className="mt-1 text-[11px] text-emerald-800">Based on thrift savings only</p>
+            <p className="mt-1 text-[11px] text-emerald-800">Based on total thrift savings only</p>
           </div>
         </div>
       </header>
