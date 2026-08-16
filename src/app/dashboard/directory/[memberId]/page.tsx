@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import ConfirmDeleteButton from './confirm-delete-button'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
+import { getMemberFinanceSummary } from '@/lib/member-finance'
 
 type SearchParams = {
   saved?: string
@@ -98,6 +99,8 @@ async function updateMemberRecord(formData: FormData) {
   const balance = Number(formData.get('balance') || 0)
   const specialBalance = Number(formData.get('specialBalance') || 0)
   const loanBalance = Number(formData.get('loanBalance') || 0)
+  const loanPrincipal = Number(formData.get('loanPrincipal') || 0)
+  const commodityPrincipal = Number(formData.get('commodityPrincipal') || 0)
   const voucherEnabled = String(formData.get('voucherEnabled') || 'true') === 'true'
 
   if (!memberId) redirect('/dashboard/directory')
@@ -117,6 +120,12 @@ async function updateMemberRecord(formData: FormData) {
     redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
   }
   if (!Number.isFinite(loanBalance) || loanBalance < 0) {
+    redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
+  }
+  if (!Number.isFinite(loanPrincipal) || loanPrincipal < 0) {
+    redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
+  }
+  if (!Number.isFinite(commodityPrincipal) || commodityPrincipal < 0) {
     redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
   }
 
@@ -149,6 +158,8 @@ async function updateMemberRecord(formData: FormData) {
           balance,
           specialBalance,
           loanBalance,
+          loanPrincipal,
+          commodityPrincipal,
           totalContributions: balance + specialBalance,
           voucherEnabled,
         },
@@ -243,12 +254,15 @@ export default async function MemberProfileEditorPage({
       specialBalance: true,
       totalContributions: true,
       loanBalance: true,
+      loanPrincipal: true,
+      commodityPrincipal: true,
       status: true,
       voucherEnabled: true,
     },
   })
 
   if (!member) redirect('/dashboard/directory')
+  const financeSummary = await getMemberFinanceSummary(member.id, member.staffId)
   const justSaved = searchParams?.saved === '1'
   const saveError = mapSaveError(searchParams?.error)
 
@@ -288,7 +302,12 @@ export default async function MemberProfileEditorPage({
           <p><span className="font-medium text-gray-800">Account Name:</span> {member.bankAccountName || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Current Savings:</span> {formatCurrency(member.balance)}</p>
           <p><span className="font-medium text-gray-800">Current Special Savings:</span> {formatCurrency(member.specialBalance || 0)}</p>
-          <p><span className="font-medium text-gray-800">Current Loan Balance:</span> {formatCurrency(member.loanBalance)}</p>
+          <p><span className="font-medium text-gray-800">Loan Amount Collected:</span> {formatCurrency(financeSummary.loanCollected)}</p>
+          <p><span className="font-medium text-gray-800">Loan Paid So Far:</span> {formatCurrency(financeSummary.loanPaid)}</p>
+          <p><span className="font-medium text-gray-800">Loan Outstanding:</span> {formatCurrency(financeSummary.loanOutstanding)}</p>
+          <p><span className="font-medium text-gray-800">Commodity Amount Collected:</span> {formatCurrency(financeSummary.commodityCollected)}</p>
+          <p><span className="font-medium text-gray-800">Commodity Paid So Far:</span> {formatCurrency(financeSummary.commodityPaid)}</p>
+          <p><span className="font-medium text-gray-800">Commodity Outstanding:</span> {formatCurrency(financeSummary.commodityOutstanding)}</p>
           <p><span className="font-medium text-gray-800">Total Contributions:</span> {formatCurrency(member.totalContributions)}</p>
           <p><span className="font-medium text-gray-800">Status:</span> {member.status}</p>
         </div>
@@ -368,7 +387,7 @@ export default async function MemberProfileEditorPage({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Loan Status Amount (Outstanding)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Legacy Loan Balance (Outstanding)</label>
             <input
               type="number"
               min={0}
@@ -377,6 +396,33 @@ export default async function MemberProfileEditorPage({
               defaultValue={member.loanBalance}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
+            <p className="mt-1 text-xs text-gray-500">Used only for older records without a collected loan amount.</p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Loan Amount Collected</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              name="loanPrincipal"
+              defaultValue={member.loanPrincipal || 0}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">Paid so far is calculated from monthly Loan deductions in the imported periods.</p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Commodity Amount Collected</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              name="commodityPrincipal"
+              defaultValue={member.commodityPrincipal || 0}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">Paid so far is calculated from monthly Commodity deductions in the imported periods.</p>
           </div>
 
           <div>

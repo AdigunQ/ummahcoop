@@ -65,6 +65,10 @@ export default async function DashboardPage({
 
   // Member dashboard data
   const loanEligibility = getLoanLimit(user.balance)
+  const displayedLoanBalance =
+    financeSummary.loanPrincipal > 0
+      ? financeSummary.loanOutstanding
+      : Math.max(user.loanBalance, financeSummary.loanOutstanding)
   const memberProfile = {
     id: user.id,
     name: user.name,
@@ -76,7 +80,7 @@ export default async function DashboardPage({
     balance: user.balance,
     specialBalance: user.specialBalance,
     totalContributions: user.totalContributions,
-    loanBalance: Math.max(user.loanBalance, financeSummary.loanOutstanding),
+    loanBalance: displayedLoanBalance,
     monthlyContribution: user.monthlyContribution,
     specialContribution: user.specialContribution,
   }
@@ -90,6 +94,7 @@ export default async function DashboardPage({
         approvedAmount: financeSummary.loanCollected,
         paidAmount: financeSummary.loanPaid,
         outstandingAmount: financeSummary.loanOutstanding,
+        repaymentStartPeriod: financeSummary.loanRepaymentStartPeriod,
       }}
       commoditySummary={financeSummary}
       recentPayments={user.payments}

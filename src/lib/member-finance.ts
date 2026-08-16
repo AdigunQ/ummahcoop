@@ -4,13 +4,17 @@ type SnapshotRow = Record<string, unknown>
 
 export type MemberFinanceSummary = {
   loanCount: number
+  loanPrincipal: number
   loanCollected: number
   loanPaid: number
   loanOutstanding: number
+  loanRepaymentStartPeriod: string | null
   commodityCount: number
+  commodityPrincipal: number
   commodityCollected: number
   commodityPaid: number
   commodityOutstanding: number
+  commodityRepaymentStartPeriod: string | null
   ledgerPeriod: string | null
 }
 
@@ -40,16 +44,20 @@ function rowsFromJson(value: unknown): SnapshotRow[] {
 }
 
 /**
- * Combines the imported ledger with live workflow records. The ledger is the
- * fallback for historical loans/commodities that were imported without a
- * corresponding request record; live repayment records always remain separate.
+ * Combines imported monthly deductions with live workflow records. The
+ * imported Loan and Commodity columns are deductions, not original amounts;
+ * the original amounts are stored on User and entered by an admin.
  */
 export async function getMemberFinanceSummary(
   userId: string,
   staffId: string | null | undefined
 ): Promise<MemberFinanceSummary> {
-  const [approvedLoans, loanRepaymentPayments, approvedCommodities, commodityRepayments, latestSnapshot] =
+  const [member, approvedLoans, loanRepaymentPayments, approvedCommodities, commodityRepayments, snapshots] =
     await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { loanPrincipal: true, commodityPrincipal: true },
+      }),
       prisma.loan.findMany({
         where: { userId, status: { in: ['APPROVED', 'COMPLETED'] } },
         select: {
@@ -70,20 +78,37 @@ export async function getMemberFinanceSummary(
         where: { userId },
         _sum: { amount: true },
       }),
-      prisma.memberDataMonth.findFirst({
-        orderBy: { period: 'desc' },
+      prisma.memberDataMonth.findMany({
+        orderBy: { period: 'asc' },
         select: { period: true, rows: true },
       }),
     ])
 
   const normalizedStaffId = normalizeStaffId(staffId)
-  const ledgerRow = rowsFromJson(latestSnapshot?.rows).find((row) => {
-    const rowStaffId = row['Staff ID'] ?? row['Employee No.']
-    return normalizeStaffId(rowStaffId) === normalizedStaffId
-  })
+  let ledgerLoanPaid = 0
+  let ledgerCommodityPaid = 0
+  let loanRepaymentStartPeriod: string | null = null
+  let commodityRepaymentStartPeriod: string | null = null
 
-  const ledgerLoan = pickNumber(ledgerRow, ['Loan', 'Loan Originated'])
-  const ledgerCommodity = pickNumber(ledgerRow, ['Commodity', 'Commodity Requests', 'Comodity'])
+  for (const snapshot of snapshots) {
+    const ledgerRow = rowsFromJson(snapshot.rows).find((row) => {
+      const rowStaffId = row['Staff ID'] ?? row['Employee No.']
+      return normalizeStaffId(rowStaffId) === normalizedStaffId
+    })
+
+    const loanDeduction = pickNumber(ledgerRow, ['Loan', 'Loan Originated'])
+    const commodityDeduction = pickNumber(ledgerRow, ['Commodity', 'Commodity Requests', 'Comodity'])
+
+    if (loanDeduction > 0) {
+      ledgerLoanPaid += loanDeduction
+      loanRepaymentStartPeriod = loanRepaymentStartPeriod || snapshot.period
+    }
+    if (commodityDeduction > 0) {
+      ledgerCommodityPaid += commodityDeduction
+      commodityRepaymentStartPeriod = commodityRepaymentStartPeriod || snapshot.period
+    }
+  }
+
   const workflowLoanCollected = approvedLoans.reduce((sum, loan) => sum + loan.amount, 0)
   const workflowLoanOutstanding = approvedLoans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0)
   const loanPaidFromRepayments = approvedLoans.reduce(
@@ -91,29 +116,37 @@ export async function getMemberFinanceSummary(
     0
   )
   const loanPaidFromPayments = loanRepaymentPayments._sum.amount || 0
-  const loanPaid = loanPaidFromRepayments + loanPaidFromPayments
-  const loanCollected = Math.max(ledgerLoan, workflowLoanCollected)
-  const loanOutstanding = Math.max(
-    workflowLoanOutstanding || loanCollected - loanPaid,
-    0
-  )
+  const workflowLoanPaid = loanPaidFromRepayments + loanPaidFromPayments
+  const loanPrincipal = Math.max(toNumber(member?.loanPrincipal), workflowLoanCollected)
+  const loanCollected = loanPrincipal
+  const loanPaid = ledgerLoanPaid > 0 ? ledgerLoanPaid : workflowLoanPaid
+  const loanOutstanding =
+    loanPrincipal > 0
+      ? Math.max(loanPrincipal - loanPaid, 0)
+      : Math.max(workflowLoanOutstanding, 0)
 
   const workflowCommodityCollected = approvedCommodities.reduce(
     (sum, request) => sum + (request.adminQuotedPrice || request.preferredBudget || 0),
     0
   )
-  const commodityCollected = Math.max(ledgerCommodity, workflowCommodityCollected)
-  const commodityPaid = commodityRepayments._sum.amount || 0
+  const commodityPrincipal = Math.max(toNumber(member?.commodityPrincipal), workflowCommodityCollected)
+  const commodityCollected = commodityPrincipal
+  const workflowCommodityPaid = commodityRepayments._sum.amount || 0
+  const commodityPaid = ledgerCommodityPaid > 0 ? ledgerCommodityPaid : workflowCommodityPaid
 
   return {
-    loanCount: Math.max(approvedLoans.length, ledgerLoan > 0 ? 1 : 0),
+    loanCount: Math.max(approvedLoans.length, loanPrincipal > 0 || ledgerLoanPaid > 0 ? 1 : 0),
+    loanPrincipal,
     loanCollected,
     loanPaid,
     loanOutstanding,
-    commodityCount: Math.max(approvedCommodities.length, ledgerCommodity > 0 ? 1 : 0),
+    loanRepaymentStartPeriod,
+    commodityCount: Math.max(approvedCommodities.length, commodityPrincipal > 0 || ledgerCommodityPaid > 0 ? 1 : 0),
+    commodityPrincipal,
     commodityCollected,
     commodityPaid,
     commodityOutstanding: Math.max(commodityCollected - commodityPaid, 0),
-    ledgerPeriod: latestSnapshot?.period || null,
+    commodityRepaymentStartPeriod,
+    ledgerPeriod: snapshots[snapshots.length - 1]?.period || null,
   }
 }

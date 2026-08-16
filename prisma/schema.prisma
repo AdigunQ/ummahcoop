@@ -58,6 +58,8 @@ model User {
   specialBalance    Float     @default(0) @map("special_balance") // Special Savings (100% withdrawable)
   totalContributions Float    @default(0) @map("total_contributions")
   loanBalance       Float     @default(0) @map("loan_balance")
+  loanPrincipal     Float     @default(0) @map("loan_principal")
+  commodityPrincipal Float    @default(0) @map("commodity_principal")
   partialWithdrawalUsed Boolean @default(false) @map("partial_withdrawal_used")
   voucherEnabled     Boolean   @default(true) @map("voucher_enabled")
   closureDate        DateTime? @map("closure_date")

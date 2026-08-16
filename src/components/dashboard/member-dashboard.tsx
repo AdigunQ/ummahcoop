@@ -43,12 +43,14 @@ interface MemberDashboardProps {
     approvedAmount: number
     paidAmount: number
     outstandingAmount: number
+    repaymentStartPeriod: string | null
   }
   commoditySummary: {
     commodityCount: number
     commodityCollected: number
     commodityPaid: number
     commodityOutstanding: number
+    commodityRepaymentStartPeriod: string | null
     ledgerPeriod: string | null
   }
   recentPayments: any[]
@@ -204,7 +206,7 @@ export function MemberDashboard({
             <DetailLine label="Outstanding" value={formatCurrency(loanOutstandingAmount)} />
           </div>
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-            Loan requests are reviewed inside the admin portal before disbursement.
+            Paid from monthly deductions starting {loanSummary.repaymentStartPeriod || 'the first recorded deduction'}.
           </p>
         </PanelCard>
 
@@ -216,7 +218,7 @@ export function MemberDashboard({
             <DetailLine label="Facilities" value={`${commoditySummary.commodityCount}`} />
           </div>
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-            Includes approved commodity facilities and the latest imported ledger ({commoditySummary.ledgerPeriod || 'current'}).
+            Paid from monthly deductions starting {commoditySummary.commodityRepaymentStartPeriod || 'the first recorded deduction'}.
           </p>
         </PanelCard>
 
