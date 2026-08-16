@@ -26,6 +26,14 @@ function mapSaveError(error?: string): string | null {
   return 'Could not save this profile.'
 }
 
+function revalidateMemberViews(memberId?: string) {
+  if (memberId) revalidatePath(`/dashboard/directory/${memberId}`)
+
+  // Member data is read by many dashboard pages. Invalidate the dashboard
+  // layout so no sibling page keeps an older server-rendered snapshot.
+  revalidatePath('/dashboard', 'layout')
+}
+
 function snapshotNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   const parsed = Number(String(value ?? '').replace(/[,₦\s]/g, ''))
@@ -178,12 +186,7 @@ async function updateMemberRecord(formData: FormData) {
     redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
   }
 
-  revalidatePath(`/dashboard/directory/${memberId}`)
-  revalidatePath('/dashboard/directory')
-  revalidatePath('/dashboard')
-  revalidatePath('/dashboard/vouchers')
-  revalidatePath('/dashboard/finance-report')
-  revalidatePath('/dashboard/member-data')
+  revalidateMemberViews(memberId)
   redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?saved=1`)
 }
 
@@ -207,11 +210,7 @@ async function deleteMemberRecord(formData: FormData) {
     redirect('/dashboard/directory?deleteError=1')
   }
 
-  revalidatePath('/dashboard/directory')
-  revalidatePath('/dashboard')
-  revalidatePath('/dashboard/vouchers')
-  revalidatePath('/dashboard/finance-report')
-  revalidatePath('/dashboard/member-data')
+  revalidateMemberViews()
   redirect('/dashboard/directory?deleted=1')
 }
 

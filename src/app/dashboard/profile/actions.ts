@@ -52,6 +52,7 @@ export async function updateProfile(formData: FormData) {
   })
 
   revalidatePath('/dashboard/profile')
+  revalidatePath('/dashboard', 'layout')
   return { success: true }
 }
 
