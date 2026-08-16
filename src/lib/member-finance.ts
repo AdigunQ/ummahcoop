@@ -43,6 +43,21 @@ function rowsFromJson(value: unknown): SnapshotRow[] {
   )
 }
 
+async function readMemberPrincipals(userId: string) {
+  // Read through JSON so an older production database can still render the
+  // dashboard while the additive principal-column migration is being applied.
+  const rows = await prisma.$queryRaw<Array<{ loanPrincipal: number | null; commodityPrincipal: number | null }>>`
+    SELECT
+      COALESCE((to_jsonb(u)->>'loan_principal')::double precision, 0) AS "loanPrincipal",
+      COALESCE((to_jsonb(u)->>'commodity_principal')::double precision, 0) AS "commodityPrincipal"
+    FROM "users" AS u
+    WHERE u.id = ${userId}
+    LIMIT 1
+  `
+
+  return rows[0] || { loanPrincipal: 0, commodityPrincipal: 0 }
+}
+
 /**
  * Combines imported monthly deductions with live workflow records. The
  * imported Loan and Commodity columns are deductions, not original amounts;
@@ -54,10 +69,7 @@ export async function getMemberFinanceSummary(
 ): Promise<MemberFinanceSummary> {
   const [member, approvedLoans, loanRepaymentPayments, approvedCommodities, commodityRepayments, snapshots] =
     await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: { loanPrincipal: true, commodityPrincipal: true },
-      }),
+      readMemberPrincipals(userId),
       prisma.loan.findMany({
         where: { userId, status: { in: ['APPROVED', 'COMPLETED'] } },
         select: {

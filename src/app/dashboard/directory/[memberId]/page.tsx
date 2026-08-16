@@ -254,8 +254,6 @@ export default async function MemberProfileEditorPage({
       specialBalance: true,
       totalContributions: true,
       loanBalance: true,
-      loanPrincipal: true,
-      commodityPrincipal: true,
       status: true,
       voucherEnabled: true,
     },
@@ -406,7 +404,7 @@ export default async function MemberProfileEditorPage({
               min={0}
               step={1}
               name="loanPrincipal"
-              defaultValue={member.loanPrincipal || 0}
+              defaultValue={financeSummary.loanPrincipal}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
             <p className="mt-1 text-xs text-gray-500">Paid so far is calculated from monthly Loan deductions in the imported periods.</p>
@@ -419,7 +417,7 @@ export default async function MemberProfileEditorPage({
               min={0}
               step={1}
               name="commodityPrincipal"
-              defaultValue={member.commodityPrincipal || 0}
+              defaultValue={financeSummary.commodityPrincipal}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
             <p className="mt-1 text-xs text-gray-500">Paid so far is calculated from monthly Commodity deductions in the imported periods.</p>
