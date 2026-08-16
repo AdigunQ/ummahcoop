@@ -98,7 +98,8 @@ async function updateMemberRecord(formData: FormData) {
   const department = String(formData.get('department') || '').trim()
   const balance = Number(formData.get('balance') || 0)
   const specialBalance = Number(formData.get('specialBalance') || 0)
-  const loanBalance = Number(formData.get('loanBalance') || 0)
+  const rawLoanBalance = formData.get('loanBalance')
+  const loanBalance = rawLoanBalance === null ? null : Number(rawLoanBalance || 0)
   const loanPrincipal = Number(formData.get('loanPrincipal') || 0)
   const commodityPrincipal = Number(formData.get('commodityPrincipal') || 0)
   const voucherEnabled = String(formData.get('voucherEnabled') || 'true') === 'true'
@@ -119,7 +120,7 @@ async function updateMemberRecord(formData: FormData) {
   if (!Number.isFinite(specialBalance) || specialBalance < 0) {
     redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
   }
-  if (!Number.isFinite(loanBalance) || loanBalance < 0) {
+  if (loanBalance !== null && (!Number.isFinite(loanBalance) || loanBalance < 0)) {
     redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
   }
   if (!Number.isFinite(loanPrincipal) || loanPrincipal < 0) {
@@ -157,11 +158,11 @@ async function updateMemberRecord(formData: FormData) {
           specialContribution,
           balance,
           specialBalance,
-          loanBalance,
           loanPrincipal,
           commodityPrincipal,
           totalContributions: balance + specialBalance,
           voucherEnabled,
+          ...(loanBalance === null ? {} : { loanBalance }),
         },
       })
 
@@ -300,10 +301,10 @@ export default async function MemberProfileEditorPage({
           <p><span className="font-medium text-gray-800">Account Name:</span> {member.bankAccountName || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Current Savings:</span> {formatCurrency(member.balance)}</p>
           <p><span className="font-medium text-gray-800">Current Special Savings:</span> {formatCurrency(member.specialBalance || 0)}</p>
-          <p><span className="font-medium text-gray-800">Loan Amount Collected:</span> {formatCurrency(financeSummary.loanCollected)}</p>
+          <p><span className="font-medium text-gray-800">Original Loan Given:</span> {formatCurrency(financeSummary.loanCollected)}</p>
           <p><span className="font-medium text-gray-800">Loan Paid So Far:</span> {formatCurrency(financeSummary.loanPaid)}</p>
           <p><span className="font-medium text-gray-800">Loan Outstanding:</span> {formatCurrency(financeSummary.loanOutstanding)}</p>
-          <p><span className="font-medium text-gray-800">Commodity Amount Collected:</span> {formatCurrency(financeSummary.commodityCollected)}</p>
+          <p><span className="font-medium text-gray-800">Original Commodity Cost:</span> {formatCurrency(financeSummary.commodityCollected)}</p>
           <p><span className="font-medium text-gray-800">Commodity Paid So Far:</span> {formatCurrency(financeSummary.commodityPaid)}</p>
           <p><span className="font-medium text-gray-800">Commodity Outstanding:</span> {formatCurrency(financeSummary.commodityOutstanding)}</p>
           <p><span className="font-medium text-gray-800">Total Contributions:</span> {formatCurrency(member.totalContributions)}</p>
@@ -313,6 +314,9 @@ export default async function MemberProfileEditorPage({
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-900">Manual Correction</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Enter the original amounts given to the member. Monthly deductions are read from Member Data, then paid and outstanding amounts are calculated automatically.
+        </p>
         <form action={updateMemberRecord} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <input type="hidden" name="memberId" value={member.id} />
 
@@ -385,20 +389,7 @@ export default async function MemberProfileEditorPage({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Legacy Loan Balance (Outstanding)</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              name="loanBalance"
-              defaultValue={member.loanBalance}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">Used only for older records without a collected loan amount.</p>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Loan Amount Collected</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Original Loan Amount Given</label>
             <input
               type="number"
               min={0}
@@ -407,11 +398,11 @@ export default async function MemberProfileEditorPage({
               defaultValue={financeSummary.loanPrincipal}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
-            <p className="mt-1 text-xs text-gray-500">Paid so far is calculated from monthly Loan deductions in the imported periods.</p>
+            <p className="mt-1 text-xs text-gray-500">Do not enter the monthly deduction here.</p>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Commodity Amount Collected</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Original Commodity Cost</label>
             <input
               type="number"
               min={0}
@@ -420,7 +411,7 @@ export default async function MemberProfileEditorPage({
               defaultValue={financeSummary.commodityPrincipal}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
-            <p className="mt-1 text-xs text-gray-500">Paid so far is calculated from monthly Commodity deductions in the imported periods.</p>
+            <p className="mt-1 text-xs text-gray-500">Do not enter the monthly deduction here.</p>
           </div>
 
           <div>
