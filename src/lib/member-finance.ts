@@ -24,14 +24,24 @@ function normalizeStaffId(value: unknown): string {
 
 function toNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  const parsed = Number(String(value ?? '').replace(/,/g, '').trim())
+  const raw = String(value ?? '').trim()
+  if (!raw) return 0
+
+  const normalized = raw
+    .replace(/[₦$]/g, '')
+    .replace(/,/g, '')
+    .replace(/^\((.*)\)$/, '-$1')
+    .trim()
+  const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : 0
 }
 
 function pickNumber(row: SnapshotRow | undefined, keys: string[]): number {
   if (!row) return 0
   for (const key of keys) {
-    if (row[key] !== undefined && row[key] !== null) return toNumber(row[key])
+    const value = row[key]
+    if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) continue
+    return toNumber(value)
   }
   return 0
 }
@@ -41,6 +51,55 @@ function rowsFromJson(value: unknown): SnapshotRow[] {
   return value.filter(
     (row): row is SnapshotRow => Boolean(row) && typeof row === 'object' && !Array.isArray(row)
   )
+}
+
+type LedgerDeductionTotals = {
+  loanPaid: number
+  commodityPaid: number
+  loanRepaymentStartPeriod: string | null
+  commodityRepaymentStartPeriod: string | null
+}
+
+/**
+ * Imported Loan and Commodity cells are payroll deductions. They must be
+ * counted exactly as entered; the separate 100 naira monthly charge must
+ * never be subtracted from either column.
+ */
+export function sumLedgerDeductions(
+  snapshots: Array<{ period: string; rows: unknown }>,
+  staffId: string | null | undefined
+): LedgerDeductionTotals {
+  const normalizedStaffId = normalizeStaffId(staffId)
+  let loanPaid = 0
+  let commodityPaid = 0
+  let loanRepaymentStartPeriod: string | null = null
+  let commodityRepaymentStartPeriod: string | null = null
+
+  for (const snapshot of snapshots) {
+    const ledgerRow = rowsFromJson(snapshot.rows).find((row) => {
+      const rowStaffId = row['Staff ID'] ?? row['Employee No.']
+      return normalizeStaffId(rowStaffId) === normalizedStaffId
+    })
+
+    const loanDeduction = pickNumber(ledgerRow, ['Loan', 'Loan Originated'])
+    const commodityDeduction = pickNumber(ledgerRow, ['Commodity', 'Commodity Requests', 'Comodity'])
+
+    if (loanDeduction > 0) {
+      loanPaid += loanDeduction
+      loanRepaymentStartPeriod = loanRepaymentStartPeriod || snapshot.period
+    }
+    if (commodityDeduction > 0) {
+      commodityPaid += commodityDeduction
+      commodityRepaymentStartPeriod = commodityRepaymentStartPeriod || snapshot.period
+    }
+  }
+
+  return {
+    loanPaid,
+    commodityPaid,
+    loanRepaymentStartPeriod,
+    commodityRepaymentStartPeriod,
+  }
 }
 
 async function readMemberPrincipals(userId: string) {
@@ -104,30 +163,7 @@ async function loadMemberFinanceSummary(
       }),
     ])
 
-  const normalizedStaffId = normalizeStaffId(staffId)
-  let ledgerLoanPaid = 0
-  let ledgerCommodityPaid = 0
-  let loanRepaymentStartPeriod: string | null = null
-  let commodityRepaymentStartPeriod: string | null = null
-
-  for (const snapshot of snapshots) {
-    const ledgerRow = rowsFromJson(snapshot.rows).find((row) => {
-      const rowStaffId = row['Staff ID'] ?? row['Employee No.']
-      return normalizeStaffId(rowStaffId) === normalizedStaffId
-    })
-
-    const loanDeduction = pickNumber(ledgerRow, ['Loan', 'Loan Originated'])
-    const commodityDeduction = pickNumber(ledgerRow, ['Commodity', 'Commodity Requests', 'Comodity'])
-
-    if (loanDeduction > 0) {
-      ledgerLoanPaid += loanDeduction
-      loanRepaymentStartPeriod = loanRepaymentStartPeriod || snapshot.period
-    }
-    if (commodityDeduction > 0) {
-      ledgerCommodityPaid += commodityDeduction
-      commodityRepaymentStartPeriod = commodityRepaymentStartPeriod || snapshot.period
-    }
-  }
+  const ledgerTotals = sumLedgerDeductions(snapshots, staffId)
 
   const workflowLoanCollected = approvedLoans.reduce((sum, loan) => sum + loan.amount, 0)
   const workflowLoanOutstanding = approvedLoans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0)
@@ -139,7 +175,7 @@ async function loadMemberFinanceSummary(
   const workflowLoanPaid = loanPaidFromRepayments + loanPaidFromPayments
   const loanPrincipal = Math.max(toNumber(member?.loanPrincipal), workflowLoanCollected)
   const loanCollected = loanPrincipal
-  const loanPaid = ledgerLoanPaid > 0 ? ledgerLoanPaid : workflowLoanPaid
+  const loanPaid = ledgerTotals.loanPaid > 0 ? ledgerTotals.loanPaid : workflowLoanPaid
   const loanOutstanding =
     loanPrincipal > 0
       ? Math.max(loanPrincipal - loanPaid, 0)
@@ -152,21 +188,21 @@ async function loadMemberFinanceSummary(
   const commodityPrincipal = Math.max(toNumber(member?.commodityPrincipal), workflowCommodityCollected)
   const commodityCollected = commodityPrincipal
   const workflowCommodityPaid = commodityRepayments._sum.amount || 0
-  const commodityPaid = ledgerCommodityPaid > 0 ? ledgerCommodityPaid : workflowCommodityPaid
+  const commodityPaid = ledgerTotals.commodityPaid > 0 ? ledgerTotals.commodityPaid : workflowCommodityPaid
 
   return {
-    loanCount: Math.max(approvedLoans.length, loanPrincipal > 0 || ledgerLoanPaid > 0 ? 1 : 0),
+    loanCount: Math.max(approvedLoans.length, loanPrincipal > 0 || ledgerTotals.loanPaid > 0 ? 1 : 0),
     loanPrincipal,
     loanCollected,
     loanPaid,
     loanOutstanding,
-    loanRepaymentStartPeriod,
-    commodityCount: Math.max(approvedCommodities.length, commodityPrincipal > 0 || ledgerCommodityPaid > 0 ? 1 : 0),
+    loanRepaymentStartPeriod: ledgerTotals.loanRepaymentStartPeriod,
+    commodityCount: Math.max(approvedCommodities.length, commodityPrincipal > 0 || ledgerTotals.commodityPaid > 0 ? 1 : 0),
     commodityPrincipal,
     commodityCollected,
     commodityPaid,
     commodityOutstanding: Math.max(commodityCollected - commodityPaid, 0),
-    commodityRepaymentStartPeriod,
+    commodityRepaymentStartPeriod: ledgerTotals.commodityRepaymentStartPeriod,
     ledgerPeriod: snapshots[snapshots.length - 1]?.period || null,
   }
 }

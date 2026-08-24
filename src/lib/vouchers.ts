@@ -113,7 +113,7 @@ function pickText(row: SnapshotRow, keys: string[]): string {
 function pickNumber(row: SnapshotRow, keys: string[]): number {
   for (const key of keys) {
     const value = row[key]
-    if (value === undefined) continue
+    if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) continue
     const parsed = toNumber(value)
     if (Number.isFinite(parsed)) return parsed
   }

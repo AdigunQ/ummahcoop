@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
 import type { VoucherRow } from '@/lib/vouchers'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
+import MemberDirectoryTable from './member-directory-table'
 
 type SearchParams = {
   deleted?: string
@@ -109,59 +110,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams?: S
         <MetricCard label="Amount Pool" value={formatCurrency(savingsPool)} tone="purple" />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="w-full min-w-[960px]">
-          <thead className="bg-gray-50">
-            <tr>
-              <HeadCell label="Employee No." />
-              <HeadCell label="Employee Name" />
-              <HeadCell label="Member Type" />
-              <HeadCell label="Monthly Saving" />
-              <HeadCell label="Special Saving" />
-              <HeadCell label="Monthly Fee" />
-              <HeadCell label="Form Fee" />
-              <HeadCell label="Amount" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {members.map((member) => (
-              <tr key={`${member.staffId}-${member.serial}`} className="hover:bg-gray-50">
-                <td className="px-6 py-4">
-                  {member.memberId ? (
-                    <Link
-                      href={`/dashboard/directory/${member.memberId}`}
-                      className="font-semibold text-gray-900 underline-offset-2 hover:underline"
-                    >
-                      {member.name || 'Unnamed Member'}
-                    </Link>
-                  ) : (
-                    <span className="font-semibold text-gray-900">{member.name || 'Unnamed Member'}</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">{member.staffId || 'N/A'}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                      member.memberType === 'NEW' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {member.memberType}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">{formatCurrency(member.monthlySavings)}</td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">{formatCurrency(member.specialSavings)}</td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">
-                  {member.monthlyCharges > 0 ? formatCurrency(member.monthlyCharges) : '—'}
-                </td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">
-                  {member.newMemberFee > 0 ? formatCurrency(member.newMemberFee) : '—'}
-                </td>
-                <td className="px-6 py-4 font-semibold text-gray-900">{formatCurrency(member.totalSavings)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <MemberDirectoryTable members={members} />
     </div>
   )
 }
@@ -188,8 +137,4 @@ function MetricCard({
       <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>
   )
-}
-
-function HeadCell({ label }: { label: string }) {
-  return <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</th>
 }

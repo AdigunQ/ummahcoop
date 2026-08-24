@@ -121,9 +121,9 @@ function buildAbanoFromSnapshotRow(
   const month = pickText(row, ['Month', 'Month Joined']) || formatMonthColumn(selectedPeriod)
   const monthlySaving = pickNumber(row, ['Thrift Savings', 'Monthly Saving'])
   const specialSaving = pickNumber(row, ['Special Savings', 'Special Saving'])
-  const loan = pickNumber(row, ['Loan'])
+  const loan = pickNumber(row, ['Loan', 'Loan Originated'])
   const managementFee = pickNumber(row, ['Management Fee'])
-  const commodity = pickNumber(row, ['Commodity'])
+  const commodity = pickNumber(row, ['Commodity', 'Commodity Requests', 'Comodity'])
   const monthlyFee = pickNumber(row, ['Monthly Fee', 'Charges'])
   const formFee = pickNumber(row, ['Form Fee', 'New Member Fee'])
   const total = pickNumber(row, ['Total', 'Amount']) || monthlySaving + specialSaving + loan + managementFee + commodity + monthlyFee + formFee
