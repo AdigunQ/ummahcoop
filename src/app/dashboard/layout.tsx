@@ -30,16 +30,20 @@ export default async function DashboardLayout({
       status: true,
       balance: true,
       loanBalance: true,
-      privileges: {
-        select: {
-          code: true,
-        },
-      },
     },
   })
 
   if (!user) {
     redirect('/login')
+  }
+
+  let privilegeCount = 0
+  if (user.role === 'MEMBER') {
+    try {
+      privilegeCount = await prisma.memberPrivilege.count({ where: { userId: user.id } })
+    } catch (error) {
+      console.error('[dashboard-layout] privilege lookup unavailable', error)
+    }
   }
 
   if (user.role === 'ADMIN') {
@@ -51,7 +55,7 @@ export default async function DashboardLayout({
     : user.loanBalance
 
   const canSeeAdminBadges =
-    user.role === 'ADMIN' || (user.privileges?.length || 0) > 0
+    user.role === 'ADMIN' || privilegeCount > 0
 
   const adminBadges = canSeeAdminBadges
     ? await (async () => {

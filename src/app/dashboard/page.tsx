@@ -7,6 +7,14 @@ import { MemberDashboard } from '@/components/dashboard/member-dashboard'
 import { getMemberFinanceSummary } from '@/lib/member-finance'
 import { getLoanLimit } from '@/lib/loan-request'
 
+type RecentCommodity = {
+  id: string
+  itemCategory: string | null
+  itemModel: string | null
+  status: string
+  createdAt: Date
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -23,9 +31,14 @@ export default async function DashboardPage({
     return <AdminAnalytics />
   }
 
-  const grantedAccessCount = session.user?.id
-    ? await prisma.memberPrivilege.count({ where: { userId: session.user.id } })
-    : 0
+  let grantedAccessCount = 0
+  if (session.user?.id) {
+    try {
+      grantedAccessCount = await prisma.memberPrivilege.count({ where: { userId: session.user.id } })
+    } catch (error) {
+      console.error('[dashboard] privilege lookup unavailable', error)
+    }
+  }
 
   if (grantedAccessCount > 0 && searchParams?.view !== 'member') {
     return <AdminAnalytics canSwitchToMember />
@@ -56,45 +69,52 @@ export default async function DashboardPage({
     redirect('/login')
   }
 
-  const [recentPayments, recentLoans, recentCommodities] = await Promise.all([
-    prisma.payment.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        type: true,
-        amount: true,
-        date: true,
-        status: true,
-        createdAt: true,
-      },
-    }),
-    prisma.loan.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        purpose: true,
-        duration: true,
-        amount: true,
-        status: true,
-      },
-    }),
-    prisma.commodityRequest.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        itemCategory: true,
-        itemModel: true,
-        status: true,
-        createdAt: true,
-      },
-    }),
-  ])
+  let recentPayments: Array<Record<string, unknown>> = []
+  let recentLoans: Array<Record<string, unknown>> = []
+  let recentCommodities: RecentCommodity[] = []
+  try {
+    ;[recentPayments, recentLoans, recentCommodities] = await Promise.all([
+      prisma.payment.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          type: true,
+          amount: true,
+          date: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+      prisma.loan.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          purpose: true,
+          duration: true,
+          amount: true,
+          status: true,
+        },
+      }),
+      prisma.commodityRequest.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          itemCategory: true,
+          itemModel: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+    ])
+  } catch (error) {
+    console.error('[dashboard] recent activity unavailable', error)
+  }
 
   const financeSummary = await getMemberFinanceSummary(user.id, user.staffId)
 
