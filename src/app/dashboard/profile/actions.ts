@@ -16,6 +16,7 @@ export async function updateProfile(formData: FormData) {
 
   const email = normalizeEmail(String(formData.get('email') || ''))
   const phone = String(formData.get('phone') || '').trim()
+  const organization = String(formData.get('organization') || '').trim()
   const bankName = String(formData.get('bankName') || '').trim()
   const bankAccountNumber = String(formData.get('bankAccountNumber') || '').trim()
   const bankAccountName = String(formData.get('bankAccountName') || '').trim()
@@ -38,6 +39,12 @@ export async function updateProfile(formData: FormData) {
     data.email = email
   }
   if (phone) data.phone = phone
+  if (formData.has('organization')) {
+    if (organization.length > 200) {
+      return { error: 'Organization must be 200 characters or fewer.' }
+    }
+    data.organization = organization || null
+  }
   if (bankName) data.bankName = bankName
   if (bankAccountNumber) data.bankAccountNumber = bankAccountNumber
   if (bankAccountName) data.bankAccountName = bankAccountName

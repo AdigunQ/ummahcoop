@@ -56,6 +56,7 @@ export default function ProfileView({
   const [isEditingBank, setIsEditingBank] = useState(false)
   const [isEditingPhone, setIsEditingPhone] = useState(false)
   const [isEditingEmail, setIsEditingEmail] = useState(false)
+  const [isEditingOrganization, setIsEditingOrganization] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(mustChangePassword)
   const displayEmail = isGeneratedMemberEmail(member.email, member.staffId) ? 'Not set' : member.email
 
@@ -68,6 +69,7 @@ export default function ProfileView({
       setIsEditingBank(false)
       setIsEditingPhone(false)
       setIsEditingEmail(false)
+      setIsEditingOrganization(false)
       router.refresh()
     }
   }
@@ -203,7 +205,57 @@ export default function ProfileView({
             <Row icon={Hash} label="Staff ID" value={member.staffId || 'N/A'} />
             <Row icon={Building2} label="Department" value={member.department || 'N/A'} />
             <Row icon={Landmark} label="Savings plan" value={member.savingsPlan || 'Not selected'} />
-            <Row icon={Building2} label="Organization" value={member.organization || 'N/A'} />
+            <form action={handleSave}>
+              <div className="flex items-center gap-3 px-5 py-3.5">
+                <Building2 className="h-4 w-4 flex-none text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Organization</span>
+                <div className="ml-auto flex flex-1 items-center justify-end gap-2">
+                  {isEditingOrganization ? (
+                    <>
+                      <input
+                        name="organization"
+                        data-testid="profile-organization-input"
+                        defaultValue={member.organization || ''}
+                        placeholder="e.g. FAAN"
+                        maxLength={200}
+                        className="input-base !py-2 !text-sm sm:max-w-[240px]"
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        data-testid="profile-organization-save"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
+                        aria-label="Save organization"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingOrganization(false)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
+                        aria-label="Cancel organization edit"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold">{member.organization || 'N/A'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingOrganization(true)}
+                        data-testid="profile-organization-edit"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
+                        style={{ borderColor: 'rgb(var(--border))' }}
+                        aria-label="Edit organization"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </form>
             <Row icon={Building2} label="Station" value={member.station || 'N/A'} />
             <Row icon={ShieldCheck} label="Grade level" value={member.gradeLevel || 'N/A'} />
 
