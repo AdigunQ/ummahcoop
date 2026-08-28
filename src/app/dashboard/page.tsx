@@ -46,27 +46,63 @@ export default async function DashboardPage({
 
   // Select only the fields this page needs so older deployments can still
   // render while additive profile migrations are being applied.
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      status: true,
-      staffId: true,
-      department: true,
-      createdAt: true,
-      balance: true,
-      specialBalance: true,
-      totalContributions: true,
-      loanBalance: true,
-      monthlyContribution: true,
-      specialContribution: true,
-    },
-  })
+  type DashboardUser = {
+    id: string
+    name: string | null
+    email: string
+    status: string
+    staffId: string | null
+    department: string | null
+    createdAt: Date
+    balance: number
+    specialBalance: number
+    totalContributions: number
+    loanBalance: number
+    monthlyContribution: number | null
+    specialContribution: number | null
+  }
 
-  if (!user) {
-    redirect('/login')
+  let user: DashboardUser | null = null
+  try {
+    user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        status: true,
+        staffId: true,
+        department: true,
+        createdAt: true,
+        balance: true,
+        specialBalance: true,
+        totalContributions: true,
+        loanBalance: true,
+        monthlyContribution: true,
+        specialContribution: true,
+      },
+    })
+  } catch (error) {
+    console.error('[dashboard] member profile lookup unavailable', error)
+  }
+
+  // A valid auth session is enough to show the member shell during a short
+  // database/schema outage. Fresh financial data is still loaded when it is
+  // available, while the page remains usable instead of returning HTTP 500.
+  user ||= {
+    id: session.user?.id || email,
+    name: session.user?.name || null,
+    email,
+    status: session.user?.status || 'ACTIVE',
+    staffId: null,
+    department: null,
+    createdAt: new Date(),
+    balance: 0,
+    specialBalance: 0,
+    totalContributions: 0,
+    loanBalance: 0,
+    monthlyContribution: null,
+    specialContribution: null,
   }
 
   let recentPayments: Array<Record<string, unknown>> = []

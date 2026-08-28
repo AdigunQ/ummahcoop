@@ -18,23 +18,47 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // Get fresh user data
-  const user = await prisma.user.findUnique({
-    where: session?.user?.id ? { id: session.user.id } : { email: email as string },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      staffId: true,
-      role: true,
-      status: true,
-      balance: true,
-      loanBalance: true,
-    },
-  })
+  // Get fresh user data, but do not turn a temporary database/schema issue
+  // into a failed login page when the auth session is still valid.
+  type DashboardUser = {
+    id: string
+    name: string | null
+    email: string
+    staffId: string | null
+    role: string
+    status: string
+    balance: number
+    loanBalance: number
+  }
 
-  if (!user) {
-    redirect('/login')
+  let user: DashboardUser | null = null
+  try {
+    user = await prisma.user.findUnique({
+      where: session?.user?.id ? { id: session.user.id } : { email: email as string },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        staffId: true,
+        role: true,
+        status: true,
+        balance: true,
+        loanBalance: true,
+      },
+    })
+  } catch (error) {
+    console.error('[dashboard-layout] user lookup unavailable', error)
+  }
+
+  user ||= {
+    id: session.user?.id || email || 'member-session',
+    name: session.user?.name || null,
+    email: email || '',
+    staffId: null,
+    role: session.user?.role || 'MEMBER',
+    status: session.user?.status || 'ACTIVE',
+    balance: 0,
+    loanBalance: 0,
   }
 
   let privilegeCount = 0
@@ -57,17 +81,19 @@ export default async function DashboardLayout({
   const canSeeAdminBadges =
     user.role === 'ADMIN' || privilegeCount > 0
 
-  const adminBadges = canSeeAdminBadges
-    ? await (async () => {
-        const [pendingMembers, pendingPayments, pendingLoans] = await Promise.all([
-          prisma.user.count({ where: { role: 'MEMBER', status: 'PENDING' } }),
-          prisma.payment.count({ where: { status: 'PENDING' } }),
-          prisma.loan.count({ where: { status: 'PENDING' } }),
-        ])
-
-        return { pendingMembers, pendingPayments, pendingLoans }
-      })()
-    : undefined
+  let adminBadges: { pendingMembers: number; pendingPayments: number; pendingLoans: number } | undefined
+  if (canSeeAdminBadges) {
+    try {
+      const [pendingMembers, pendingPayments, pendingLoans] = await Promise.all([
+        prisma.user.count({ where: { role: 'MEMBER', status: 'PENDING' } }),
+        prisma.payment.count({ where: { status: 'PENDING' } }),
+        prisma.loan.count({ where: { status: 'PENDING' } }),
+      ])
+      adminBadges = { pendingMembers, pendingPayments, pendingLoans }
+    } catch (error) {
+      console.error('[dashboard-layout] admin badges unavailable', error)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
