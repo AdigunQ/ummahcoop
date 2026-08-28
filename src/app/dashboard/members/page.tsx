@@ -28,7 +28,11 @@ async function updateMemberStatus(formData: FormData) {
   })
 
   revalidatePath('/dashboard')
+  revalidatePath('/dashboard', 'layout')
   revalidatePath('/dashboard/members')
+  revalidatePath('/dashboard/member-data')
+  revalidatePath('/dashboard/analytics')
+  revalidatePath('/dashboard/directory')
 }
 
 export default async function MembersPage() {

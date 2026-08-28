@@ -49,6 +49,13 @@ model User {
   status            Status    @default(PENDING)
   phone             String?
   department        String?
+  organization      String?
+  station           String?
+  gradeLevel        String?   @map("grade_level")
+  nextOfKinName     String?   @map("next_of_kin_name")
+  nextOfKinPhone    String?   @map("next_of_kin_phone")
+  nextOfKinEmail    String?   @map("next_of_kin_email")
+  nextOfKinRelationship String? @map("next_of_kin_relationship")
   bankName          String?   @map("bank_name")
   bankAccountNumber String?   @map("bank_account_number")
   bankAccountName   String?   @map("bank_account_name")

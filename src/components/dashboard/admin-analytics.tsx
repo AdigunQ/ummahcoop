@@ -48,8 +48,9 @@ export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchT
   const currentMonth = resolveVoucherPeriod().period
   const currentLabel = formatPeriodLabel(currentMonth)
 
-  const [currentDataset, activeLoanRecords, approvedCommodityRecords, queueCounts, trends] = await Promise.all([
+  const [currentDataset, activeMemberCount, activeLoanRecords, approvedCommodityRecords, queueCounts, trends] = await Promise.all([
     getCurrentMemberLiveDataset(currentMonth),
+    prisma.user.count({ where: { role: 'MEMBER', status: 'ACTIVE' } }),
     prisma.loan.findMany({
       where: { status: 'APPROVED', balance: { gt: 0 } },
       select: { balance: true, user: { select: { id: true, staffId: true } } },
@@ -216,7 +217,7 @@ export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchT
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <MetricCard
           label="Members on record"
-          value={currentRows.length.toLocaleString('en-NG')}
+          value={activeMemberCount.toLocaleString('en-NG')}
           icon={<Users className="h-5 w-5" />}
           tone="slate"
           caption={currentLabel}

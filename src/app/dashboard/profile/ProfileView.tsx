@@ -28,6 +28,13 @@ type MemberProfile = {
   phone: string | null
   staffId: string | null
   department: string | null
+  organization: string | null
+  station: string | null
+  gradeLevel: string | null
+  nextOfKinName: string | null
+  nextOfKinPhone: string | null
+  nextOfKinEmail: string | null
+  nextOfKinRelationship: string | null
   bankName: string | null
   bankAccountNumber: string | null
   bankAccountName: string | null
@@ -194,6 +201,9 @@ export default function ProfileView({
             </form>
             <Row icon={Hash} label="Staff ID" value={member.staffId || 'N/A'} />
             <Row icon={Building2} label="Department" value={member.department || 'N/A'} />
+            <Row icon={Building2} label="Organization" value={member.organization || 'N/A'} />
+            <Row icon={Building2} label="Station" value={member.station || 'N/A'} />
+            <Row icon={ShieldCheck} label="Grade level" value={member.gradeLevel || 'N/A'} />
 
             <form action={handleSave}>
               <div className="flex items-center gap-3 px-5 py-3.5">
@@ -319,6 +329,19 @@ export default function ProfileView({
           )}
         </section>
       </div>
+
+      <section className="card overflow-hidden">
+        <div className="border-b px-5 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
+          <p className="label-eyebrow">Emergency contact</p>
+          <h2 className="mt-1 text-base font-semibold tracking-tight">Next of kin</h2>
+        </div>
+        <div className="grid gap-4 p-5 sm:grid-cols-2">
+          <Row icon={User} label="Name" value={member.nextOfKinName || 'N/A'} />
+          <Row icon={PhoneCall} label="Phone" value={member.nextOfKinPhone || 'N/A'} />
+          <Row icon={Mail} label="Email" value={member.nextOfKinEmail || 'N/A'} />
+          <Row icon={User} label="Relationship" value={member.nextOfKinRelationship || 'N/A'} />
+        </div>
+      </section>
 
       <section className="card overflow-hidden">
         <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'rgb(var(--border))' }}>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { notifyAdminsOfNewMember } from '@/lib/notifications'
 import { z } from 'zod'
 import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
 
@@ -109,6 +110,18 @@ export async function POST(req: Request) {
         loanBalance: 0,
       },
     })
+
+    try {
+      await notifyAdminsOfNewMember({
+        name,
+        staffId: normalizedStaffId,
+        phone,
+        submittedAt: new Date(),
+      })
+    } catch (notificationError) {
+      // A provider outage must not turn a successful registration into an error.
+      console.error('Unable to notify admins about new member registration', notificationError)
+    }
 
     return NextResponse.json(
       { 

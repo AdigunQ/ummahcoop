@@ -96,6 +96,13 @@ async function updateMemberRecord(formData: FormData) {
   const monthlyContribution = Number(formData.get('monthlyContribution') || 0)
   const specialContribution = Number(formData.get('specialContribution') || 0)
   const department = String(formData.get('department') || '').trim()
+  const organization = String(formData.get('organization') || '').trim()
+  const station = String(formData.get('station') || '').trim()
+  const gradeLevel = String(formData.get('gradeLevel') || '').trim()
+  const nextOfKinName = String(formData.get('nextOfKinName') || '').trim()
+  const nextOfKinPhone = String(formData.get('nextOfKinPhone') || '').trim()
+  const nextOfKinEmail = String(formData.get('nextOfKinEmail') || '').trim()
+  const nextOfKinRelationship = String(formData.get('nextOfKinRelationship') || '').trim()
   const balance = Number(formData.get('balance') || 0)
   const specialBalance = Number(formData.get('specialBalance') || 0)
   const rawLoanBalance = formData.get('loanBalance')
@@ -154,6 +161,13 @@ async function updateMemberRecord(formData: FormData) {
         data: {
           staffId,
           department: department || null,
+          organization: organization || null,
+          station: station || null,
+          gradeLevel: gradeLevel || null,
+          nextOfKinName: nextOfKinName || null,
+          nextOfKinPhone: nextOfKinPhone || null,
+          nextOfKinEmail: nextOfKinEmail || null,
+          nextOfKinRelationship: nextOfKinRelationship || null,
           monthlyContribution,
           specialContribution,
           balance,
@@ -246,6 +260,13 @@ export default async function MemberProfileEditorPage({
       staffId: true,
       phone: true,
       department: true,
+      organization: true,
+      station: true,
+      gradeLevel: true,
+      nextOfKinName: true,
+      nextOfKinPhone: true,
+      nextOfKinEmail: true,
+      nextOfKinRelationship: true,
       bankName: true,
       bankAccountNumber: true,
       bankAccountName: true,
@@ -296,7 +317,14 @@ export default async function MemberProfileEditorPage({
         <div className="mt-4 grid grid-cols-1 gap-2 text-sm text-gray-600 md:grid-cols-2">
           <p><span className="font-medium text-gray-800">Staff ID:</span> {member.staffId || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Department:</span> {member.department || 'N/A'}</p>
+          <p><span className="font-medium text-gray-800">Organization:</span> {member.organization || 'N/A'}</p>
+          <p><span className="font-medium text-gray-800">Station:</span> {member.station || 'N/A'}</p>
+          <p><span className="font-medium text-gray-800">Grade Level:</span> {member.gradeLevel || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Phone:</span> {member.phone || 'N/A'}</p>
+          <p><span className="font-medium text-gray-800">Next of Kin:</span> {member.nextOfKinName || 'N/A'}</p>
+          <p><span className="font-medium text-gray-800">Next of Kin Phone:</span> {member.nextOfKinPhone || 'N/A'}</p>
+          <p><span className="font-medium text-gray-800">Next of Kin Email:</span> {member.nextOfKinEmail || 'N/A'}</p>
+          <p><span className="font-medium text-gray-800">Relationship:</span> {member.nextOfKinRelationship || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Bank:</span> {member.bankName || 'N/A'} / {member.bankAccountNumber || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Account Name:</span> {member.bankAccountName || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Current Savings:</span> {formatCurrency(member.balance)}</p>
@@ -336,6 +364,78 @@ export default async function MemberProfileEditorPage({
               name="department"
               defaultValue={member.department || ''}
               placeholder="e.g. Operations"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Organization</label>
+            <input
+              name="organization"
+              defaultValue={member.organization || ''}
+              placeholder="e.g. FAAN"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Station</label>
+            <input
+              name="station"
+              defaultValue={member.station || ''}
+              placeholder="e.g. Lagos"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Staff Grade Level</label>
+            <input
+              name="gradeLevel"
+              defaultValue={member.gradeLevel || ''}
+              placeholder="e.g. 08"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <h3 className="border-b border-gray-100 pb-2 text-sm font-semibold text-gray-800">Next of Kin</h3>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+            <input
+              name="nextOfKinName"
+              defaultValue={member.nextOfKinName || ''}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Phone number</label>
+            <input
+              name="nextOfKinPhone"
+              defaultValue={member.nextOfKinPhone || ''}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Email address</label>
+            <input
+              type="email"
+              name="nextOfKinEmail"
+              defaultValue={member.nextOfKinEmail || ''}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Relationship</label>
+            <input
+              name="nextOfKinRelationship"
+              defaultValue={member.nextOfKinRelationship || ''}
+              placeholder="e.g. Spouse"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
