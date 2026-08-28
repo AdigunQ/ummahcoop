@@ -61,11 +61,26 @@ export default async function DashboardPage({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
       take: 5,
+      select: {
+        id: true,
+        type: true,
+        amount: true,
+        date: true,
+        status: true,
+        createdAt: true,
+      },
     }),
     prisma.loan.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
       take: 5,
+      select: {
+        id: true,
+        purpose: true,
+        duration: true,
+        amount: true,
+        status: true,
+      },
     }),
     prisma.commodityRequest.findMany({
       where: { userId: user.id },
