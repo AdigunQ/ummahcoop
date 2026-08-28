@@ -22,6 +22,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { LOAN_POLICY } from '@/lib/constants'
 
 interface MemberDashboardProps {
+  isPrivileged?: boolean
   user: {
     id: string
     name: string | null
@@ -65,6 +66,7 @@ interface MemberDashboardProps {
 }
 
 export function MemberDashboard({
+  isPrivileged = false,
   user,
   loanEligibility,
   loanSummary,
@@ -117,7 +119,18 @@ export function MemberDashboard({
         <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.07] via-transparent to-transparent" />
         <div className="relative grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <p className="label-eyebrow">Member portal</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="label-eyebrow">Member portal</p>
+              {isPrivileged && (
+                <Link
+                  href="/dashboard"
+                  data-testid="switch-to-admin-view"
+                  className="inline-flex items-center rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/15"
+                >
+                  Switch to admin view
+                </Link>
+              )}
+            </div>
             <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
               Welcome back, {firstName}
             </h1>

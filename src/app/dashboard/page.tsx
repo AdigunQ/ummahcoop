@@ -178,6 +178,7 @@ export default async function DashboardPage({
 
   return (
     <MemberDashboard
+      isPrivileged={grantedAccessCount > 0}
       user={memberProfile}
       loanEligibility={loanEligibility}
       loanSummary={{
