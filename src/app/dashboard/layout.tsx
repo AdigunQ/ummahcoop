@@ -5,6 +5,7 @@ import { DashboardNav } from '@/components/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { autoPostMonthEndIfDue } from '@/lib/payroll'
 import { getMemberFinanceSummary } from '@/lib/member-finance'
+import { getUserPrivilegeCodes } from '@/lib/access'
 
 export default async function DashboardLayout({
   children,
@@ -62,9 +63,11 @@ export default async function DashboardLayout({
   }
 
   let privilegeCount = 0
+  let privilegeCodes: string[] = []
   if (user.role === 'MEMBER') {
     try {
-      privilegeCount = await prisma.memberPrivilege.count({ where: { userId: user.id } })
+      privilegeCodes = await getUserPrivilegeCodes(user.id)
+      privilegeCount = privilegeCodes.length
     } catch (error) {
       console.error('[dashboard-layout] privilege lookup unavailable', error)
     }
@@ -97,7 +100,14 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardNav user={{ ...user, loanBalance: navLoanBalance }} adminBadges={adminBadges} />
+      <DashboardNav
+        user={{
+          ...user,
+          loanBalance: navLoanBalance,
+          privileges: privilegeCodes.map((code) => ({ code })),
+        }}
+        adminBadges={adminBadges}
+      />
       <main className="min-h-screen lg:ml-72">
         <div className="px-4 pb-10 pt-20 lg:px-8 lg:pt-10">
           <div className="mx-auto max-w-6xl animate-fadeIn">{children}</div>
