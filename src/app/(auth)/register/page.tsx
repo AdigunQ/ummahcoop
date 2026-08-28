@@ -13,9 +13,11 @@ type FormState = {
   staffId: string
   name: string
   phone: string
+  savingsPlan: SavingsPlan | ''
 }
 
-type FormErrors = Partial<Record<'staffId' | 'name' | 'phone', string>>
+type SavingsPlan = 'THRIFT' | 'SPECIAL' | 'BOTH'
+type FormErrors = Partial<Record<'staffId' | 'name' | 'phone' | 'savingsPlan', string>>
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -24,14 +26,20 @@ export default function RegisterPage() {
     staffId: '',
     name: '',
     phone: '',
+    savingsPlan: '',
   })
   const [errors, setErrors] = useState<FormErrors>({})
 
   const onTextChange =
-    (field: keyof FormState) => (event: ChangeEvent<HTMLInputElement>) => {
+    (field: keyof Pick<FormState, 'staffId' | 'name' | 'phone'>) => (event: ChangeEvent<HTMLInputElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }))
       setErrors((current) => ({ ...current, [field]: undefined }))
     }
+
+  const onSavingsPlanChange = (savingsPlan: SavingsPlan) => {
+    setForm((current) => ({ ...current, savingsPlan }))
+    setErrors((current) => ({ ...current, savingsPlan: undefined }))
+  }
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -40,6 +48,7 @@ export default function RegisterPage() {
     if (!form.staffId.trim()) nextErrors.staffId = 'Staff ID is required'
     if (!form.name.trim()) nextErrors.name = 'Full name is required'
     if (!form.phone.trim()) nextErrors.phone = 'Phone number is required'
+    if (!form.savingsPlan) nextErrors.savingsPlan = 'Choose a savings plan'
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -54,6 +63,7 @@ export default function RegisterPage() {
           staffId: form.staffId.trim(),
           name: form.name.trim(),
           phone: form.phone.trim(),
+          savingsPlan: form.savingsPlan,
         }),
       })
 
@@ -99,15 +109,16 @@ export default function RegisterPage() {
               Open your cooperative account
             </h1>
             <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Keep it short. Send only your Staff ID, full name, and phone number.
+              Keep it short. Send your Staff ID, full name, phone number, and savings plan.
               Admin will review the request before access is granted.
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             <MiniCard label="Staff ID" value="Unique member code" />
             <MiniCard label="Name" value="Full legal name" />
             <MiniCard label="Phone" value="Reachable number" />
+            <MiniCard label="Plan" value="Thrift or special" />
           </div>
 
           <div className="rounded-2xl border bg-surface p-4 text-sm text-muted-foreground" style={{ borderColor: 'rgb(var(--border))' }}>
@@ -122,10 +133,10 @@ export default function RegisterPage() {
         <div className="card overflow-hidden">
           <form onSubmit={onSubmit} className="space-y-5 p-6 sm:p-8" noValidate>
             <div>
-              <p className="label-eyebrow">Three fields only</p>
+              <p className="label-eyebrow">Registration details</p>
               <h2 className="mt-1 text-2xl font-semibold tracking-tight">Member form</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Nothing extra. No savings plan setup at this stage.
+                Choose how you want to save. Contribution amounts can be set during approval.
               </p>
             </div>
 
@@ -166,6 +177,39 @@ export default function RegisterPage() {
                   autoComplete="tel"
                 />
               </Field>
+
+              <fieldset>
+                <legend className="mb-2 text-sm font-medium text-foreground">Savings plan</legend>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {([
+                    ['THRIFT', 'Thrift savings', 'Regular savings and loan eligibility'],
+                    ['SPECIAL', 'Special savings', 'A separate savings balance'],
+                    ['BOTH', 'Both', 'Save in both plans'],
+                  ] as const).map(([value, label, description]) => (
+                    <label
+                      key={value}
+                      className={
+                        'cursor-pointer rounded-xl border p-3 transition ' +
+                        (form.savingsPlan === value
+                          ? 'border-accent bg-accent/10'
+                          : 'border-[rgb(var(--border))] bg-surface hover:border-accent/50')
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="savingsPlan"
+                        value={value}
+                        checked={form.savingsPlan === value}
+                        onChange={() => onSavingsPlanChange(value)}
+                        className="sr-only"
+                      />
+                      <span className="block text-sm font-semibold">{label}</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{description}</span>
+                    </label>
+                  ))}
+                </div>
+                {errors.savingsPlan && <p className="mt-1.5 text-xs text-rose-500">{errors.savingsPlan}</p>}
+              </fieldset>
             </div>
 
             <button

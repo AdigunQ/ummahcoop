@@ -9,6 +9,7 @@ const registerPayloadSchema = z.object({
   name: z.string().trim().min(1),
   staffId: z.string().trim().min(1).regex(/^[a-zA-Z0-9-]+$/),
   phone: z.string().trim().min(1),
+  savingsPlan: z.enum(['THRIFT', 'SPECIAL', 'BOTH']).default('BOTH'),
   department: z.string().trim().optional(),
   bankName: z.string().trim().optional(),
   bankAccountNumber: z.string().trim().optional(),
@@ -48,6 +49,7 @@ export async function POST(req: Request) {
       name,
       staffId,
       phone,
+      savingsPlan,
       department,
       bankName,
       bankAccountNumber,
@@ -97,6 +99,7 @@ export async function POST(req: Request) {
         staffId: normalizedStaffId,
         phone,
         department: normalizedDepartment,
+        savingsPlan,
         bankName: normalizedBankName,
         bankAccountNumber: normalizedBankAccountNumber,
         bankAccountName: normalizedBankAccountName,
@@ -116,6 +119,7 @@ export async function POST(req: Request) {
         name,
         staffId: normalizedStaffId,
         phone,
+        savingsPlan,
         submittedAt: new Date(),
       })
     } catch (notificationError) {

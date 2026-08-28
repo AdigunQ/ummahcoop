@@ -49,6 +49,7 @@ model User {
   status            Status    @default(PENDING)
   phone             String?
   department        String?
+  savingsPlan       String?   @map("savings_plan")
   organization      String?
   station           String?
   gradeLevel        String?   @map("grade_level")

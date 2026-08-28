@@ -59,6 +59,7 @@ export default async function MembersPage() {
       email: true,
       phone: true,
       department: true,
+      savingsPlan: true,
       bankName: true,
       bankAccountNumber: true,
       bankAccountName: true,
@@ -95,6 +96,9 @@ export default async function MembersPage() {
                     <p className="text-sm text-gray-500 mt-1">
                       Phone: {member.phone || 'N/A'} · Department:{' '}
                       {member.department || 'N/A'}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Savings Plan: {member.savingsPlan === 'THRIFT' ? 'Thrift savings' : member.savingsPlan === 'SPECIAL' ? 'Special savings' : member.savingsPlan === 'BOTH' ? 'Thrift + Special' : 'Not selected'}
                     </p>
                     <p className="text-sm text-gray-500">
                       Bank: {member.bankName || 'N/A'} · {member.bankAccountNumber || 'N/A'}

@@ -42,6 +42,7 @@ export default async function ProfilePage({ searchParams }: { searchParams?: Sea
       phone: true,
       staffId: true,
       department: true,
+      savingsPlan: true,
       organization: true,
       station: true,
       gradeLevel: true,

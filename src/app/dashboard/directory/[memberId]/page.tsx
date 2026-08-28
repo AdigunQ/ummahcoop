@@ -96,6 +96,7 @@ async function updateMemberRecord(formData: FormData) {
   const monthlyContribution = Number(formData.get('monthlyContribution') || 0)
   const specialContribution = Number(formData.get('specialContribution') || 0)
   const department = String(formData.get('department') || '').trim()
+  const savingsPlan = String(formData.get('savingsPlan') || '').trim()
   const organization = String(formData.get('organization') || '').trim()
   const station = String(formData.get('station') || '').trim()
   const gradeLevel = String(formData.get('gradeLevel') || '').trim()
@@ -161,6 +162,7 @@ async function updateMemberRecord(formData: FormData) {
         data: {
           staffId,
           department: department || null,
+          savingsPlan: savingsPlan || null,
           organization: organization || null,
           station: station || null,
           gradeLevel: gradeLevel || null,
@@ -260,6 +262,7 @@ export default async function MemberProfileEditorPage({
       staffId: true,
       phone: true,
       department: true,
+      savingsPlan: true,
       organization: true,
       station: true,
       gradeLevel: true,
@@ -317,6 +320,7 @@ export default async function MemberProfileEditorPage({
         <div className="mt-4 grid grid-cols-1 gap-2 text-sm text-gray-600 md:grid-cols-2">
           <p><span className="font-medium text-gray-800">Staff ID:</span> {member.staffId || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Department:</span> {member.department || 'N/A'}</p>
+          <p><span className="font-medium text-gray-800">Savings Plan:</span> {member.savingsPlan || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Organization:</span> {member.organization || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Station:</span> {member.station || 'N/A'}</p>
           <p><span className="font-medium text-gray-800">Grade Level:</span> {member.gradeLevel || 'N/A'}</p>
@@ -366,6 +370,20 @@ export default async function MemberProfileEditorPage({
               placeholder="e.g. Operations"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Savings Plan</label>
+            <select
+              name="savingsPlan"
+              defaultValue={member.savingsPlan || ''}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+            >
+              <option value="">Not selected</option>
+              <option value="THRIFT">Thrift savings</option>
+              <option value="SPECIAL">Special savings</option>
+              <option value="BOTH">Thrift + Special</option>
+            </select>
           </div>
 
           <div>

@@ -28,6 +28,7 @@ type MemberProfile = {
   phone: string | null
   staffId: string | null
   department: string | null
+  savingsPlan: string | null
   organization: string | null
   station: string | null
   gradeLevel: string | null
@@ -201,6 +202,7 @@ export default function ProfileView({
             </form>
             <Row icon={Hash} label="Staff ID" value={member.staffId || 'N/A'} />
             <Row icon={Building2} label="Department" value={member.department || 'N/A'} />
+            <Row icon={Landmark} label="Savings plan" value={member.savingsPlan || 'Not selected'} />
             <Row icon={Building2} label="Organization" value={member.organization || 'N/A'} />
             <Row icon={Building2} label="Station" value={member.station || 'N/A'} />
             <Row icon={ShieldCheck} label="Grade level" value={member.gradeLevel || 'N/A'} />
