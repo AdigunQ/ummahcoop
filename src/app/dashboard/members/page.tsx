@@ -64,6 +64,7 @@ export default async function MembersPage() {
       bankAccountNumber: true,
       bankAccountName: true,
       monthlyContribution: true,
+      specialContribution: true,
       createdAt: true,
     },
   })
@@ -107,8 +108,8 @@ export default async function MembersPage() {
                       Account Name: {member.bankAccountName || 'N/A'}
                     </p>
                     <p className="text-sm text-gray-500">
-                      Monthly Contribution: ₦
-                      {(member.monthlyContribution || 0).toLocaleString()}
+                      Monthly thrift: ₦{(member.monthlyContribution || 0).toLocaleString()} · Monthly special: ₦
+                      {(member.specialContribution || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
                       Requested: {new Date(member.createdAt).toLocaleString()}

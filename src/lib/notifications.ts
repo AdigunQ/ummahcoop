@@ -1,8 +1,9 @@
 type NewMemberRegistration = {
   name: string
   staffId: string
-  phone: string
   savingsPlan: string
+  thriftAmount: number
+  specialAmount: number
   submittedAt: Date
 }
 
@@ -45,8 +46,9 @@ export async function notifyAdminsOfNewMember(member: NewMemberRegistration): Pr
         '',
         `Name: ${member.name}`,
         `Staff ID: ${member.staffId}`,
-        `Phone: ${member.phone}`,
         `Savings plan: ${member.savingsPlan}`,
+        `Monthly thrift savings: N${member.thriftAmount.toLocaleString('en-NG')}`,
+        `Monthly special savings: N${member.specialAmount.toLocaleString('en-NG')}`,
         `Submitted: ${submittedAt}`,
         '',
         'Review the request in the Admin dashboard under Member Approvals.',

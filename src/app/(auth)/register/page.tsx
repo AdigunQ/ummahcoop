@@ -5,19 +5,22 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
-import { ArrowRight, Hash, Loader2, PhoneCall, ShieldCheck, User } from 'lucide-react'
+import { ArrowRight, Hash, Loader2, LockKeyhole, ShieldCheck, User, Wallet } from 'lucide-react'
 import { UmmahLogo } from '@/components/brand/ummah-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 type FormState = {
   staffId: string
   name: string
-  phone: string
   savingsPlan: SavingsPlan | ''
+  thriftAmount: string
+  specialAmount: string
+  password: string
+  confirmPassword: string
 }
 
 type SavingsPlan = 'THRIFT' | 'SPECIAL' | 'BOTH'
-type FormErrors = Partial<Record<'staffId' | 'name' | 'phone' | 'savingsPlan', string>>
+type FormErrors = Partial<Record<'staffId' | 'name' | 'savingsPlan' | 'thriftAmount' | 'specialAmount' | 'password' | 'confirmPassword', string>>
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -25,13 +28,22 @@ export default function RegisterPage() {
   const [form, setForm] = useState<FormState>({
     staffId: '',
     name: '',
-    phone: '',
     savingsPlan: '',
+    thriftAmount: '',
+    specialAmount: '',
+    password: '',
+    confirmPassword: '',
   })
   const [errors, setErrors] = useState<FormErrors>({})
 
   const onTextChange =
-    (field: keyof Pick<FormState, 'staffId' | 'name' | 'phone'>) => (event: ChangeEvent<HTMLInputElement>) => {
+    (field: keyof Pick<FormState, 'staffId' | 'name' | 'password' | 'confirmPassword'>) => (event: ChangeEvent<HTMLInputElement>) => {
+      setForm((current) => ({ ...current, [field]: event.target.value }))
+      setErrors((current) => ({ ...current, [field]: undefined }))
+    }
+
+  const onAmountChange =
+    (field: 'thriftAmount' | 'specialAmount') => (event: ChangeEvent<HTMLInputElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }))
       setErrors((current) => ({ ...current, [field]: undefined }))
     }
@@ -47,8 +59,23 @@ export default function RegisterPage() {
     const nextErrors: FormErrors = {}
     if (!form.staffId.trim()) nextErrors.staffId = 'Staff ID is required'
     if (!form.name.trim()) nextErrors.name = 'Full name is required'
-    if (!form.phone.trim()) nextErrors.phone = 'Phone number is required'
     if (!form.savingsPlan) nextErrors.savingsPlan = 'Choose a savings plan'
+
+    const usesThrift = form.savingsPlan === 'THRIFT' || form.savingsPlan === 'BOTH'
+    const usesSpecial = form.savingsPlan === 'SPECIAL' || form.savingsPlan === 'BOTH'
+    const thriftAmount = Number(form.thriftAmount)
+    const specialAmount = Number(form.specialAmount)
+
+    if (usesThrift && (!form.thriftAmount.trim() || !Number.isFinite(thriftAmount) || thriftAmount <= 0)) {
+      nextErrors.thriftAmount = 'Enter a valid monthly thrift amount'
+    }
+    if (usesSpecial && (!form.specialAmount.trim() || !Number.isFinite(specialAmount) || specialAmount <= 0)) {
+      nextErrors.specialAmount = 'Enter a valid monthly special amount'
+    }
+    if (!form.password) nextErrors.password = 'Create a password'
+    else if (form.password.length < 6) nextErrors.password = 'Use at least 6 characters'
+    if (!form.confirmPassword) nextErrors.confirmPassword = 'Confirm your password'
+    else if (form.password !== form.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match'
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -62,8 +89,11 @@ export default function RegisterPage() {
         body: JSON.stringify({
           staffId: form.staffId.trim(),
           name: form.name.trim(),
-          phone: form.phone.trim(),
           savingsPlan: form.savingsPlan,
+          thriftAmount: usesThrift ? thriftAmount : 0,
+          specialAmount: usesSpecial ? specialAmount : 0,
+          password: form.password,
+          confirmPassword: form.confirmPassword,
         }),
       })
 
@@ -109,7 +139,7 @@ export default function RegisterPage() {
               Open your cooperative account
             </h1>
             <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Keep it short. Send your Staff ID, full name, phone number, and savings plan.
+              Keep it short. Send your Staff ID, full name, savings plan, monthly amount, and password.
               Admin will review the request before access is granted.
             </p>
           </div>
@@ -117,15 +147,15 @@ export default function RegisterPage() {
           <div className="grid gap-3 sm:grid-cols-4">
             <MiniCard label="Staff ID" value="Unique member code" />
             <MiniCard label="Name" value="Full legal name" />
-            <MiniCard label="Phone" value="Reachable number" />
-            <MiniCard label="Plan" value="Thrift or special" />
+            <MiniCard label="Savings" value="Thrift or special" />
+            <MiniCard label="Password" value="You choose it" />
           </div>
 
           <div className="rounded-2xl border bg-surface p-4 text-sm text-muted-foreground" style={{ borderColor: 'rgb(var(--border))' }}>
             <p className="font-semibold text-foreground">What happens next</p>
             <p className="mt-1 leading-relaxed">
-              Your record is created as pending. The admin can later update department,
-              contribution plan, and bank details when approving the account.
+              Your record is created as pending. The admin will review your selected
+              savings plan and monthly amounts before approving the account.
             </p>
           </div>
         </div>
@@ -136,7 +166,7 @@ export default function RegisterPage() {
               <p className="label-eyebrow">Registration details</p>
               <h2 className="mt-1 text-2xl font-semibold tracking-tight">Member form</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Choose how you want to save. Contribution amounts can be set during approval.
+                Choose how you want to save and enter the amount you plan to contribute each month.
               </p>
             </div>
 
@@ -163,18 +193,6 @@ export default function RegisterPage() {
                   placeholder="As it appears on records"
                   className="input-base pl-10"
                   autoComplete="name"
-                />
-              </Field>
-
-              <Field label="Phone number" error={errors.phone} icon={PhoneCall}>
-                <input
-                  data-testid="register-phone-input"
-                  value={form.phone}
-                  onChange={onTextChange('phone')}
-                  type="tel"
-                  placeholder="08012345678"
-                  className="input-base pl-10"
-                  autoComplete="tel"
                 />
               </Field>
 
@@ -210,6 +228,75 @@ export default function RegisterPage() {
                 </div>
                 {errors.savingsPlan && <p className="mt-1.5 text-xs text-rose-500">{errors.savingsPlan}</p>}
               </fieldset>
+
+              {form.savingsPlan && (
+                <div className="space-y-4 rounded-2xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Monthly contribution</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Enter the amount for each savings plan you selected.</p>
+                  </div>
+
+                  {(form.savingsPlan === 'THRIFT' || form.savingsPlan === 'BOTH') && (
+                    <Field label="Monthly thrift savings" error={errors.thriftAmount} icon={Wallet}>
+                      <input
+                        data-testid="register-thrift-amount-input"
+                        value={form.thriftAmount}
+                        onChange={onAmountChange('thriftAmount')}
+                        type="number"
+                        min="1"
+                        step="1"
+                        inputMode="numeric"
+                        placeholder="e.g. 10000"
+                        className="input-base pl-10"
+                      />
+                    </Field>
+                  )}
+
+                  {(form.savingsPlan === 'SPECIAL' || form.savingsPlan === 'BOTH') && (
+                    <Field label="Monthly special savings" error={errors.specialAmount} icon={Wallet}>
+                      <input
+                        data-testid="register-special-amount-input"
+                        value={form.specialAmount}
+                        onChange={onAmountChange('specialAmount')}
+                        type="number"
+                        min="1"
+                        step="1"
+                        inputMode="numeric"
+                        placeholder="e.g. 5000"
+                        className="input-base pl-10"
+                      />
+                    </Field>
+                  )}
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Create password" error={errors.password} icon={LockKeyhole}>
+                  <input
+                    data-testid="register-password-input"
+                    value={form.password}
+                    onChange={onTextChange('password')}
+                    type="password"
+                    minLength={6}
+                    placeholder="At least 6 characters"
+                    className="input-base pl-10"
+                    autoComplete="new-password"
+                  />
+                </Field>
+
+                <Field label="Confirm password" error={errors.confirmPassword} icon={LockKeyhole}>
+                  <input
+                    data-testid="register-confirm-password-input"
+                    value={form.confirmPassword}
+                    onChange={onTextChange('confirmPassword')}
+                    type="password"
+                    minLength={6}
+                    placeholder="Repeat your password"
+                    className="input-base pl-10"
+                    autoComplete="new-password"
+                  />
+                </Field>
+              </div>
             </div>
 
             <button
@@ -232,7 +319,7 @@ export default function RegisterPage() {
             </button>
 
             <div className="rounded-xl border bg-surface-2 px-4 py-3 text-xs text-muted-foreground" style={{ borderColor: 'rgb(var(--border))' }}>
-              New accounts use the Staff ID as the initial password for sign-in after approval.
+              Your Staff ID is your login username. Use the password you create here after approval.
             </div>
 
             <p className="text-center text-sm text-muted-foreground">

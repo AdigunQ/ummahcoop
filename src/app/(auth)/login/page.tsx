@@ -9,9 +9,9 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
+  Hash,
   Loader2,
   Lock,
-  Mail,
   ShieldCheck,
 } from 'lucide-react'
 import { UmmahLogo } from '@/components/brand/ummah-logo'
@@ -19,13 +19,13 @@ import { ThemeToggle } from '@/components/theme-toggle'
 
 function getLoginErrorMessage(error?: string | null) {
   if (!error || error === 'undefined') {
-    return 'Login failed. Please check your Staff ID or email and password.'
+    return 'Login failed. Please check your Staff ID and password.'
   }
 
   const normalized = error.trim()
 
   if (normalized === 'CredentialsSignin') {
-    return 'Invalid Staff ID, email or password.'
+    return 'Invalid Staff ID or password.'
   }
 
   return normalized
@@ -59,7 +59,7 @@ export default function LoginPage() {
 
     const trimmedIdentifier = identifier.trim()
     if (!trimmedIdentifier) {
-      setIdentifierError('Enter your Staff ID or email address.')
+      setIdentifierError('Enter your Staff ID.')
       return
     }
 
@@ -163,23 +163,23 @@ export default function LoginPage() {
               <p className="label-eyebrow">Member portal</p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight">Sign in to your account</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
-                Use your Staff ID or registered email to continue.
+                Use your Staff ID and password to continue.
               </p>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-5" noValidate>
               <div>
                 <label htmlFor="identifier" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Staff ID or email
+                  Staff ID
                 </label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Hash className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     id="identifier"
                     data-testid="login-identifier-input"
                     type="text"
                     name="identifier"
-                    placeholder="e.g. OPS-1042 or staff@faan.gov.ng"
+                    placeholder="e.g. OPS-1042"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     autoComplete="username"

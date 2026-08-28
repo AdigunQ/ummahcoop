@@ -5,16 +5,41 @@ import { notifyAdminsOfNewMember } from '@/lib/notifications'
 import { z } from 'zod'
 import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
 
+const amountSchema = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null || value === '') return undefined
+    if (typeof value === 'string') return Number(value.replace(/,/g, ''))
+    return value
+  },
+  z.number().finite().positive().max(1_000_000_000).optional()
+)
+
 const registerPayloadSchema = z.object({
   name: z.string().trim().min(1),
   staffId: z.string().trim().min(1).regex(/^[a-zA-Z0-9-]+$/),
-  phone: z.string().trim().min(1),
-  savingsPlan: z.enum(['THRIFT', 'SPECIAL', 'BOTH']).default('BOTH'),
+  phone: z.string().trim().optional(),
+  savingsPlan: z.enum(['THRIFT', 'SPECIAL', 'BOTH']),
+  thriftAmount: amountSchema,
+  specialAmount: amountSchema,
   department: z.string().trim().optional(),
   bankName: z.string().trim().optional(),
   bankAccountNumber: z.string().trim().optional(),
   bankAccountName: z.string().trim().optional(),
-  password: z.string().min(6).optional(),
+  password: z.string().min(6),
+  confirmPassword: z.string().min(6),
+}).superRefine((data, context) => {
+  const usesThrift = data.savingsPlan === 'THRIFT' || data.savingsPlan === 'BOTH'
+  const usesSpecial = data.savingsPlan === 'SPECIAL' || data.savingsPlan === 'BOTH'
+
+  if (usesThrift && !data.thriftAmount) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['thriftAmount'], message: 'Monthly thrift amount is required' })
+  }
+  if (usesSpecial && !data.specialAmount) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['specialAmount'], message: 'Monthly special amount is required' })
+  }
+  if (data.password !== data.confirmPassword) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['confirmPassword'], message: 'Passwords do not match' })
+  }
 })
 
 function buildMemberEmail(staffId: string): string {
@@ -50,11 +75,14 @@ export async function POST(req: Request) {
       staffId,
       phone,
       savingsPlan,
+      thriftAmount,
+      specialAmount,
       department,
       bankName,
       bankAccountNumber,
       bankAccountName,
       password,
+      confirmPassword,
     } = parsed.data
 
     const normalizedStaffId = staffId.trim().toUpperCase()
@@ -63,7 +91,7 @@ export async function POST(req: Request) {
     const normalizedBankName = bankName?.trim() || null
     const normalizedBankAccountNumber = bankAccountNumber?.trim() || null
     const normalizedBankAccountName = bankAccountName?.trim() || null
-    const passwordValue = (password || normalizedStaffId).trim()
+    const passwordValue = password
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -72,7 +100,7 @@ export async function POST(req: Request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'Email already registered' },
+        { error: 'Staff ID already registered' },
         { status: 400 }
       )
     }
@@ -97,14 +125,14 @@ export async function POST(req: Request) {
         name,
         email: normalizedEmail,
         staffId: normalizedStaffId,
-        phone,
+        phone: phone?.trim() || null,
         department: normalizedDepartment,
         savingsPlan,
         bankName: normalizedBankName,
         bankAccountNumber: normalizedBankAccountNumber,
         bankAccountName: normalizedBankAccountName,
-        monthlyContribution: 0,
-        specialContribution: 0,
+        monthlyContribution: savingsPlan === 'SPECIAL' ? 0 : thriftAmount || 0,
+        specialContribution: savingsPlan === 'THRIFT' ? 0 : specialAmount || 0,
         password: hashedPassword,
         role: 'MEMBER',
         status: 'PENDING',
@@ -118,8 +146,9 @@ export async function POST(req: Request) {
       await notifyAdminsOfNewMember({
         name,
         staffId: normalizedStaffId,
-        phone,
         savingsPlan,
+        thriftAmount: savingsPlan === 'SPECIAL' ? 0 : thriftAmount || 0,
+        specialAmount: savingsPlan === 'THRIFT' ? 0 : specialAmount || 0,
         submittedAt: new Date(),
       })
     } catch (notificationError) {
