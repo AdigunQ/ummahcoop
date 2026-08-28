@@ -31,35 +31,55 @@ export default async function DashboardPage({
     return <AdminAnalytics canSwitchToMember />
   }
 
-  // Get member data
+  // Select only the fields this page needs so older deployments can still
+  // render while additive profile migrations are being applied.
   const user = await prisma.user.findUnique({
     where: { email },
-    include: {
-      payments: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      },
-      loans: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      },
-      commodityRequests: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          itemCategory: true,
-          itemModel: true,
-          status: true,
-          createdAt: true,
-        },
-      },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      status: true,
+      staffId: true,
+      department: true,
+      createdAt: true,
+      balance: true,
+      specialBalance: true,
+      totalContributions: true,
+      loanBalance: true,
+      monthlyContribution: true,
+      specialContribution: true,
     },
   })
 
   if (!user) {
     redirect('/login')
   }
+
+  const [recentPayments, recentLoans, recentCommodities] = await Promise.all([
+    prisma.payment.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    }),
+    prisma.loan.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    }),
+    prisma.commodityRequest.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        itemCategory: true,
+        itemModel: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
+  ])
 
   const financeSummary = await getMemberFinanceSummary(user.id, user.staffId)
 
@@ -97,9 +117,9 @@ export default async function DashboardPage({
         repaymentStartPeriod: financeSummary.loanRepaymentStartPeriod,
       }}
       commoditySummary={financeSummary}
-      recentPayments={user.payments}
-      recentLoans={user.loans}
-      recentCommodities={user.commodityRequests}
+      recentPayments={recentPayments}
+      recentLoans={recentLoans}
+      recentCommodities={recentCommodities}
     />
   )
 }
