@@ -8,8 +8,8 @@ import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
 const amountSchema = z.preprocess(
   (value) => {
     if (value === undefined || value === null || value === '') return undefined
-    if (typeof value === 'string') return Number(value.replace(/,/g, ''))
-    return value
+    const amount = typeof value === 'string' ? Number(value.replace(/,/g, '')) : value
+    return amount === 0 ? undefined : amount
   },
   z.number().finite().positive().max(1_000_000_000).optional()
 )
