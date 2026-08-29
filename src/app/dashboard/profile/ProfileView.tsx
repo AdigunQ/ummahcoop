@@ -21,6 +21,12 @@ import {
 import { changePassword, updateProfile } from './actions'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate, getInitials } from '@/lib/utils'
+import {
+  DEPARTMENT_OPTIONS,
+  GRADE_LEVEL_OPTIONS,
+  ORGANIZATION_OPTIONS,
+  STATION_OPTIONS,
+} from '@/lib/profile-options'
 
 type MemberProfile = {
   name: string | null
@@ -178,6 +184,7 @@ export default function ProfileView({
               onSave={handleSave}
               placeholder="Department"
               testId="profile-department"
+              options={DEPARTMENT_OPTIONS}
             />
             <Row icon={Landmark} label="Savings plan" value={member.savingsPlan || 'Not selected'} />
             <EditableRow
@@ -188,6 +195,7 @@ export default function ProfileView({
               onSave={handleSave}
               placeholder="e.g. FAAN"
               testId="profile-organization"
+              options={ORGANIZATION_OPTIONS}
             />
             <EditableRow
               icon={Landmark}
@@ -197,6 +205,7 @@ export default function ProfileView({
               onSave={handleSave}
               placeholder="Station"
               testId="profile-station"
+              options={STATION_OPTIONS}
             />
             <EditableRow
               icon={ShieldCheck}
@@ -206,6 +215,7 @@ export default function ProfileView({
               onSave={handleSave}
               placeholder="Grade level"
               testId="profile-grade-level"
+              options={GRADE_LEVEL_OPTIONS}
             />
             <EditableRow
               icon={PhoneCall}
@@ -463,6 +473,7 @@ function EditableRow({
   placeholder,
   testId,
   compact = false,
+  options,
 }: {
   icon: any
   label: string
@@ -474,6 +485,7 @@ function EditableRow({
   placeholder?: string
   testId: string
   compact?: boolean
+  options?: readonly string[]
 }) {
   const [isEditing, setIsEditing] = useState(false)
 
@@ -482,56 +494,82 @@ function EditableRow({
     if (!result?.error) setIsEditing(false)
   }
 
-  return (
-    <form action={submit}>
-      <div className={`flex items-center gap-3 ${compact ? 'rounded-xl border px-3 py-3' : 'px-5 py-3.5'}`} style={compact ? { borderColor: 'rgb(var(--border))' } : undefined}>
+  const row = `flex items-center gap-3 ${compact ? 'rounded-xl border px-3 py-3' : 'px-5 py-3.5'}`
+  const rowStyle = compact ? { borderColor: 'rgb(var(--border))' } : undefined
+
+  if (!isEditing) {
+    return (
+      <div className={row} style={rowStyle}>
         <Icon className="h-4 w-4 flex-none text-muted-foreground" />
         <span className="text-sm text-muted-foreground">{label}</span>
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
-          {isEditing ? (
-            <>
-              <input
-                name={name}
-                type={type}
-                data-testid={`${testId}-input`}
-                defaultValue={value}
-                placeholder={placeholder}
-                className="input-base !min-w-0 !py-2 !text-sm sm:max-w-[240px]"
-                required={required}
-                autoFocus
-              />
-              <button
-                type="submit"
-                data-testid={`${testId}-save`}
-                aria-label={`Save ${label}`}
-                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
-              >
-                <Save className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                aria-label={`Cancel ${label} edit`}
-                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </>
+          <span className="truncate text-sm font-semibold">{value || 'N/A'}</span>
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            data-testid={`${testId}-edit`}
+            aria-label={`Edit ${label}`}
+            className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
+            style={{ borderColor: 'rgb(var(--border))' }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <form action={submit}>
+      <div className={row} style={rowStyle}>
+        <Icon className="h-4 w-4 flex-none text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
+          {options ? (
+            <select
+              name={name}
+              data-testid={`${testId}-input`}
+              defaultValue={value}
+              className="input-base !min-w-0 !py-2 !text-sm sm:max-w-[300px]"
+              required={required}
+              autoFocus
+            >
+              {!required && <option value="">Select {label.toLowerCase()}</option>}
+              {value && !options.includes(value) && <option value={value}>{value}</option>}
+              {options.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           ) : (
-            <>
-              <span className="truncate text-sm font-semibold">{value || 'N/A'}</span>
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                data-testid={`${testId}-edit`}
-                aria-label={`Edit ${label}`}
-                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
-                style={{ borderColor: 'rgb(var(--border))' }}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            </>
+            <input
+              name={name}
+              type={type}
+              data-testid={`${testId}-input`}
+              defaultValue={value}
+              placeholder={placeholder}
+              className="input-base !min-w-0 !py-2 !text-sm sm:max-w-[240px]"
+              required={required}
+              autoFocus
+            />
           )}
+          <button
+            type="submit"
+            data-testid={`${testId}-save`}
+            aria-label={`Save ${label}`}
+            className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
+          >
+            <Save className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsEditing(false)}
+            aria-label={`Cancel ${label} edit`}
+            className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
     </form>
