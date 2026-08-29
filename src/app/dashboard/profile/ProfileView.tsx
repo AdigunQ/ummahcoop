@@ -54,9 +54,6 @@ export default function ProfileView({
 }) {
   const router = useRouter()
   const [isEditingBank, setIsEditingBank] = useState(false)
-  const [isEditingPhone, setIsEditingPhone] = useState(false)
-  const [isEditingEmail, setIsEditingEmail] = useState(false)
-  const [isEditingOrganization, setIsEditingOrganization] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(mustChangePassword)
   const displayEmail = isGeneratedMemberEmail(member.email, member.staffId) ? 'Not set' : member.email
 
@@ -67,11 +64,9 @@ export default function ProfileView({
     } else {
       toast.success('Profile updated')
       setIsEditingBank(false)
-      setIsEditingPhone(false)
-      setIsEditingEmail(false)
-      setIsEditingOrganization(false)
       router.refresh()
     }
+    return res
   }
 
   async function handlePasswordChange(formData: FormData) {
@@ -153,158 +148,74 @@ export default function ProfileView({
           </div>
 
           <div className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
-            <Row icon={User} label="Name" value={member.name || 'N/A'} />
-            <form action={handleSave}>
-              <div className="flex items-center gap-3 px-5 py-3.5">
-                <Mail className="h-4 w-4 flex-none text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Email</span>
-                <div className="ml-auto flex flex-1 items-center justify-end gap-2">
-                  {isEditingEmail ? (
-                    <>
-                      <input
-                        name="email"
-                        type="email"
-                        data-testid="profile-email-input"
-                        defaultValue={displayEmail === 'Not set' ? '' : member.email}
-                        placeholder="name@example.com"
-                        className="input-base !py-2 !text-sm sm:max-w-[240px]"
-                        required
-                      />
-                      <button
-                        type="submit"
-                        data-testid="profile-email-save"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
-                      >
-                        <Save className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingEmail(false)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="truncate text-sm font-semibold">{displayEmail}</span>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingEmail(true)}
-                        data-testid="profile-email-edit"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
-                        style={{ borderColor: 'rgb(var(--border))' }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </form>
+            <EditableRow
+              icon={User}
+              label="Name"
+              name="name"
+              value={member.name || ''}
+              onSave={handleSave}
+              required
+              placeholder="Full name"
+              testId="profile-name"
+            />
+            <EditableRow
+              icon={Mail}
+              label="Email"
+              name="email"
+              value={displayEmail === 'Not set' ? '' : member.email}
+              onSave={handleSave}
+              type="email"
+              required
+              placeholder="name@example.com"
+              testId="profile-email"
+            />
             <Row icon={Hash} label="Staff ID" value={member.staffId || 'N/A'} />
-            <Row icon={Building2} label="Department" value={member.department || 'N/A'} />
+            <EditableRow
+              icon={Building2}
+              label="Department"
+              name="department"
+              value={member.department || ''}
+              onSave={handleSave}
+              placeholder="Department"
+              testId="profile-department"
+            />
             <Row icon={Landmark} label="Savings plan" value={member.savingsPlan || 'Not selected'} />
-            <form action={handleSave}>
-              <div className="flex items-center gap-3 px-5 py-3.5">
-                <Building2 className="h-4 w-4 flex-none text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Organization</span>
-                <div className="ml-auto flex flex-1 items-center justify-end gap-2">
-                  {isEditingOrganization ? (
-                    <>
-                      <input
-                        name="organization"
-                        data-testid="profile-organization-input"
-                        defaultValue={member.organization || ''}
-                        placeholder="e.g. FAAN"
-                        maxLength={200}
-                        className="input-base !py-2 !text-sm sm:max-w-[240px]"
-                        autoFocus
-                      />
-                      <button
-                        type="submit"
-                        data-testid="profile-organization-save"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
-                        aria-label="Save organization"
-                      >
-                        <Save className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingOrganization(false)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
-                        aria-label="Cancel organization edit"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm font-semibold">{member.organization || 'N/A'}</span>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingOrganization(true)}
-                        data-testid="profile-organization-edit"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
-                        style={{ borderColor: 'rgb(var(--border))' }}
-                        aria-label="Edit organization"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </form>
-            <Row icon={Building2} label="Station" value={member.station || 'N/A'} />
-            <Row icon={ShieldCheck} label="Grade level" value={member.gradeLevel || 'N/A'} />
-
-            <form action={handleSave}>
-              <div className="flex items-center gap-3 px-5 py-3.5">
-                <PhoneCall className="h-4 w-4 flex-none text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Phone</span>
-                <div className="ml-auto flex flex-1 items-center justify-end gap-2">
-                  {isEditingPhone ? (
-                    <>
-                      <input
-                        name="phone"
-                        data-testid="profile-phone-input"
-                        defaultValue={member.phone || ''}
-                        className="input-base !py-2 !text-sm sm:max-w-[200px]"
-                        required
-                      />
-                      <button
-                        type="submit"
-                        data-testid="profile-phone-save"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
-                      >
-                        <Save className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingPhone(false)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm font-semibold">{member.phone || 'N/A'}</span>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingPhone(true)}
-                        data-testid="profile-phone-edit"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
-                        style={{ borderColor: 'rgb(var(--border))' }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </form>
+            <EditableRow
+              icon={Building2}
+              label="Organization"
+              name="organization"
+              value={member.organization || ''}
+              onSave={handleSave}
+              placeholder="e.g. FAAN"
+              testId="profile-organization"
+            />
+            <EditableRow
+              icon={Landmark}
+              label="Station"
+              name="station"
+              value={member.station || ''}
+              onSave={handleSave}
+              placeholder="Station"
+              testId="profile-station"
+            />
+            <EditableRow
+              icon={ShieldCheck}
+              label="Grade level"
+              name="gradeLevel"
+              value={member.gradeLevel || ''}
+              onSave={handleSave}
+              placeholder="Grade level"
+              testId="profile-grade-level"
+            />
+            <EditableRow
+              icon={PhoneCall}
+              label="Phone"
+              name="phone"
+              value={member.phone || ''}
+              onSave={handleSave}
+              placeholder="Phone number"
+              testId="profile-phone"
+            />
           </div>
         </section>
 
@@ -328,7 +239,7 @@ export default function ProfileView({
           </div>
 
           {isEditingBank ? (
-            <form action={handleSave} className="space-y-4 p-5 animate-fadeIn">
+            <form action={async (formData) => { await handleSave(formData) }} className="space-y-4 p-5 animate-fadeIn">
               <Field label="Bank name">
                 <input
                   name="bankName"
@@ -390,10 +301,47 @@ export default function ProfileView({
           <h2 className="mt-1 text-base font-semibold tracking-tight">Next of kin</h2>
         </div>
         <div className="grid gap-4 p-5 sm:grid-cols-2">
-          <Row icon={User} label="Name" value={member.nextOfKinName || 'N/A'} />
-          <Row icon={PhoneCall} label="Phone" value={member.nextOfKinPhone || 'N/A'} />
-          <Row icon={Mail} label="Email" value={member.nextOfKinEmail || 'N/A'} />
-          <Row icon={User} label="Relationship" value={member.nextOfKinRelationship || 'N/A'} />
+          <EditableRow
+            icon={User}
+            label="Name"
+            name="nextOfKinName"
+            value={member.nextOfKinName || ''}
+            onSave={handleSave}
+            placeholder="Full name"
+            testId="profile-next-of-kin-name"
+            compact
+          />
+          <EditableRow
+            icon={PhoneCall}
+            label="Phone"
+            name="nextOfKinPhone"
+            value={member.nextOfKinPhone || ''}
+            onSave={handleSave}
+            placeholder="Phone number"
+            testId="profile-next-of-kin-phone"
+            compact
+          />
+          <EditableRow
+            icon={Mail}
+            label="Email"
+            name="nextOfKinEmail"
+            value={member.nextOfKinEmail || ''}
+            onSave={handleSave}
+            type="email"
+            placeholder="name@example.com"
+            testId="profile-next-of-kin-email"
+            compact
+          />
+          <EditableRow
+            icon={User}
+            label="Relationship"
+            name="nextOfKinRelationship"
+            value={member.nextOfKinRelationship || ''}
+            onSave={handleSave}
+            placeholder="Relationship"
+            testId="profile-next-of-kin-relationship"
+            compact
+          />
         </div>
       </section>
 
@@ -501,6 +449,92 @@ function Row({ icon: Icon, label, value, mono }: { icon: any; label: string; val
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className={`ml-auto truncate text-sm font-semibold ${mono ? 'font-mono' : ''}`}>{value}</span>
     </div>
+  )
+}
+
+function EditableRow({
+  icon: Icon,
+  label,
+  name,
+  value,
+  onSave,
+  type = 'text',
+  required = false,
+  placeholder,
+  testId,
+  compact = false,
+}: {
+  icon: any
+  label: string
+  name: string
+  value: string
+  onSave: (formData: FormData) => Promise<{ error?: string; success?: boolean } | undefined>
+  type?: string
+  required?: boolean
+  placeholder?: string
+  testId: string
+  compact?: boolean
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+
+  async function submit(formData: FormData) {
+    const result = await onSave(formData)
+    if (!result?.error) setIsEditing(false)
+  }
+
+  return (
+    <form action={submit}>
+      <div className={`flex items-center gap-3 ${compact ? 'rounded-xl border px-3 py-3' : 'px-5 py-3.5'}`} style={compact ? { borderColor: 'rgb(var(--border))' } : undefined}>
+        <Icon className="h-4 w-4 flex-none text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2">
+          {isEditing ? (
+            <>
+              <input
+                name={name}
+                type={type}
+                data-testid={`${testId}-input`}
+                defaultValue={value}
+                placeholder={placeholder}
+                className="input-base !min-w-0 !py-2 !text-sm sm:max-w-[240px]"
+                required={required}
+                autoFocus
+              />
+              <button
+                type="submit"
+                data-testid={`${testId}-save`}
+                aria-label={`Save ${label}`}
+                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500/25 dark:text-emerald-400"
+              >
+                <Save className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                aria-label={`Cancel ${label} edit`}
+                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 transition hover:bg-rose-500/25 dark:text-rose-400"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="truncate text-sm font-semibold">{value || 'N/A'}</span>
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                data-testid={`${testId}-edit`}
+                aria-label={`Edit ${label}`}
+                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg border text-muted-foreground transition hover:border-ring/40 hover:text-foreground"
+                style={{ borderColor: 'rgb(var(--border))' }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </form>
   )
 }
 

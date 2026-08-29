@@ -10,19 +10,40 @@ function normalizeEmail(value: string): string {
   return value.trim().toLowerCase()
 }
 
+function readTextField(formData: FormData, field: string): string {
+  return String(formData.get(field) || '').trim()
+}
+
+function updateTextField(
+  formData: FormData,
+  data: Record<string, unknown>,
+  field: string,
+  label: string,
+  maxLength: number,
+  required = false
+): string | null {
+  if (!formData.has(field)) return null
+
+  const value = readTextField(formData, field)
+  if (required && !value) return `${label} is required.`
+  if (value.length > maxLength) return `${label} must be ${maxLength} characters or fewer.`
+
+  data[field] = value || null
+  return null
+}
+
 export async function updateProfile(formData: FormData) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return { error: 'Unauthorized' }
 
-  const email = normalizeEmail(String(formData.get('email') || ''))
-  const phone = String(formData.get('phone') || '').trim()
-  const organization = String(formData.get('organization') || '').trim()
-  const bankName = String(formData.get('bankName') || '').trim()
-  const bankAccountNumber = String(formData.get('bankAccountNumber') || '').trim()
-  const bankAccountName = String(formData.get('bankAccountName') || '').trim()
+  const email = normalizeEmail(readTextField(formData, 'email'))
+  const data: Record<string, unknown> = {}
 
-  const data: any = {}
-  if (email) {
+  if (formData.has('email')) {
+    if (!email) {
+      return { error: 'Please enter a valid email address.' }
+    }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return { error: 'Please enter a valid email address.' }
     }
@@ -38,13 +59,35 @@ export async function updateProfile(formData: FormData) {
 
     data.email = email
   }
-  if (phone) data.phone = phone
-  if (formData.has('organization')) {
-    if (organization.length > 200) {
-      return { error: 'Organization must be 200 characters or fewer.' }
-    }
-    data.organization = organization || null
+
+  const editableFields = [
+    ['name', 'Name', 200, true],
+    ['phone', 'Phone number', 40, false],
+    ['department', 'Department', 200, false],
+    ['organization', 'Organization', 200, false],
+    ['station', 'Station', 200, false],
+    ['gradeLevel', 'Grade level', 80, false],
+    ['nextOfKinName', 'Next of Kin name', 200, false],
+    ['nextOfKinPhone', 'Next of Kin phone', 40, false],
+    ['nextOfKinEmail', 'Next of Kin email', 320, false],
+    ['nextOfKinRelationship', 'Next of Kin relationship', 100, false],
+  ] as const
+
+  for (const [field, label, maxLength, required] of editableFields) {
+    const error = updateTextField(formData, data, field, label, maxLength, required)
+    if (error) return { error }
   }
+
+  if (formData.has('nextOfKinEmail')) {
+    const nextOfKinEmail = readTextField(formData, 'nextOfKinEmail')
+    if (nextOfKinEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextOfKinEmail)) {
+      return { error: 'Please enter a valid Next of Kin email address.' }
+    }
+  }
+
+  const bankName = readTextField(formData, 'bankName')
+  const bankAccountNumber = readTextField(formData, 'bankAccountNumber')
+  const bankAccountName = readTextField(formData, 'bankAccountName')
   if (bankName) data.bankName = bankName
   if (bankAccountNumber) data.bankAccountNumber = bankAccountNumber
   if (bankAccountName) data.bankAccountName = bankAccountName
