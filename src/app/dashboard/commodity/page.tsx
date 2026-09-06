@@ -187,10 +187,12 @@ async function recordCommodityRepayment(formData: FormData) {
 }
 
 export default async function CommodityPage({
-  searchParams,
+  searchParams: searchParamsInput,
 }: {
-  searchParams: { review?: string }
+  searchParams: Promise<{ review?: string }>
 }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email || !session.user.id) {

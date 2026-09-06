@@ -37,7 +37,9 @@ function formatPeriodLabel(period: string): string {
   })
 }
 
-export default async function DirectoryPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function DirectoryPage({ searchParams: searchParamsInput }: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) {

@@ -1,9 +1,8 @@
 import { NextAuthOptions } from 'next-auth'
-import { PrismaAdapter } from '@auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
-import { getInitialMemberPassword } from './default-member-password'
+import { verifyStoredPassword } from './password-verification'
 
 type AuthUser = {
   id: string
@@ -61,101 +60,7 @@ function buildMemberEmail(staffId: string): string {
   return `${staffId.toLowerCase()}@${domain.toLowerCase()}`
 }
 
-function readSnapshotValue(row: unknown, keys: string[]): string {
-  if (!row || typeof row !== 'object') return ''
-  const record = row as Record<string, unknown>
-
-  for (const key of keys) {
-    const value = record[key]
-    if (value !== undefined && value !== null && String(value).trim()) {
-      return String(value).trim()
-    }
-  }
-
-  return ''
-}
-
-async function findLatestSnapshotMember(staffId: string) {
-  const compactLoginStaffId = compactStaffId(staffId)
-  if (!compactLoginStaffId) return null
-
-  const months = await prisma.memberDataMonth.findMany({
-    orderBy: { period: 'desc' },
-    select: {
-      period: true,
-      rows: true,
-    },
-    take: 3,
-  })
-
-  for (const month of months) {
-    const rows = Array.isArray(month.rows) ? month.rows : []
-    for (const row of rows) {
-      const rowStaffId = readSnapshotValue(row, ['Staff ID', 'staffId', 'StaffID', 'STAFF ID'])
-      if (compactStaffId(rowStaffId) !== compactLoginStaffId) continue
-
-      return {
-        staffId: rowStaffId,
-        name: readSnapshotValue(row, ['Name', 'name']) || rowStaffId,
-        department: readSnapshotValue(row, ['Department', 'department']) || null,
-        thriftSavings: Number(readSnapshotValue(row, ['Thrift Savings', 'thriftSavings']) || 0) || 0,
-        specialSavings: Number(readSnapshotValue(row, ['Special Savings', 'Special Saving', 'specialSavings']) || 0) || 0,
-      }
-    }
-  }
-
-  return null
-}
-
-async function createMemberUserFromSnapshot(staffId: string): Promise<AuthUser | null> {
-  const snapshotMember = await findLatestSnapshotMember(staffId)
-  if (!snapshotMember) return null
-
-  const normalizedStaffId = normalizeStaffId(snapshotMember.staffId || staffId)
-  const email = buildMemberEmail(normalizedStaffId)
-  const passwordHash = await bcrypt.hash(getInitialMemberPassword(normalizedStaffId), 10)
-
-  const existingByEmail = await prisma.user.findUnique({
-    where: { email },
-    select: AUTH_USER_SELECT,
-  })
-
-  if (existingByEmail) {
-    return prisma.user.update({
-      where: { id: existingByEmail.id },
-      data: {
-        staffId: existingByEmail.staffId || normalizedStaffId,
-        name: existingByEmail.name || snapshotMember.name,
-        password: existingByEmail.password || passwordHash,
-        status: existingByEmail.status === 'PENDING' ? 'ACTIVE' : existingByEmail.status,
-        role: 'MEMBER',
-        voucherEnabled: true,
-      },
-    })
-  }
-
-  return prisma.user.create({
-    data: {
-      staffId: normalizedStaffId,
-      email,
-      name: snapshotMember.name,
-      department: snapshotMember.department,
-      password: passwordHash,
-      role: 'MEMBER',
-      status: 'ACTIVE',
-      monthlyContribution: snapshotMember.thriftSavings,
-      specialContribution: snapshotMember.specialSavings,
-      balance: 0,
-      specialBalance: 0,
-      totalContributions: 0,
-      loanBalance: 0,
-      voucherEnabled: true,
-    },
-  })
-}
-
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
   session: {
     strategy: 'jwt',
   },
@@ -225,10 +130,6 @@ export const authOptions: NextAuthOptions = {
 
               user = possibleMembers.find((member) => compactStaffId(member.staffId) === compactLoginStaffId) || null
             }
-
-            if (!user) {
-              user = await createMemberUserFromSnapshot(staffId)
-            }
           }
 
           if (!user && normalizedIdentifier.includes('@')) {
@@ -250,19 +151,9 @@ export const authOptions: NextAuthOptions = {
             user.role === 'MEMBER' &&
             Boolean(user.staffId) &&
             compactStaffId(password) === compactStaffId(user.staffId)
-          const isPasswordValid = user.password
-            ? await bcrypt.compare(password, user.password)
-            : false
-
-          if (!isPasswordValid && !isStaffIdFallbackPassword) {
+          const isPasswordValid = await verifyStoredPassword(user, password)
+          if (user.password ? !isPasswordValid : !isStaffIdFallbackPassword) {
             return null
-          }
-
-          if ((!user.password || !isPasswordValid) && isStaffIdFallbackPassword) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { password: await bcrypt.hash(compactStaffId(user.staffId), 10) },
-            })
           }
 
           if (user.status === 'PENDING') {
@@ -279,6 +170,13 @@ export const authOptions: NextAuthOptions = {
 
           if (user.status === 'CLOSED') {
             throw new Error('Account is closed. Contact admin for reactivation.')
+          }
+
+          if (!user.password && isStaffIdFallbackPassword) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { password: await bcrypt.hash(compactStaffId(user.staffId), 10) },
+            })
           }
 
           return {

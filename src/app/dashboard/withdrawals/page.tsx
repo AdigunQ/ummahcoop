@@ -10,10 +10,12 @@ import { AdminCollection, AdminReviewItem } from '@/components/admin/admin-colle
 import { DetailRows } from '@/components/member/account-ui'
 
 export default async function WithdrawalsPage({
-  searchParams,
+  searchParams: searchParamsInput,
 }: {
-  searchParams?: { view?: string }
+  searchParams?: Promise<{ view?: string }>
 }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/login')
   const canReview =

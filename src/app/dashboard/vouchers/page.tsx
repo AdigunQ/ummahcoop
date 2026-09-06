@@ -13,7 +13,9 @@ type SearchParams = {
   period?: string
 }
 
-export default async function VouchersPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function VouchersPage({ searchParams: searchParamsInput }: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) redirect('/login')

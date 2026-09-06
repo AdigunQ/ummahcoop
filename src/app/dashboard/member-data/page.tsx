@@ -281,7 +281,9 @@ function toDisplayRowFromVoucher(row: VoucherRow, selectedPeriod: string): Displ
   }
 }
 
-export default async function MemberDataPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function MemberDataPage({ searchParams: searchParamsInput }: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) redirect('/login')

@@ -24,7 +24,9 @@ async function mustChangeInitialPassword(member: { staffId: string | null; passw
   return bcrypt.compare(compactStaffId(member.staffId), member.password)
 }
 
-export default async function ProfilePage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function ProfilePage({ searchParams: searchParamsInput }: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     redirect('/login')

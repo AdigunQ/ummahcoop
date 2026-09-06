@@ -2,45 +2,9 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { notifyAdminsOfNewMember } from '@/lib/notifications'
-import { z } from 'zod'
+import { registerPayloadSchema } from '@/lib/registration'
+import { Prisma } from '@prisma/client'
 import { checkRateLimit, getRequestIp } from '@/lib/rate-limit'
-
-const amountSchema = z.preprocess(
-  (value) => {
-    if (value === undefined || value === null || value === '') return undefined
-    const amount = typeof value === 'string' ? Number(value.replace(/,/g, '')) : value
-    return amount === 0 ? undefined : amount
-  },
-  z.number().finite().positive().max(1_000_000_000).optional()
-)
-
-const registerPayloadSchema = z.object({
-  name: z.string().trim().min(1),
-  staffId: z.string().trim().min(1).regex(/^[a-zA-Z0-9-]+$/),
-  phone: z.string().trim().optional(),
-  savingsPlan: z.enum(['THRIFT', 'SPECIAL', 'BOTH']),
-  thriftAmount: amountSchema,
-  specialAmount: amountSchema,
-  department: z.string().trim().optional(),
-  bankName: z.string().trim().optional(),
-  bankAccountNumber: z.string().trim().optional(),
-  bankAccountName: z.string().trim().optional(),
-  password: z.string().min(6),
-  confirmPassword: z.string().min(6),
-}).superRefine((data, context) => {
-  const usesThrift = data.savingsPlan === 'THRIFT' || data.savingsPlan === 'BOTH'
-  const usesSpecial = data.savingsPlan === 'SPECIAL' || data.savingsPlan === 'BOTH'
-
-  if (usesThrift && !data.thriftAmount) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['thriftAmount'], message: 'Monthly thrift amount is required' })
-  }
-  if (usesSpecial && !data.specialAmount) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['specialAmount'], message: 'Monthly special amount is required' })
-  }
-  if (data.password !== data.confirmPassword) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['confirmPassword'], message: 'Passwords do not match' })
-  }
-})
 
 function buildMemberEmail(staffId: string): string {
   const domain = (process.env.MEMBER_EMAIL_DOMAIN || 'faan-ummah.coop').trim().replace(/^@/, '')
@@ -170,6 +134,12 @@ export async function POST(req: Request) {
       { status: 201 }
     )
   } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: 'Invalid registration details.' }, { status: 400 })
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Staff ID already registered' }, { status: 409 })
+    }
     console.error('Registration error:', error)
     return NextResponse.json(
       { error: 'Registration failed. Please try again.' },

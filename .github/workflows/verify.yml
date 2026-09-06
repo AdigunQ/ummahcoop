@@ -1,0 +1,30 @@
+name: Verify application
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'release/**']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/unused_ci_database
+      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/unused_ci_database
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: isolated-ci-build-placeholder-not-a-live-secret
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ui
+      - run: npm run lint
+      - run: npm run build

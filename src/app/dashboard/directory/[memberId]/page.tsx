@@ -262,12 +262,15 @@ async function deleteMemberRecord(formData: FormData) {
 }
 
 export default async function MemberProfileEditorPage({
-  params,
-  searchParams,
+  params: paramsInput,
+  searchParams: searchParamsInput,
 }: {
-  params: { memberId: string }
-  searchParams?: SearchParams
+  params: Promise<{ memberId: string }>
+  searchParams?: Promise<SearchParams>
 }) {
+  const searchParams = await searchParamsInput
+  const params = await paramsInput
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) redirect('/login')
   if (

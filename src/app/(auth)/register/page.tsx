@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { AuthShell } from '@/components/public/auth-shell'
+import { registerPayloadSchema } from '@/lib/registration'
 
 type FormState = {
   staffId: string
@@ -78,36 +79,30 @@ export default function RegisterPage() {
     event.preventDefault()
     if (isLoading) return
 
-    const nextErrors: FormErrors = {}
-    if (!form.staffId.trim()) nextErrors.staffId = 'Staff ID is required'
-    if (!form.name.trim()) nextErrors.name = 'Full name is required'
-    if (!form.savingsPlan) nextErrors.savingsPlan = 'Choose a savings plan'
-
     const usesThrift = form.savingsPlan === 'THRIFT' || form.savingsPlan === 'BOTH'
     const usesSpecial = form.savingsPlan === 'SPECIAL' || form.savingsPlan === 'BOTH'
-    const thriftAmount = Number(form.thriftAmount)
-    const specialAmount = Number(form.specialAmount)
-
-    if (
-      usesThrift &&
-      (!form.thriftAmount.trim() || !Number.isFinite(thriftAmount) || thriftAmount <= 0)
-    ) {
-      nextErrors.thriftAmount = 'Enter a valid monthly thrift amount'
+    const parsed = registerPayloadSchema.safeParse({
+      ...form,
+      thriftAmount: usesThrift ? form.thriftAmount : undefined,
+      specialAmount: usesSpecial ? form.specialAmount : undefined,
+    })
+    if (!parsed.success) {
+      const nextErrors: FormErrors = {}
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0] as keyof FormErrors
+        nextErrors[field] ||= issue.message
+      }
+      setErrors(nextErrors)
+      const fields: Record<keyof FormErrors, string> = {
+        staffId: 'register-staffid-input', name: 'register-name-input',
+        savingsPlan: 'register-savings-plan', thriftAmount: 'register-thrift-amount-input',
+        specialAmount: 'register-special-amount-input', password: 'register-password-input',
+        confirmPassword: 'register-confirm-password-input',
+      }
+      event.currentTarget.querySelector<HTMLElement>(`[data-testid="${fields[Object.keys(nextErrors)[0] as keyof FormErrors]}"]`)?.focus()
+      return
     }
-    if (
-      usesSpecial &&
-      (!form.specialAmount.trim() || !Number.isFinite(specialAmount) || specialAmount <= 0)
-    ) {
-      nextErrors.specialAmount = 'Enter a valid monthly special amount'
-    }
-    if (!form.password) nextErrors.password = 'Create a password'
-    else if (form.password.length < 6) nextErrors.password = 'Use at least 6 characters'
-    if (!form.confirmPassword) nextErrors.confirmPassword = 'Confirm your password'
-    else if (form.password !== form.confirmPassword)
-      nextErrors.confirmPassword = 'Passwords do not match'
-
-    setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
+    setErrors({})
 
     setIsLoading(true)
 
@@ -115,15 +110,7 @@ export default function RegisterPage() {
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          staffId: form.staffId.trim(),
-          name: form.name.trim(),
-          savingsPlan: form.savingsPlan,
-          thriftAmount: usesThrift ? thriftAmount : undefined,
-          specialAmount: usesSpecial ? specialAmount : undefined,
-          password: form.password,
-          confirmPassword: form.confirmPassword,
-        }),
+        body: JSON.stringify(parsed.data),
       })
 
       const result = await response.json().catch(() => ({}))
@@ -198,6 +185,7 @@ export default function RegisterPage() {
                     <input
                       type="radio"
                       name="savingsPlan"
+                      data-testid="register-savings-plan"
                       value={value}
                       checked={form.savingsPlan === value}
                       onChange={() => onSavingsPlanChange(value)}

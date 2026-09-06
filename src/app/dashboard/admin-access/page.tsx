@@ -83,7 +83,9 @@ async function updateAccessBundle(formData: FormData) {
   redirect('/dashboard/admin-access?saved=1')
 }
 
-export default async function AdminAccessPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function AdminAccessPage({ searchParams: searchParamsInput }: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/login')
   if (!(await canManageAdminAccess({ id: session.user.id, role: session.user.role })))

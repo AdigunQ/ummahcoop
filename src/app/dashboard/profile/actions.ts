@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next'
 import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { verifyStoredPassword } from '@/lib/password-verification'
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase()
@@ -128,14 +129,14 @@ export async function changePassword(formData: FormData) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { password: true },
+    select: { password: true, staffId: true, role: true },
   })
 
   if (!user?.password) {
     return { error: 'Password change is unavailable for this account.' }
   }
 
-  const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password)
+  const isCurrentPasswordValid = await verifyStoredPassword(user, currentPassword)
   if (!isCurrentPasswordValid) {
     return { error: 'Current password is incorrect.' }
   }

@@ -215,7 +215,8 @@ export function LoanRequestForm({
                   role="status"
                   className="mb-7 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"
                 >
-                  {!hasBankDetails ? (
+                  {(!canSubmit || loanEligibility <= 0) && <p>{eligibilityMessage}</p>}
+                  {!hasBankDetails && (
                     <>
                       <p>Add your payout account before applying.</p>
                       <Link
@@ -225,8 +226,6 @@ export function LoanRequestForm({
                         Update bank details <ArrowUpRight className="h-3 w-3" />
                       </Link>
                     </>
-                  ) : (
-                    <p>{eligibilityMessage}</p>
                   )}
                 </div>
               )}

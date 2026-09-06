@@ -23,10 +23,12 @@ type RecentCommodity = {
 }
 
 export default async function DashboardPage({
-  searchParams,
+  searchParams: searchParamsInput,
 }: {
-  searchParams?: { view?: string }
+  searchParams?: Promise<{ view?: string }>
 }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
   const email = session?.user?.email
 

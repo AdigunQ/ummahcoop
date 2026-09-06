@@ -124,7 +124,9 @@ async function createMember(formData: FormData) {
   redirect('/dashboard/directory/add?created=1')
 }
 
-export default async function AddMemberPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function AddMemberPage({ searchParams: searchParamsInput }: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await searchParamsInput
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) redirect('/login')
   if (

@@ -5,6 +5,7 @@
 
 # Testing
 /coverage
+/.codebase-memory/
 
 # Next.js
 /.next/

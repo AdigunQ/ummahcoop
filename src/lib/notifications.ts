@@ -33,6 +33,7 @@ export async function notifyAdminsOfNewMember(member: NewMemberRegistration): Pr
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
+    signal: AbortSignal.timeout(8_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',

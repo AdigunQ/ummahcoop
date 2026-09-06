@@ -29,6 +29,7 @@ export async function GET(request: Request) {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       database: 'skipped',
+      release: process.env.RENDER_GIT_COMMIT?.slice(0, 12) || null,
     })
   }
 
