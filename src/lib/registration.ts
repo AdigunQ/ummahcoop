@@ -10,8 +10,8 @@ const amountSchema = z.preprocess(
 )
 
 export const registerPayloadSchema = z.object({
-  name: z.string().trim().min(1, 'Full name is required'),
   staffId: z.string().trim().min(1, 'Staff ID is required').regex(/^[a-zA-Z0-9-]+$/, 'Use only letters, numbers, or hyphens for your Staff ID'),
+  name: z.string().trim().min(1, 'Full name is required'),
   phone: z.string().trim().optional(),
   savingsPlan: z.enum(['THRIFT', 'SPECIAL', 'BOTH'], { errorMap: () => ({ message: 'Choose a savings plan' }) }),
   thriftAmount: amountSchema,

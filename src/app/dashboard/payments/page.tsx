@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { savePaymentDecision } from '@/lib/review-decisions'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
@@ -35,71 +36,20 @@ async function reviewPayment(formData: FormData) {
     include: { user: true },
   })
 
-  if (!payment) {
-    return
+  if (!payment || payment.status !== 'PENDING') {
+    redirect('/dashboard/payments')
   }
 
   const approved = action === 'approve'
 
-  await prisma.payment.update({
-    where: { id: paymentId },
-    data: {
-      status: approved ? 'APPROVED' : 'REJECTED',
-      reviewedAt: new Date(),
-      reviewedBy: session.user.name || session.user.email,
-      notes: approved
-        ? payment.notes || 'Payment verified by admin'
-        : payment.notes || 'Payment rejected after review',
-    },
-  })
-
-  if (approved) {
-    const contributionDelta =
-      payment.type === 'CONTRIBUTION' ||
-      payment.type === 'SAVINGS' ||
-      payment.type === 'REGISTRATION'
-        ? payment.amount
-        : 0
-
-    const loanDelta = payment.type === 'LOAN_REPAYMENT' ? -payment.amount : 0
-
-    await prisma.user.update({
-      where: { id: payment.userId },
-      data: {
-        balance: { increment: contributionDelta },
-        totalContributions: { increment: contributionDelta },
-        loanBalance: { increment: loanDelta },
-      },
-    })
-  }
-
-  await prisma.transaction.upsert({
-    where: { paymentId: payment.id },
-    create: {
-      userId: payment.userId,
-      paymentId: payment.id,
-      amount: payment.amount,
-      reference: `TRX-${payment.id.slice(-8).toUpperCase()}`,
-      type:
-        payment.type === 'LOAN_REPAYMENT'
-          ? 'LOAN_REPAYMENT'
-          : payment.type === 'REGISTRATION'
-            ? 'REGISTRATION'
-            : payment.type === 'SAVINGS'
-              ? 'SAVINGS'
-              : 'CONTRIBUTION',
-      status: approved ? 'COMPLETED' : 'FAILED',
-      description: payment.notes || 'Payment verification update',
-    },
-    update: {
-      status: approved ? 'COMPLETED' : 'FAILED',
-      description: payment.notes || 'Payment verification update',
-    },
-  })
+  await savePaymentDecision(payment, approved, session.user.name || session.user.email || 'Admin')
 
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/payments')
   revalidatePath('/dashboard/transactions')
+  revalidatePath('/dashboard/my-loans')
+  revalidatePath('/dashboard/history')
+  redirect('/dashboard/payments')
 }
 
 export default async function PaymentsPage() {
@@ -136,7 +86,7 @@ export default async function PaymentsPage() {
     }),
     prisma.payment.findMany({
       where: { status: { in: ['APPROVED', 'REJECTED'] } },
-      orderBy: { reviewedAt: 'desc' },
+      orderBy: [{ reviewedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
       take: 8,
       include: {
         user: {

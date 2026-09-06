@@ -20,12 +20,16 @@ export function BalanceStrip({
   paid,
   outstanding,
   label = 'Amount received',
+  outstandingLabel = 'Outstanding',
+  note = 'Includes recorded monthly deductions.',
   period,
 }: {
   collected: number
   paid: number
   outstanding: number
   label?: string
+  outstandingLabel?: string
+  note?: string
   period?: string | null
 }) {
   const unknown = collected <= 0 && (paid > 0 || outstanding > 0)
@@ -55,7 +59,7 @@ export function BalanceStrip({
           </strong>
         </div>
         <div>
-          <span>Outstanding</span>
+          <span>{outstandingLabel}</span>
           <strong>
             <Amount value={outstanding} unknown={unknown && outstanding <= 0} />
           </strong>
@@ -64,7 +68,7 @@ export function BalanceStrip({
       <p className="account-balance-note">
         {unknown
           ? 'The original amount has not been recorded. Contact your admin to confirm the balance.'
-          : 'Includes recorded monthly deductions.'}
+          : note}
         {period && ` Ledger through ${monthLabel(period)}.`}
       </p>
     </section>

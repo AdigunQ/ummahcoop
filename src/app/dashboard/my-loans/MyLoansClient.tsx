@@ -76,7 +76,12 @@ export default function MyLoansClient({
           </>
         }
       />
-      <BalanceStrip {...totals} label="Loan received" />
+      <BalanceStrip
+        {...totals}
+        label="Loan received"
+        outstandingLabel="Principal outstanding"
+        note="Principal after recorded deductions. Administration charges are shown in each loan's details."
+      />
       {hasLedgerOnly && (
         <section className="account-panel">
           <button type="button" className="loan-ledger-record" onClick={() => setLedgerOpen(true)}>

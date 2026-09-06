@@ -13,6 +13,7 @@ import { PRIVILEGE_CODES, canAccessWithPrivileges } from '@/lib/access'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
 import { resolveVoucherPeriod } from '@/lib/vouchers'
 import { getMemberFinanceSummary } from '@/lib/member-finance'
+import { saveLoanDecision } from '@/lib/review-decisions'
 
 async function reviewLoan(formData: FormData) {
   'use server'
@@ -49,8 +50,8 @@ async function reviewLoan(formData: FormData) {
     },
   })
 
-  if (!loan) {
-    return
+  if (!loan || loan.status !== 'PENDING') {
+    redirect('/dashboard/loans')
   }
 
   const approved = action === 'approve'
@@ -63,8 +64,8 @@ async function reviewLoan(formData: FormData) {
   const cannotApprove = loan.amount > eligibility || hasOutstandingLoan || !tenureOk
 
   if (approved && cannotApprove) {
-    await prisma.loan.update({
-      where: { id: loanId },
+    await prisma.loan.updateMany({
+      where: { id: loanId, status: 'PENDING' },
       data: {
         status: 'REJECTED',
         approvedBy: session.user.id,
@@ -73,50 +74,21 @@ async function reviewLoan(formData: FormData) {
       },
     })
     revalidatePath('/dashboard/loans')
-    return
+    revalidatePath('/dashboard/my-loans')
+    revalidatePath('/dashboard/apply-loan')
+    revalidatePath('/dashboard')
+    redirect('/dashboard/loans')
   }
 
-  const chargeRate = loan.interestRate || LOAN_REQUEST_POLICY.adminChargePercent
-  const totalRepayable = loan.amount + loan.amount * (chargeRate / 100)
-
-  await prisma.loan.update({
-    where: { id: loanId },
-    data: {
-      status: approved ? 'APPROVED' : 'REJECTED',
-      approvedBy: session.user.id,
-      approvedAt: new Date(),
-      totalRepayable,
-      monthlyPayment: totalRepayable / loan.duration,
-      balance: approved ? totalRepayable : 0,
-      notes: approved
-        ? `Loan approved with ${chargeRate}% admin charge. Repayment will be deducted monthly.`
-        : 'Loan request declined after review.',
-    },
-  })
-
-  if (approved) {
-    await prisma.user.update({
-      where: { id: loan.userId },
-      data: {
-        loanBalance: { increment: totalRepayable },
-      },
-    })
-
-    await prisma.transaction.create({
-      data: {
-        userId: loan.userId,
-        type: 'LOAN_DISBURSEMENT',
-        amount: loan.amount,
-        status: 'COMPLETED',
-        reference: `TRX-LOAN-${loan.id.slice(-6).toUpperCase()}`,
-        description: `Loan approved: ${loan.purpose}`,
-      },
-    })
-  }
+  await saveLoanDecision(loan, approved, session.user.id)
 
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/loans')
   revalidatePath('/dashboard/transactions')
+  revalidatePath('/dashboard/my-loans')
+  revalidatePath('/dashboard/history')
+  revalidatePath('/dashboard/apply-loan')
+  redirect('/dashboard/loans')
 }
 
 export default async function LoansPage() {
@@ -159,7 +131,7 @@ export default async function LoansPage() {
     }),
     prisma.loan.findMany({
       where: { status: { in: ['APPROVED', 'REJECTED'] } },
-      orderBy: { approvedAt: 'desc' },
+      orderBy: [{ approvedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
       take: 10,
       include: {
         user: {

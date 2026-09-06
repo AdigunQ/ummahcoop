@@ -3,7 +3,7 @@ import test from 'node:test'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { paginationState } from '../src/components/ui/pagination-state'
-import { Pagination } from '../src/components/member/account-ui'
+import { BalanceStrip, Pagination } from '../src/components/member/account-ui'
 import { SmartSelect, FormSelect } from '../src/components/ui/smart-select'
 import { AdminCollection, AdminReviewItem } from '../src/components/admin/admin-collection'
 import { AdminDataTable } from '../src/components/admin/admin-data-table'
@@ -15,6 +15,15 @@ import { StatementDownload } from '../src/components/member/statement-download'
 import DashboardLoading from '../src/app/dashboard/loading'
 import NotFound from '../src/app/not-found'
 import { selectPosition } from '../src/components/ui/select-position'
+
+test('principal summaries distinguish the loan principal from administration charges', () => {
+  const html = renderToStaticMarkup(
+    <BalanceStrip collected={10000} paid={0} outstanding={10000}
+      outstandingLabel="Principal outstanding" note="Charges are shown in loan details." />
+  )
+  assert.ok(html.includes('Principal outstanding'))
+  assert.ok(html.includes('Charges are shown in loan details.'))
+})
 
 test('pagination stays on a real page after records are removed', () => {
   assert.deepEqual(paginationState(3, 8, 6), { page: 2, pages: 2, start: 6, end: 8 })
