@@ -1,223 +1,178 @@
 import Link from 'next/link'
 import {
   ArrowRight,
+  ArrowUpRight,
+  Check,
   HandCoins,
+  Leaf,
   PiggyBank,
   ShieldCheck,
   Wallet,
-  LineChart,
-  Lock,
 } from 'lucide-react'
 import { UmmahLogo } from '@/components/brand/ummah-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 
-const features = [
-  {
-    title: 'Thrift Savings',
-    description: 'A consistent monthly contribution that builds your core savings.',
-    icon: PiggyBank,
-  },
-  {
-    title: 'Special Savings',
-    description: 'A separate, goal-oriented bucket for milestones and projects.',
-    icon: Wallet,
-  },
-  {
-    title: 'Member Loans',
-    description: 'Borrow against your savings with transparent, fixed terms.',
-    icon: HandCoins,
-  },
-]
-
-const trustPoints = [
-  { icon: ShieldCheck, label: 'Admin-reviewed' },
-  { icon: Lock, label: 'Member-only access' },
-  { icon: LineChart, label: 'Monthly reporting' },
-]
-
 export default function HomePage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      {/* Ambient background */}
-      <div className="pointer-events-none absolute inset-0 grid-pattern opacity-[0.35] dark:opacity-[0.18]" />
-      <div className="pointer-events-none absolute inset-0 glow-radial" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
-
-      {/* Top bar */}
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6 lg:px-10">
-        <UmmahLogo
-          markClassName="h-9 w-9"
-          textClassName="text-foreground"
-          compactText
-        />
-
-        <div className="flex items-center gap-3">
-          <ThemeToggle data-testid="theme-toggle" />
-          <Link
-            href="/login"
-            data-testid="header-sign-in-link"
-            className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
-          >
-            Sign in
+    <main className="min-h-screen bg-background">
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
+      <header className="public-wrap">
+        <div className="public-header">
+          <Link href="/" aria-label="Ummah Coop home">
+            <UmmahLogo compactText />
           </Link>
-          <Link
-            href="/register"
-            data-testid="header-register-button"
-            className="btn-primary !py-2 !px-4 text-xs"
-          >
-            Open account
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+          <div className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
+            <a href="#savings" className="hover:text-accent">
+              Made for your future
+            </a>
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4" /> A cooperative, together
+            </span>
+          </div>
+          <nav className="flex items-center gap-3 sm:gap-5" aria-label="Main navigation">
+            <ThemeToggle className="hidden sm:inline-flex" />
+            <Link
+              href="/login"
+              data-testid="header-sign-in-link"
+              className="text-sm font-medium hover:text-accent"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              data-testid="header-register-button"
+              className="btn-primary !px-4 !py-2"
+            >
+              Register <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </nav>
         </div>
       </header>
-
-      {/* Hero */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 pb-20 pt-10 lg:px-10 lg:pt-20">
-        <div className="grid gap-14 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-          <div>
-            <div
-              className="inline-flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground backdrop-blur"
-              style={{ borderColor: 'rgb(var(--border))' }}
+      <section
+        id="main-content"
+        className="public-wrap grid items-center gap-12 py-12 lg:min-h-[560px] lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-14"
+      >
+        <div className="reveal">
+          <p className="mb-7 flex items-center gap-2 text-xs font-semibold normal-case tracking-normal text-accent">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Small steps. Shared
+            possibilities.
+          </p>
+          <h1 className="editorial-title max-w-xl text-[3rem] sm:text-[3.75rem] lg:text-[4.25rem]">
+            A little today.
+            <br />
+            <em className="font-normal text-accent">More tomorrow.</em>
+          </h1>
+          <p className="mt-6 max-w-[380px] text-sm leading-7 text-muted-foreground">
+            Make room for the things that matter. Build your savings, plan ahead, and find support
+            in a community that grows with you.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-5">
+            <Link href="/register" data-testid="hero-register-button" className="btn-primary !px-6">
+              Start saving with us <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/login"
+              data-testid="hero-sign-in-button"
+              className="inline-flex items-center gap-2 text-sm font-medium hover:text-accent"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Member portal · 2026
+              Already a member? <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <p className="mt-7 flex items-center gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="h-4 w-4 text-accent" /> Your savings. Your progress. All in one
+            place.
+          </p>
+        </div>
+        <div
+          className="reveal reveal-delay relative mx-auto w-full max-w-[490px] pb-6 pt-5"
+          aria-label="Illustration of the member savings experience"
+        >
+          <div className="absolute -right-3 -top-2 h-[370px] w-[370px] max-w-full rounded-full border border-accent/10 bg-[radial-gradient(ellipse_at_center,_rgb(var(--accent)/.06),_transparent_70%)]" />
+          <div className="absolute inset-x-7 top-10 h-[345px] rotate-[-7deg] rounded-[24px] border border-accent/15 bg-surface-2" />
+          <div className="balance-card relative px-7 pb-7 pt-6 sm:px-9">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-[#dfeabb]">Your future, taking shape</p>
+              <Leaf className="h-5 w-5 text-[#dfeabb]" />
             </div>
-
-            <h1 className="mt-6 max-w-2xl text-[2.75rem] font-semibold tracking-[-0.02em] text-foreground sm:text-5xl lg:text-[3.75rem] lg:leading-[1.05]">
-              Savings and loans,
-              <br />
-              <span className="text-muted-foreground">handled the modern way.</span>
-            </h1>
-
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              A focused cooperative platform for FAAN staff — manage thrift savings,
-              track special contributions, and request member loans from one calm dashboard.
-            </p>
-
-            <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Link
-                href="/register"
-                data-testid="hero-register-button"
-                className="btn-primary"
-              >
-                Register as member
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/login"
-                data-testid="hero-sign-in-button"
-                className="btn-ghost"
-              >
-                Sign in
-              </Link>
+            <div className="my-8">
+              <p className="text-xs text-white/85">A place for every goal</p>
+              <p className="mt-3 font-display text-[2.25rem] leading-snug tracking-normal">
+                Good habits.
+                <br />
+                <em className="text-[#dfeabb]">Greater possibilities.</em>
+              </p>
             </div>
-
-            <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
-              {trustPoints.map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Icon className="h-4 w-4 text-accent" />
-                  <span className="font-medium">{label}</span>
-                </div>
+            <div className="flex items-end gap-2 border-b border-white/15 pb-0" aria-hidden="true">
+              {[23, 36, 29, 50, 44, 65, 70, 89, 100, 117, 128, 144].map((height, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-t-[5px]"
+                  style={{
+                    height: height / 1.8,
+                    background: i > 8 ? '#dfeabb' : `rgba(223,234,187,${0.1 + i * 0.025})`,
+                  }}
+                />
               ))}
             </div>
-          </div>
-
-          {/* Right side mock card */}
-          <div className="relative">
-            <div className="card relative overflow-hidden p-6">
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.06] via-transparent to-transparent" />
-              <div className="relative">
-                <div className="flex items-center justify-between">
-                  <p className="label-eyebrow">Account snapshot</p>
-                  <span className="pill bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    Active
-                  </span>
-                </div>
-
-                <div className="mt-6">
-                  <p className="text-sm text-muted-foreground">Total balance</p>
-                  <p className="mt-1 text-4xl font-semibold tracking-tight text-foreground">
-                    ₦1,284,500
-                  </p>
-                </div>
-
-                <div className="mt-6 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Thrift</p>
-                    <p className="mt-2 text-lg font-semibold">₦820,000</p>
-                  </div>
-                  <div className="rounded-xl border bg-surface-2 p-4" style={{ borderColor: 'rgb(var(--border))' }}>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Special</p>
-                    <p className="mt-2 text-lg font-semibold">₦464,500</p>
-                  </div>
-                </div>
-
-                <div className="mt-6 space-y-3">
-                  {[
-                    { name: 'Monthly contribution', amount: '+ ₦25,000', tone: 'text-emerald-600 dark:text-emerald-400' },
-                    { name: 'Special saving', amount: '+ ₦10,000', tone: 'text-emerald-600 dark:text-emerald-400' },
-                    { name: 'Loan repayment', amount: '− ₦18,750', tone: 'text-foreground' },
-                  ].map((row) => (
-                    <div key={row.name} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{row.name}</span>
-                      <span className={`font-semibold ${row.tone}`}>{row.amount}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="mt-4 flex items-center justify-between text-xs text-white/85">
+              <span>A little consistency goes a long way</span>
+              <ArrowUpRight className="h-4 w-4 text-[#dfeabb]" />
             </div>
-
-            {/* Floating accent card */}
-            <div
-              className="absolute -bottom-6 -left-6 hidden w-56 rounded-2xl border bg-surface p-4 shadow-soft sm:block dark:shadow-soft-dark"
-              style={{ borderColor: 'rgb(var(--border))' }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                  <LineChart className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">YTD growth</p>
-                  <p className="text-sm font-semibold">+ 18.4%</p>
-                </div>
-              </div>
+          </div>
+          <div className="relative ml-8 mt-[-10px] flex items-center gap-4 rounded-2xl border bg-surface px-5 py-4 shadow-soft sm:ml-14">
+            <span className="icon-tile tone-green">
+              <Check className="h-5 w-5" />
+            </span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold">One community. Your own goals.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Thrift, special savings, and member support.
+              </p>
             </div>
           </div>
         </div>
-
-        {/* Feature grid */}
-        <div className="mt-24 grid gap-4 sm:grid-cols-3">
-          {features.map((feature) => (
+      </section>
+      <section id="savings" className="public-wrap">
+        <div className="grid border-y md:grid-cols-3">
+          {[
+            {
+              icon: PiggyBank,
+              title: 'A steady saving habit',
+              text: 'Build your thrift savings, month by month.',
+              number: '01',
+            },
+            {
+              icon: Wallet,
+              title: 'Something to look forward to',
+              text: 'Set money aside with special savings.',
+              number: '02',
+            },
+            {
+              icon: HandCoins,
+              title: 'Support for your next step',
+              text: 'Request a loan when you are eligible.',
+              number: '03',
+            },
+          ].map(({ icon: Icon, title, text, number }) => (
             <article
-              key={feature.title}
-              className="card card-hover p-6"
+              key={number}
+              className="flex gap-4 py-6 md:px-5 md:first:pl-0 md:[&:not(:last-child)]:border-r"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                <feature.icon className="h-5 w-5" />
+              <Icon className="mt-1 h-5 w-5 shrink-0 text-accent" />
+              <div>
+                <h2 className="text-sm font-semibold">{title}</h2>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">{text}</p>
               </div>
-              <h2 className="mt-5 text-base font-semibold tracking-tight text-foreground">
-                {feature.title}
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {feature.description}
-              </p>
             </article>
           ))}
         </div>
-
-        {/* Footer */}
-        <footer className="mt-20 border-t pt-8" style={{ borderColor: 'rgb(var(--border))' }}>
-          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-            <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} FAAN Staff Ummah Multipurpose Cooperative.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Members-only portal · For internal use
-            </p>
-          </div>
-        </footer>
       </section>
+      <footer className="public-wrap flex flex-wrap items-center justify-between gap-3 py-6 text-xs text-muted-foreground">
+        <p>&copy; {new Date().getFullYear()} Ummah Coop. Growing together.</p>
+        <span>Save today. Enjoy tomorrow.</span>
+      </footer>
     </main>
   )
 }

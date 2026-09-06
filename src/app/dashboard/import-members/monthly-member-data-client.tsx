@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { FileSpreadsheet, Upload, ArrowRight, ArrowUpRight, Check, RotateCcw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 type MonthListItem = {
@@ -56,7 +57,10 @@ type ImportResponse = {
   }
 }
 
-function templateBadge(validation: PreviewResponse['validation']): { label: string; tone: 'green' | 'yellow' | 'red' } {
+function templateBadge(validation: PreviewResponse['validation']): {
+  label: string
+  tone: 'green' | 'yellow' | 'red'
+} {
   if (validation.template === 'combined' && validation.isAbanoStandard) {
     return { label: 'ABano Standard (Combined) detected', tone: 'green' }
   }
@@ -72,11 +76,6 @@ function templateBadge(validation: PreviewResponse['validation']): { label: stri
   return { label: 'Mixed/unsupported workbook format', tone: 'red' }
 }
 
-function badgeClass(tone: 'green' | 'yellow' | 'red') {
-  if (tone === 'green') return 'border-green-200 bg-green-50 text-green-900'
-  if (tone === 'yellow') return 'border-amber-200 bg-amber-50 text-amber-900'
-  return 'border-red-200 bg-red-50 text-red-900'
-}
 
 type ApiError = {
   ok: false
@@ -84,15 +83,20 @@ type ApiError = {
 }
 
 const IMPORT_CONFIRM_TEXT = 'IMPORT MONTHLY DATA'
-const SERVER_WORKBOOK_TEXT = 'IMPORT SERVER WORKBOOK'
 
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
-  if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2)
+  if (typeof value === 'number')
+    return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2)
   return String(value)
 }
 
 export default function MonthlyMemberDataClient() {
+  const [selectedMonth, setSelectedMonth] = useState('')
+  const [listError, setListError] = useState('')
+  const [listLoading, setListLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [dragging, setDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [months, setMonths] = useState<MonthListItem[]>([])
   const [preview, setPreview] = useState<PreviewResponse | null>(null)
@@ -115,13 +119,17 @@ export default function MonthlyMemberDataClient() {
   }, [preview])
 
   async function refreshMonths() {
+    setListLoading(true)
+    setListError('')
     try {
       const res = await fetch('/api/admin/member-data', { method: 'GET' })
       const json = (await res.json()) as ListResponse
-      if (!res.ok || !json.ok) return
+      if (!res.ok || !json.ok) throw new Error('Could not load the saved months.')
       setMonths(json.months || [])
     } catch {
-      // ignore refresh failures
+      setListError('Could not load saved months. Please retry.')
+    } finally {
+      setListLoading(false)
     }
   }
 
@@ -135,6 +143,8 @@ export default function MonthlyMemberDataClient() {
       return
     }
 
+    if (isLoading || (mode === 'import' && !canImport)) return
+    setError('')
     setIsLoading(true)
     setAction(mode)
     setLastSource(source)
@@ -159,6 +169,7 @@ export default function MonthlyMemberDataClient() {
 
       const json = (await res.json()) as PreviewResponse | ImportResponse | ApiError
       if (!res.ok || !json.ok) {
+        setError((json as ApiError).error || 'Upload failed')
         toast.error((json as ApiError).error || 'Upload failed')
         return
       }
@@ -166,15 +177,23 @@ export default function MonthlyMemberDataClient() {
       if (mode === 'preview') {
         const parsed = json as PreviewResponse
         setPreview(parsed)
-        toast.success(`Preview ready: ${parsed.months.length} month(s), ${parsed.months.reduce((sum, m) => sum + m.rowCount, 0).toLocaleString()} rows.`)
+        setSelectedMonth(parsed.months[0]?.period || '')
+        toast.success(
+          `Preview ready: ${parsed.months.length} month(s), ${parsed.months.reduce((sum, m) => sum + m.rowCount, 0).toLocaleString()} rows.`
+        )
         return
       }
 
       const imported = json as ImportResponse
       setImportResult(imported)
-      toast.success(`Imported ${imported.importedMonths} month(s) and ${imported.importedRows.toLocaleString()} rows.`)
+      setPreview(null)
+      setConfirmText('')
+      toast.success(
+        `Imported ${imported.importedMonths} month(s) and ${imported.importedRows.toLocaleString()} rows.`
+      )
       await refreshMonths()
     } catch (err: any) {
+      setError(err?.message || 'Unexpected error')
       toast.error(err?.message || 'Unexpected error')
     } finally {
       setIsLoading(false)
@@ -182,243 +201,369 @@ export default function MonthlyMemberDataClient() {
     }
   }
 
+  function chooseFile(next: File | null) {
+    if (isLoading) return
+    if (next && !/\.xlsx?$/i.test(next.name)) {
+      setError('Choose an Excel file (.xlsx or .xls).')
+      return
+    }
+    setFile(next)
+    setPreview(null)
+    setImportResult(null)
+    setConfirmText('')
+    setError('')
+  }
+  const sample =
+    preview?.months.find((month) => month.period === selectedMonth) || preview?.months[0]
+  const step = importResult ? 3 : preview ? 2 : 1
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-900">Workbook (.xlsx, .xls)</label>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] || null)
-                setPreview(null)
-                setImportResult(null)
-                setConfirmText('')
+    <div className="import-workflow">
+      <ol className="import-steps" aria-label="Import progress">
+        {['Choose workbook', 'Review data', 'Confirm import'].map((label, index) => (
+          <li
+            key={label}
+            aria-current={step === index + 1 ? 'step' : undefined}
+            data-complete={step > index + 1}
+          >
+            <span>
+              {step > index + 1 ? <Check size={13} /> : String(index + 1).padStart(2, '0')}
+            </span>
+            {label}
+          </li>
+        ))}
+      </ol>
+      {error && (
+        <p className="admin-error" role="alert">
+          {error}
+        </p>
+      )}
+      {!preview && !importResult && (
+        <div className="import-start-grid">
+          <section className="admin-panel import-upload-panel">
+            <div className="admin-panel-heading">
+              <div>
+                <h2>Monthly workbook</h2>
+                <p>Excel files with one sheet per month.</p>
+              </div>
+              <span className="admin-tag">.xlsx / .xls</span>
+            </div>
+            <label
+              className={`import-dropzone ${dragging ? 'is-dragging' : ''}`}
+              onDragOver={(event) => {
+                event.preventDefault()
+                if (!isLoading) setDragging(true)
               }}
-              className="block w-full text-sm"
-            />
-            <p className="mt-2 text-xs text-gray-500">
-              Upload one workbook with multiple monthly sheets. Row 1 is treated as title, row 2 as headers, row 3 onward as member rows,
-              and the totals row is auto-skipped. On import, monthly snapshots are saved and member fields are synced across the app.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={!canUploadPreview}
-              onClick={() => run('preview', 'upload')}
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              onDragLeave={() => setDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault()
+                setDragging(false)
+                if (!isLoading) chooseFile(event.dataTransfer.files[0] || null)
+              }}
             >
-              {isLoading && action === 'preview' && lastSource === 'upload' ? 'Preparing Preview…' : 'Preview Workbook'}
-            </button>
-            <button
-              type="button"
-              disabled={!canServerPreview}
-              onClick={() => run('preview', 'server')}
-              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isLoading && action === 'preview' && lastSource === 'server' ? 'Preparing Preview…' : SERVER_WORKBOOK_TEXT}
-            </button>
-            <p className="mt-1 w-full text-xs text-gray-500">
-              The server import reads <span className="font-mono">data/ABano.xlsx</span> from the app root unless WORKBOOK_IMPORT_PATH is set.
-            </p>
-            <Link
-              href="/dashboard/member-data"
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Open Member Data
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {preview && (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h3 className="text-lg font-semibold text-gray-900">Workbook Preview</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {previewTotals.months} month(s) detected • {previewTotals.rows.toLocaleString()} total row(s)
-            </p>
-            {preview.validation && (
-              <div className={`mt-2 rounded-lg border p-3 text-sm ${badgeClass(templateBadge(preview.validation).tone)}`}>
-                <p className="font-semibold">Template Check: {templateBadge(preview.validation).label}</p>
-                {preview.validation.issues.length > 0 ? (
-                  <p className="mt-1 text-xs">{preview.validation.issues.join(' • ')}</p>
-                ) : (
-                  <p className="mt-1 text-xs">All required columns match the ABano standard template.</p>
-                )}
-              </div>
-            )}
-            {preview.warnings.length > 0 && (
-              <p className="mt-2 text-xs text-amber-700">
-                Notes: the importer is normalizing joining-month charges and member fees to match the workbook rules.
-                {preview.warnings.length > 0 ? ` ${preview.warnings.join(' • ')}` : ''}
-              </p>
-            )}
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-6 py-3">Month</th>
-                  <th className="px-6 py-3">Sheet</th>
-                  <th className="px-6 py-3">Rows</th>
-                  <th className="px-6 py-3">Notes</th>
-                  <th className="px-6 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {preview.months.map((month) => (
-                  <tr key={month.period}>
-                    <td className="px-6 py-3 font-medium text-gray-900">{month.label}</td>
-                    <td className="px-6 py-3 text-gray-700">{month.sheetName || '—'}</td>
-                    <td className="px-6 py-3 text-gray-700">{month.rowCount.toLocaleString()}</td>
-                    <td className="px-6 py-3 text-xs text-amber-700">{month.warnings.length ? month.warnings.slice(0, 2).join(' • ') : '—'}</td>
-                    <td className="px-6 py-3 text-right">
-                      <Link
-                        href={`/dashboard/member-data?period=${encodeURIComponent(month.period)}`}
-                        className="text-sm font-semibold text-primary-600 hover:text-primary-700"
-                      >
-                        View Period
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="border-t border-gray-200 px-6 py-5">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <p className="text-sm font-semibold text-gray-900">Confirm Import</p>
-              <p className="mt-1 text-sm text-gray-600">
-                Type <span className="font-mono">{IMPORT_CONFIRM_TEXT}</span> to replace current monthly snapshots and sync member records.
-                {lastSource === 'server' ? ` Current source: ${SERVER_WORKBOOK_TEXT}.` : ''}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <input
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder={IMPORT_CONFIRM_TEXT}
-                  className="w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-                />
-                <button
-                  type="button"
-                  disabled={!canImport}
-                  onClick={() => run('import', lastSource)}
-                  className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isLoading && action === 'import' ? 'Importing…' : 'Import All Months'}
-                </button>
-              </div>
+              <input
+                id="monthly-workbook"
+                type="file"
+                accept=".xlsx,.xls"
+                disabled={isLoading}
+                aria-label="Choose monthly workbook"
+                onChange={(event) => chooseFile(event.target.files?.[0] || null)}
+              />
+              <span className="import-file-icon">
+                <FileSpreadsheet size={27} strokeWidth={1.5} />
+              </span>
+              <strong>{file ? file.name : 'Drop your workbook here'}</strong>
+              <span>
+                {file
+                  ? `${Math.max(1, Math.round(file.size / 1024))} KB · Ready to preview`
+                  : 'or click to browse your files'}
+              </span>
+              <span className="import-browse">
+                {file ? 'Choose a different file' : 'Browse files'}
+                <Upload size={14} />
+              </span>
+            </label>
+            <div className="import-upload-footer">
+              <p>Previewing does not change any records.</p>
+              <button
+                type="button"
+                disabled={!canUploadPreview}
+                onClick={() => run('preview', 'upload')}
+                className="btn-primary"
+              >
+                {isLoading && action === 'preview' ? 'Reading workbook…' : 'Preview workbook'}
+                <ArrowRight size={16} />
+              </button>
             </div>
-          </div>
-
-          <div className="border-t border-gray-200 px-6 py-5">
-            <h4 className="text-sm font-semibold text-gray-900">Sample Rows</h4>
-            <div className="mt-3 space-y-3">
-              {preview.months.map((month) => (
-                <details key={`${month.period}-sample`} className="rounded-lg border border-gray-200 bg-white">
-                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-gray-900">
-                    {month.label} ({month.rowCount.toLocaleString()} rows)
-                  </summary>
-                  <div className="overflow-x-auto border-t border-gray-200">
-                    <table className="w-full min-w-[900px] text-sm">
-                      <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                        <tr>
-                          {preview.columns.map((col) => (
-                            <th key={`${month.period}-${col}`} className="px-4 py-2">
-                              {col}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {month.sampleRows.map((row, rowIndex) => (
-                          <tr key={`${month.period}-sample-${rowIndex}`}>
-                            {preview.columns.map((col) => (
-                              <td key={`${month.period}-sample-${rowIndex}-${col}`} className="px-4 py-2 text-gray-800">
-                                {formatCell(row[col])}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              ))}
-            </div>
-          </div>
+          </section>
+          <aside className="import-guide">
+            <span className="admin-eyebrow">Before you import</span>
+            <h2>A clear review before anything changes.</h2>
+            <ol>
+              <li>
+                <span>01</span>
+                <div>
+                  <strong>Check the months</strong>
+                  <p>Each sheet is detected as a separate period.</p>
+                </div>
+              </li>
+              <li>
+                <span>02</span>
+                <div>
+                  <strong>Review the columns</strong>
+                  <p>Inspect sample rows and any normalization notes.</p>
+                </div>
+              </li>
+              <li>
+                <span>03</span>
+                <div>
+                  <strong>Confirm the update</strong>
+                  <p>Import replaces monthly snapshots and syncs member records.</p>
+                </div>
+              </li>
+            </ol>
+            <details className="import-server">
+              <summary>Use a workbook already on the server</summary>
+              <p>This previews the configured server file. It does not import immediately.</p>
+              <button
+                className="btn-ghost"
+                type="button"
+                disabled={!canServerPreview}
+                onClick={() => run('preview', 'server')}
+              >
+                {isLoading && lastSource === 'server' ? 'Reading…' : 'Preview server workbook'}
+              </button>
+            </details>
+          </aside>
         </div>
       )}
-
+      {preview && (
+        <section className="admin-panel import-preview">
+          <div className="admin-panel-heading">
+            <div>
+              <span className="admin-eyebrow">Ready for review</span>
+              <h2>{lastSource === 'upload' ? file?.name : 'Server workbook'}</h2>
+              <p>
+                {previewTotals.months} months · {previewTotals.rows.toLocaleString()} rows detected
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={isLoading}
+              onClick={() => {
+                setPreview(null)
+                setConfirmText('')
+              }}
+            >
+              <RotateCcw size={14} />
+              Change workbook
+            </button>
+          </div>
+          {preview.validation && (
+            <div className={`import-validation ${templateBadge(preview.validation).tone}`}>
+              <strong>{templateBadge(preview.validation).label}</strong>
+              {preview.validation.issues.length > 0 && (
+                <p>{preview.validation.issues.join(' · ')}</p>
+              )}
+            </div>
+          )}
+          {preview.warnings.length > 0 && (
+            <details className="import-notes">
+              <summary>{preview.warnings.length} workbook notes</summary>
+              <ul>
+                {preview.warnings.map((note, index) => (
+                  <li key={index}>{note}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <div className="import-months-review">
+            <div className="import-month-list" role="group" aria-label="Preview month">
+              {preview.months.map((month) => (
+                <button
+                  key={month.period}
+                  type="button"
+                  aria-pressed={sample?.period === month.period}
+                  onClick={() => setSelectedMonth(month.period)}
+                >
+                  <div>
+                    <strong>{month.label}</strong>
+                    <span>{month.sheetName.trim()}</span>
+                  </div>
+                  <span>
+                    {month.rowCount} rows
+                    {month.warnings.length > 0 && <small>{month.warnings.length} notes</small>}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="import-sample">
+              <div className="admin-panel-heading">
+                <div>
+                  <h3>{sample?.label} sample rows</h3>
+                  <p>Preview only. These values have not been saved.</p>
+                </div>
+              </div>
+              {!!sample?.warnings.length && (
+                <details className="import-notes">
+                  <summary>{sample.warnings.length} notes for this month</summary>
+                  <ul>
+                    {sample.warnings.map((note, index) => (
+                      <li key={index}>{note}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div className="admin-table-scroll" tabIndex={0} aria-label="Preview data columns">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      {preview.columns.map((column) => (
+                        <th key={column}>{column}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sample?.sampleRows.map((row, index) => (
+                      <tr key={index}>
+                        {preview.columns.map((column) => (
+                          <td key={column}>{formatCell(row[column])}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div className="import-confirm">
+            <div>
+              <h3>Confirm this import</h3>
+              <p>
+                This replaces the current monthly snapshots and syncs member records. Active members
+                absent from the workbook may be suspended. Type <code>{IMPORT_CONFIRM_TEXT}</code>{' '}
+                to continue.
+              </p>
+            </div>
+            <div>
+              <label className="sr-only" htmlFor="import-confirmation">
+                Import confirmation
+              </label>
+              <input
+                id="import-confirmation"
+                value={confirmText}
+                disabled={isLoading}
+                onChange={(event) => setConfirmText(event.target.value)}
+                placeholder={IMPORT_CONFIRM_TEXT}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                disabled={!canImport}
+                onClick={() => run('import', lastSource)}
+                className="btn-primary"
+              >
+                {isLoading && action === 'import' ? 'Importing…' : 'Confirm import'}
+                <ArrowRight size={15} />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
       {importResult && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-green-900">
-          <p className="font-semibold">Import completed</p>
-          <p className="mt-1 text-sm">
-            Saved {importResult.importedMonths} month(s) with {importResult.importedRows.toLocaleString()} total row(s).
+        <section className="admin-panel import-success" role="status">
+          <span>
+            <Check size={24} />
+          </span>
+          <h2>Workbook imported</h2>
+          <p>
+            {importResult.importedMonths} months and {importResult.importedRows.toLocaleString()}{' '}
+            rows saved.
           </p>
-          {(importResult.syncedMembers !== undefined || importResult.suspendedMembers !== undefined) && (
-            <p className="mt-1 text-sm">
-              Synced {importResult.syncedMembers ?? 0} active member record(s)
-              {importResult.suspendedMembers !== undefined ? ` • Suspended ${importResult.suspendedMembers} non-imported active member(s)` : ''}.
+          {importResult.syncedMembers !== undefined && (
+            <p>
+              {importResult.syncedMembers} member records synced
+              {importResult.suspendedMembers !== undefined
+                ? `; ${importResult.suspendedMembers} non-imported members suspended`
+                : ''}
+              .
             </p>
           )}
           {importResult.warnings.length > 0 && (
-            <p className="mt-2 text-xs">Notes: {importResult.warnings.join(' • ')}</p>
+            <details className="import-notes">
+              <summary>Import notes</summary>
+              <ul>
+                {importResult.warnings.map((note, index) => (
+                  <li key={index}>{note}</li>
+                ))}
+              </ul>
+            </details>
           )}
-        </div>
+          <div>
+            <Link href="/dashboard/member-data" className="btn-primary">
+              View member data
+              <ArrowUpRight size={15} />
+            </Link>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                setImportResult(null)
+                setFile(null)
+              }}
+            >
+              Import another workbook
+            </button>
+          </div>
+        </section>
       )}
-
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">Uploaded Months</h3>
-          <p className="mt-1 text-sm text-gray-500">Current snapshots available in the database.</p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-6 py-3">Month</th>
-                <th className="px-6 py-3">Rows</th>
-                <th className="px-6 py-3">Last Upload</th>
-                <th className="px-6 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {months.length === 0 ? (
-                <tr>
-                  <td className="px-6 py-8 text-center text-gray-500" colSpan={4}>
-                    No uploaded month snapshots yet.
-                  </td>
-                </tr>
-              ) : (
-                months.map((month) => (
-                  <tr key={month.period}>
-                    <td className="px-6 py-3 font-medium text-gray-900">{month.label}</td>
-                    <td className="px-6 py-3 text-gray-700">{month.rowCount.toLocaleString()}</td>
-                    <td className="px-6 py-3 text-gray-700">{new Date(month.uploadedAt).toLocaleString()}</td>
-                    <td className="px-6 py-3 text-right">
-                      <Link
-                        href={`/dashboard/member-data?period=${encodeURIComponent(month.period)}`}
-                        className="text-sm font-semibold text-primary-600 hover:text-primary-700"
-                      >
-                        Open
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <section className="admin-panel">
+        <header className="admin-panel-heading">
+          <div>
+            <h2>Saved months</h2>
+            <p>Your current monthly snapshots.</p>
+          </div>
+          <span className="admin-tag">{months.length} periods</span>
+        </header>
+        {listError ? (
+          <div className="admin-empty" role="alert">
+            {listError}
+            <button type="button" className="btn-ghost" onClick={refreshMonths}>
+              Retry
+            </button>
+          </div>
+        ) : listLoading ? (
+          <p className="admin-empty" role="status">
+            Loading saved months…
+          </p>
+        ) : !months.length ? (
+          <p className="admin-empty">No months uploaded yet.</p>
+        ) : (
+          <div className="import-saved-months">
+            {[...months].reverse().map((month) => (
+              <Link
+                key={month.period}
+                href={`/dashboard/member-data?period=${encodeURIComponent(month.period)}`}
+              >
+                <span className="import-saved-icon">
+                  <FileSpreadsheet size={18} />
+                </span>
+                <div>
+                  <strong>{month.label}</strong>
+                  <small>
+                    {month.rowCount.toLocaleString()} members ·{' '}
+                    {new Date(month.uploadedAt).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                  </small>
+                </div>
+                <ArrowUpRight size={15} />
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

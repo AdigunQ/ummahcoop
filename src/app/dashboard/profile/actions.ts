@@ -71,6 +71,9 @@ export async function updateProfile(formData: FormData) {
     ['nextOfKinPhone', 'Next of Kin phone', 40, false],
     ['nextOfKinEmail', 'Next of Kin email', 320, false],
     ['nextOfKinRelationship', 'Next of Kin relationship', 100, false],
+    ['bankName', 'Bank name', 200, false],
+    ['bankAccountNumber', 'Account number', 40, false],
+    ['bankAccountName', 'Account holder name', 200, false],
   ] as const
 
   for (const [field, label, maxLength, required] of editableFields) {
@@ -84,13 +87,6 @@ export async function updateProfile(formData: FormData) {
       return { error: 'Please enter a valid Next of Kin email address.' }
     }
   }
-
-  const bankName = readTextField(formData, 'bankName')
-  const bankAccountNumber = readTextField(formData, 'bankAccountNumber')
-  const bankAccountName = readTextField(formData, 'bankAccountName')
-  if (bankName) data.bankName = bankName
-  if (bankAccountNumber) data.bankAccountNumber = bankAccountNumber
-  if (bankAccountName) data.bankAccountName = bankAccountName
 
   if (Object.keys(data).length === 0) {
     return { error: 'Nothing to update' }

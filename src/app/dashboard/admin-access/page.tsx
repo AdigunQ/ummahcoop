@@ -1,3 +1,7 @@
+import { AdminHeading, AdminPanel } from '@/components/admin/admin-ui'
+import { AdminCollection } from '@/components/admin/admin-collection'
+import { AccessRecord } from '@/components/admin/access-record'
+import { FormSelect } from '@/components/ui/smart-select'
 import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
@@ -39,7 +43,10 @@ async function updateAccessBundle(formData: FormData) {
   'use server'
 
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id || !(await canManageAdminAccess({ id: session.user.id, role: session.user.role }))) {
+  if (
+    !session?.user?.id ||
+    !(await canManageAdminAccess({ id: session.user.id, role: session.user.role }))
+  ) {
     redirect('/dashboard')
   }
 
@@ -79,7 +86,8 @@ async function updateAccessBundle(formData: FormData) {
 export default async function AdminAccessPage({ searchParams }: { searchParams?: SearchParams }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/login')
-  if (!(await canManageAdminAccess({ id: session.user.id, role: session.user.role }))) redirect('/dashboard')
+  if (!(await canManageAdminAccess({ id: session.user.id, role: session.user.role })))
+    redirect('/dashboard')
 
   const members = await prisma.user.findMany({
     where: {
@@ -105,120 +113,68 @@ export default async function AdminAccessPage({ searchParams }: { searchParams?:
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">Developer control</p>
-          <h1 className="mt-2 text-3xl font-bold text-gray-950">Admin Access</h1>
-          <p className="mt-2 max-w-2xl text-sm text-gray-600">
-            Grant Exco access to existing members without creating separate admin accounts. Everyone still signs in
-            with their normal Staff ID and password.
-          </p>
-        </div>
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <ShieldCheck className="mb-1 h-5 w-5" />
-          Only Developer access can change these roles.
-        </div>
-      </div>
-
+    <div className="admin-page">
+      <AdminHeading
+        section="Developer settings"
+        title="Access & permissions"
+        description="One member account. The right level of admin access."
+        actions={
+          <span className="admin-tag">
+            <ShieldCheck size={14} />
+            Developer only
+          </span>
+        }
+      />
       {searchParams?.saved === '1' && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+        <p className="admin-success" role="status">
           Access updated successfully.
-        </div>
+        </p>
       )}
-
       {searchParams?.error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="admin-error" role="alert">
           Could not update access. Please try again.
-        </div>
+        </p>
       )}
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="admin-role-guide">
         {Object.entries(ACCESS_BUNDLES).map(([key, bundle]) => (
-          <div key={key} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-gray-950">{bundle.label}</p>
-            <p className="mt-1 text-xs leading-5 text-gray-500">{bundle.description}</p>
-            <p className="mt-3 text-xs font-medium text-gray-700">
-              {bundle.privileges.length} permission{bundle.privileges.length === 1 ? '' : 's'}
-            </p>
+          <div key={key}>
+            <span>{bundle.privileges.length} permissions</span>
+            <h2>{bundle.label}</h2>
+            <p>{bundle.description}</p>
           </div>
         ))}
       </div>
-
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-gray-950">Assign Access To Members</h2>
-          <p className="mt-1 text-sm text-gray-500">Use Exco Viewer for read-only access and Exco Manager for the one read/write admin.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-5 py-3">Member</th>
-                <th className="px-5 py-3">Current Access</th>
-                <th className="px-5 py-3">Permissions</th>
-                <th className="px-5 py-3">Change Role</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {members.map((member) => {
-                const codes = member.privileges.map((privilege) => privilege.code)
-                const currentBundle = resolveBundle(codes)
-                return (
-                  <tr key={member.id} className="align-top">
-                    <td className="px-5 py-4">
-                      <p className="font-medium text-gray-950">{member.name || 'Unnamed member'}</p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {member.staffId || 'No Staff ID'} · {member.department || 'No department'} · {member.status}
-                      </p>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                        {ACCESS_BUNDLES[currentBundle].label}
-                      </span>
-                    </td>
-                    <td className="max-w-md px-5 py-4">
-                      {codes.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {codes.map((code) => (
-                            <span key={code} className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                              {PRIVILEGE_LABELS[code as PrivilegeCode] || code}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">Member access only</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <form action={updateAccessBundle} className="flex min-w-64 gap-2">
-                        <input type="hidden" name="memberId" value={member.id} />
-                        <select
-                          name="bundle"
-                          defaultValue={currentBundle}
-                          className="min-w-44 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"
-                        >
-                          {Object.entries(ACCESS_BUNDLES).map(([key, bundle]) => (
-                            <option key={key} value={key}>
-                              {bundle.label}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="submit"
-                          className="rounded-lg bg-gray-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-black"
-                        >
-                          Save
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <AdminPanel
+        title="Member access"
+        note="Expand a member to review or change their permissions."
+      >
+        <AdminCollection>
+          {members.map((member) => {
+            const codes = member.privileges.map((p) => p.code)
+            const bundle = resolveBundle(codes)
+            return (
+              <AccessRecord
+                key={member.id}
+                memberId={member.id}
+                name={member.name || 'Unnamed member'}
+                staffId={member.staffId}
+                searchText={
+                  (member.name || '') + ' ' + member.staffId + ' ' + ACCESS_BUNDLES[bundle].label
+                }
+                currentLabel={ACCESS_BUNDLES[bundle].label}
+                currentBundle={bundle}
+                codes={codes.map((code) => PRIVILEGE_LABELS[code as PrivilegeCode] || code)}
+                options={Object.entries(ACCESS_BUNDLES).map(([value, b]) => ({
+                  value,
+                  label: b.label,
+                  description: b.description,
+                }))}
+                action={updateAccessBundle}
+              />
+            )
+          })}
+        </AdminCollection>
+      </AdminPanel>
     </div>
   )
 }

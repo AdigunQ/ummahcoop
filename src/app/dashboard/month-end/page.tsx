@@ -1,3 +1,6 @@
+import { AdminSubmit } from '@/components/admin/admin-collection'
+import { AdminHeading, AdminStats } from '@/components/admin/admin-ui'
+import { FormSelect } from '@/components/ui/smart-select'
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -98,7 +101,10 @@ async function generateCycle(formData: FormData) {
       lineType: 'LOAN_REPAYMENT',
       expectedAmount: due,
       actualAmount: due,
-      reason: directPaid > 0 ? `Adjusted for direct repayment (${formatCurrency(directPaid)})` : undefined,
+      reason:
+        directPaid > 0
+          ? `Adjusted for direct repayment (${formatCurrency(directPaid)})`
+          : undefined,
     })
   }
 
@@ -302,68 +308,75 @@ export default async function MonthEndPage() {
   ])
 
   const pendingLines = latestCycle?.lines.filter((l) => l.status === 'PENDING') || []
-  const pendingAmount = pendingLines.reduce((sum, l) => sum + (l.actualAmount ?? l.expectedAmount), 0)
+  const pendingAmount = pendingLines.reduce(
+    (sum, l) => sum + (l.actualAmount ?? l.expectedAmount),
+    0
+  )
 
   return (
-    <div className="animate-fadeIn space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Month-End Posting</h1>
-        <p className="mt-1 text-gray-500">
-          Draft deductions first. Post to balances only after salary payment and cooperative transfer are confirmed.
-        </p>
-      </div>
+    <div className="admin-page">
+      <AdminHeading
+        section="Finance"
+        title="Month-end posting"
+        description={
+          <>
+            Draft deductions first. Post to balances only after salary payment and cooperative
+            transfer are confirmed.
+          </>
+        }
+      />
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">Generate New Payroll Cycle</h2>
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-foreground">Generate New Payroll Cycle</h2>
         <form action={generateCycle} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Period</label>
+            <label className="mb-1 block text-sm font-medium text-foreground">Period</label>
             <input
+              aria-label="Period"
               type="month"
               name="period"
               required
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+              className="rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
-          <button
-            type="submit"
+          <AdminSubmit pendingLabel="Processing..."
             className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
           >
             Generate Draft
-          </button>
+          </AdminSubmit>
         </form>
       </div>
 
       {latestCycle ? (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label="Current Cycle" value={latestCycle.period} tone="blue" />
-            <MetricCard label="Status" value={latestCycle.status} tone="amber" />
-            <MetricCard label="Pending Lines" value={pendingLines.length.toString()} tone="green" />
-            <MetricCard label="Pending Amount" value={formatCurrency(pendingAmount)} tone="purple" />
-          </div>
+          <AdminStats
+            items={[
+              { label: 'Current Cycle', value: latestCycle.period },
+              { label: 'Status', value: latestCycle.status },
+              { label: 'Pending Lines', value: pendingLines.length.toString() },
+              { label: 'Pending Amount', value: formatCurrency(pendingAmount) },
+            ]}
+          />
 
           <div className="flex flex-wrap items-center gap-3">
             {latestCycle.status === 'DRAFT' && (
               <form action={confirmFinance}>
                 <input type="hidden" name="cycleId" value={latestCycle.id} />
-                <button
-                  type="submit"
+                <AdminSubmit pendingLabel="Processing..."
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                 >
                   Confirm Salary Paid + Transfer Received
-                </button>
+                </AdminSubmit>
               </form>
             )}
             {latestCycle.status === 'FINANCE_CONFIRMED' && (
               <form action={postCycle}>
                 <input type="hidden" name="cycleId" value={latestCycle.id} />
-                <button
-                  type="submit"
+                <AdminSubmit pendingLabel="Processing..."
                   className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
                 >
                   Post Cycle
-                </button>
+                </AdminSubmit>
               </form>
             )}
             {latestCycle.status === 'POSTED' && (
@@ -373,77 +386,85 @@ export default async function MonthEndPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">Cycle Lines</h2>
+          <div className="rounded-xl border border-border bg-surface shadow-sm">
+            <div className="border-b border-border px-6 py-4">
+              <h2 className="text-lg font-semibold text-foreground">Cycle Lines</h2>
             </div>
             {latestCycle.lines.length === 0 ? (
-              <div className="px-6 py-10 text-center text-gray-500">No lines in this cycle.</div>
+              <div className="px-6 py-10 text-center text-muted-foreground">
+                No lines in this cycle.
+              </div>
             ) : (
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-border">
                 {latestCycle.lines.map((line) => (
                   <div key={line.id} className="px-6 py-4">
                     <form action={updateLine} className="grid grid-cols-1 gap-3 xl:grid-cols-8">
                       <input type="hidden" name="lineId" value={line.id} />
                       <div className="xl:col-span-2">
-                        <p className="text-sm font-semibold text-gray-900">{line.user?.name || 'Unknown Member'}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-semibold text-foreground">
+                          {line.user?.name || 'Unknown Member'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
                           {line.user?.staffId || 'N/A'} · {line.user?.department || 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Type</p>
-                        <p className="text-sm font-semibold text-gray-800">
+                        <p className="text-xs text-muted-foreground">Type</p>
+                        <p className="text-sm font-semibold text-foreground">
                           {line.lineType === 'SAVINGS' ? 'Savings' : 'Loan Repayment'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Expected</p>
-                        <p className="text-sm font-semibold text-gray-800">{formatCurrency(line.expectedAmount)}</p>
+                        <p className="text-xs text-muted-foreground">Expected</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {formatCurrency(line.expectedAmount)}
+                        </p>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Actual</label>
+                        <label className="text-xs text-muted-foreground">Actual</label>
                         <input
+                          aria-label="Actual Amount"
                           name="actualAmount"
                           type="number"
                           min={0}
                           step={1}
                           defaultValue={line.actualAmount ?? line.expectedAmount}
                           disabled={latestCycle.status !== 'DRAFT'}
-                          className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:border-primary-500 disabled:bg-gray-100"
+                          className="mt-1 w-full rounded-lg border border-border px-2 py-1 text-sm outline-none focus:border-primary-500 disabled:bg-surface-2"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Status</label>
-                        <select
+                        <label className="text-xs text-muted-foreground">Status</label>
+                        <FormSelect
+                          aria-label="Status"
                           name="status"
                           defaultValue={line.status}
                           disabled={latestCycle.status !== 'DRAFT' || line.status === 'POSTED'}
-                          className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:border-primary-500 disabled:bg-gray-100"
+                          className="min-w-40 w-full"
                         >
                           <option value="PENDING">Pending</option>
                           <option value="EXCLUDED">Excluded</option>
                           {line.status === 'POSTED' && <option value="POSTED">Posted</option>}
-                        </select>
+                        </FormSelect>
                       </div>
                       <div className="xl:col-span-2">
-                        <label className="text-xs text-gray-500">Reason</label>
+                        <label className="text-xs text-muted-foreground">Reason</label>
                         <input
+                          aria-label="Reason"
                           name="reason"
                           type="text"
                           defaultValue={line.reason || ''}
                           disabled={latestCycle.status !== 'DRAFT'}
-                          className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:border-primary-500 disabled:bg-gray-100"
+                          className="mt-1 w-full rounded-lg border border-border px-2 py-1 text-sm outline-none focus:border-primary-500 disabled:bg-surface-2"
                         />
                       </div>
                       {latestCycle.status === 'DRAFT' && (
                         <div className="xl:col-span-8">
-                          <button
-                            type="submit"
-                            className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black"
+                          <AdminSubmit pendingLabel="Processing..."
+                            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground hover:bg-black"
                           >
                             Save Line
-                          </button>
+                          </AdminSubmit>
                         </div>
                       )}
                     </form>
@@ -453,49 +474,25 @@ export default async function MonthEndPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Cycles</h2>
+          <div className="rounded-xl border border-border bg-surface shadow-sm">
+            <div className="border-b border-border px-6 py-4">
+              <h2 className="text-lg font-semibold text-foreground">Recent Cycles</h2>
             </div>
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-border">
               {recentCycles.map((cycle) => (
                 <div key={cycle.id} className="flex items-center justify-between px-6 py-3 text-sm">
-                  <span className="font-medium text-gray-900">{cycle.period}</span>
-                  <span className="text-gray-600">{cycle.status}</span>
+                  <span className="font-medium text-foreground">{cycle.period}</span>
+                  <span className="text-muted-foreground">{cycle.status}</span>
                 </div>
               ))}
             </div>
           </div>
         </>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
+        <div className="rounded-xl border border-border bg-surface p-8 text-center text-muted-foreground">
           No cycle yet. Generate a month-end draft.
         </div>
       )}
-    </div>
-  )
-}
-
-function MetricCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: 'blue' | 'green' | 'amber' | 'purple'
-}) {
-  const tones = {
-    blue: 'border-blue-200 bg-blue-50 text-blue-800',
-    green: 'border-green-200 bg-green-50 text-green-800',
-    amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    purple: 'border-purple-200 bg-purple-50 text-purple-800',
-  }
-
-  return (
-    <div className={`rounded-xl border p-4 ${tones[tone]}`}>
-      <p className="text-xs uppercase tracking-wide">{label}</p>
-      <p className="mt-2 text-xl font-bold">{value}</p>
     </div>
   )
 }

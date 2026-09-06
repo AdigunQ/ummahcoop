@@ -1,17 +1,13 @@
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { authOptions } from '@/lib/auth'
 import { DashboardNav } from '@/components/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { autoPostMonthEndIfDue } from '@/lib/payroll'
-import { getMemberFinanceSummary } from '@/lib/member-finance'
 import { getUserPrivilegeCodes } from '@/lib/access'
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
   const email = session?.user?.email
 
@@ -28,8 +24,6 @@ export default async function DashboardLayout({
     staffId: string | null
     role: string
     status: string
-    balance: number
-    loanBalance: number
   }
 
   let user: DashboardUser | null = null
@@ -43,8 +37,6 @@ export default async function DashboardLayout({
         staffId: true,
         role: true,
         status: true,
-        balance: true,
-        loanBalance: true,
       },
     })
   } catch (error) {
@@ -58,8 +50,6 @@ export default async function DashboardLayout({
     staffId: null,
     role: session.user?.role || 'MEMBER',
     status: session.user?.status || 'ACTIVE',
-    balance: 0,
-    loanBalance: 0,
   }
 
   let privilegeCount = 0
@@ -73,18 +63,21 @@ export default async function DashboardLayout({
     }
   }
 
+  let monthEndIssue = false
   if (user.role === 'ADMIN') {
-    await autoPostMonthEndIfDue()
+    try {
+      await autoPostMonthEndIfDue()
+    } catch (error) {
+      console.error('[dashboard-layout] month-end processing unavailable', error)
+      monthEndIssue = true
+    }
   }
 
-  const navLoanBalance = user.role === 'MEMBER'
-    ? Math.max(user.loanBalance, (await getMemberFinanceSummary(user.id, user.staffId)).loanOutstanding)
-    : user.loanBalance
+  const canSeeAdminBadges = user.role === 'ADMIN' || privilegeCount > 0
 
-  const canSeeAdminBadges =
-    user.role === 'ADMIN' || privilegeCount > 0
-
-  let adminBadges: { pendingMembers: number; pendingPayments: number; pendingLoans: number } | undefined
+  let adminBadges:
+    | { pendingMembers: number; pendingPayments: number; pendingLoans: number }
+    | undefined
   if (canSeeAdminBadges) {
     try {
       const [pendingMembers, pendingPayments, pendingLoans] = await Promise.all([
@@ -99,18 +92,26 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="workspace">
       <DashboardNav
         user={{
           ...user,
-          loanBalance: navLoanBalance,
           privileges: privilegeCodes.map((code) => ({ code })),
         }}
         adminBadges={adminBadges}
       />
-      <main className="min-h-screen lg:ml-72">
-        <div className="px-4 pb-10 pt-20 lg:px-8 lg:pt-10">
-          <div className="mx-auto max-w-6xl animate-fadeIn">{children}</div>
+      <main className="workspace-main">
+        <div id="workspace-content" className="workspace-content" tabIndex={-1}>
+          {monthEndIssue && (
+            <p role="alert" className="card mb-5 p-4 text-sm">
+              Automatic month-end processing could not finish.{' '}
+              <Link href="/dashboard/month-end" className="font-semibold underline">
+                Review month-end status
+              </Link>{' '}
+              before posting again.
+            </p>
+          )}
+          <div className="animate-fadeIn">{children}</div>
         </div>
       </main>
     </div>

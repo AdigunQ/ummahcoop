@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
-import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
+import { canAccessWithPrivileges, getUserPrivilegeCodes, PRIVILEGE_CODES } from '@/lib/access'
 
 export default async function AnalyticsPage() {
   const session = await getServerSession(authOptions)
@@ -11,5 +11,5 @@ export default async function AnalyticsPage() {
     redirect('/dashboard')
   }
 
-  return <AdminAnalytics canSwitchToMember={session.user.role === 'MEMBER'} />
+  return <AdminAnalytics canSwitchToMember={session.user.role === 'MEMBER'} privilegeCodes={session.user.role === 'ADMIN' ? undefined : await getUserPrivilegeCodes(session.user.id)} />
 }

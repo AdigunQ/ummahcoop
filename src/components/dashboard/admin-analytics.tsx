@@ -1,10 +1,22 @@
-import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { BellRing, CreditCard, Landmark, PackageSearch, TrendingUp, Users, Wallet } from 'lucide-react'
+import { AdminHeading, AdminStats, AdminPanel } from '@/components/admin/admin-ui'
+import {
+  ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
+  CreditCard,
+  FileText,
+  Landmark,
+  PackageSearch,
+  Users,
+  UserCheck,
+  Wallet,
+} from 'lucide-react'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { firstVoucherPeriodForCreatedAt, resolveVoucherPeriod } from '@/lib/vouchers'
+import { canOpenAdminRoute } from '@/components/admin/overview-access'
 
 type TrendRow = {
   period: string
@@ -40,15 +52,31 @@ function sum(values: number[]) {
 }
 
 function normalizeStaffId(value: string | null | undefined): string {
-  return String(value || '').trim().replace(/\s+/g, '').toUpperCase()
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .toUpperCase()
 }
 
-export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchToMember?: boolean }) {
+export async function AdminAnalytics({
+  canSwitchToMember = false,
+  privilegeCodes,
+}: {
+  canSwitchToMember?: boolean
+  privilegeCodes?: string[]
+}) {
   const now = new Date()
   const currentMonth = resolveVoucherPeriod().period
   const currentLabel = formatPeriodLabel(currentMonth)
 
-  const [currentDataset, activeMemberCount, activeLoanRecords, approvedCommodityRecords, queueCounts, trends] = await Promise.all([
+  const [
+    currentDataset,
+    activeMemberCount,
+    activeLoanRecords,
+    approvedCommodityRecords,
+    queueCounts,
+    trends,
+  ] = await Promise.all([
     getCurrentMemberLiveDataset(currentMonth),
     prisma.user.count({ where: { role: 'MEMBER', status: 'ACTIVE' } }),
     prisma.loan.findMany({
@@ -68,64 +96,71 @@ export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchT
       prisma.payment.count({ where: { status: 'PENDING' } }),
       prisma.loan.count({ where: { status: 'PENDING' } }),
       prisma.withdrawal.count({ where: { status: 'PENDING' } }),
+      prisma.commodityRequest.count({ where: { status: 'PENDING' } }),
     ]),
     Promise.all(
-      Array.from({ length: 6 }, (_, index) => new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)).map(
-        async (startDate): Promise<TrendRow> => {
-          const start = startDate
-          const end = new Date(start.getFullYear(), start.getMonth() + 1, 1)
-          const period = toPeriod(start)
+      Array.from(
+        { length: 6 },
+        (_, index) => new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
+      ).map(async (startDate): Promise<TrendRow> => {
+        const start = startDate
+        const end = new Date(start.getFullYear(), start.getMonth() + 1, 1)
+        const period = toPeriod(start)
 
-          const [registrations, eligibleMembers] = await Promise.all([
-            prisma.user.count({
-              where: {
-                role: 'MEMBER',
-                createdAt: { gte: start, lt: end },
-              },
-            }),
-            prisma.user.findMany({
-              where: {
-                role: 'MEMBER',
-                status: 'ACTIVE',
-                voucherEnabled: true,
-                OR: [{ monthlyContribution: { gt: 0 } }, { specialContribution: { gt: 0 } }],
-                createdAt: { lt: end },
-              },
-              select: {
-                createdAt: true,
-                monthlyContribution: true,
-                specialContribution: true,
-              },
-            }),
-          ])
+        const [registrations, eligibleMembers] = await Promise.all([
+          prisma.user.count({
+            where: {
+              role: 'MEMBER',
+              createdAt: { gte: start, lt: end },
+            },
+          }),
+          prisma.user.findMany({
+            where: {
+              role: 'MEMBER',
+              status: 'ACTIVE',
+              voucherEnabled: true,
+              OR: [{ monthlyContribution: { gt: 0 } }, { specialContribution: { gt: 0 } }],
+              createdAt: { lt: end },
+            },
+            select: {
+              createdAt: true,
+              monthlyContribution: true,
+              specialContribution: true,
+            },
+          }),
+        ])
 
-          const included = eligibleMembers.filter((member) => firstVoucherPeriodForCreatedAt(member.createdAt) <= period)
-          const newCount = included.filter((member) => firstVoucherPeriodForCreatedAt(member.createdAt) === period).length
-          const oldCount = Math.max(0, included.length - newCount)
-          const newMemberFeeRevenue = newCount * 1000
-          const chargeRevenue = oldCount * 100
-          const voucherFees = newMemberFeeRevenue + chargeRevenue
-          const savingsBasis = included.reduce(
-            (acc, member) => acc + (member.monthlyContribution || 0) + (member.specialContribution || 0),
-            0
-          )
+        const included = eligibleMembers.filter(
+          (member) => firstVoucherPeriodForCreatedAt(member.createdAt) <= period
+        )
+        const newCount = included.filter(
+          (member) => firstVoucherPeriodForCreatedAt(member.createdAt) === period
+        ).length
+        const oldCount = Math.max(0, included.length - newCount)
+        const newMemberFeeRevenue = newCount * 1000
+        const chargeRevenue = oldCount * 100
+        const voucherFees = newMemberFeeRevenue + chargeRevenue
+        const savingsBasis = included.reduce(
+          (acc, member) =>
+            acc + (member.monthlyContribution || 0) + (member.specialContribution || 0),
+          0
+        )
 
-          return {
-            period,
-            label: formatPeriodLabel(period),
-            registrations,
-            newMemberFeeRevenue,
-            chargeRevenue,
-            voucherFees,
-            savingsBasis,
-            voucherTotal: voucherFees + savingsBasis,
-          }
+        return {
+          period,
+          label: formatPeriodLabel(period),
+          registrations,
+          newMemberFeeRevenue,
+          chargeRevenue,
+          voucherFees,
+          savingsBasis,
+          voucherTotal: voucherFees + savingsBasis,
         }
-      )
+      })
     ),
   ])
 
-  const [pendingMembers, pendingPayments, pendingLoans, pendingWithdrawals] = queueCounts
+  const [pendingMembers, pendingPayments, pendingLoans, pendingWithdrawals, pendingCommodities] = queueCounts
   const currentRows = currentDataset.rows
   const currentThriftSavings = sum(currentRows.map((row) => row.monthlySavings))
   const currentSpecialSavings = sum(currentRows.map((row) => row.specialSavings))
@@ -135,7 +170,10 @@ export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchT
   const ledgerLoanRows = currentRows.filter((row) => row.loanAmount > 0)
   const ledgerCommodityRows = currentRows.filter((row) => row.commodityAmount > 0)
   const operationalLoansByStaff = new Map(
-    activeLoanRecords.map((loan) => [normalizeStaffId(loan.user.staffId) || `user:${loan.user.id}`, loan])
+    activeLoanRecords.map((loan) => [
+      normalizeStaffId(loan.user.staffId) || `user:${loan.user.id}`,
+      loan,
+    ])
   )
   const countedLoanKeys = new Set<string>()
   let outstandingLoanBalance = 0
@@ -158,7 +196,9 @@ export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchT
 
   const activeLoans = new Set([
     ...ledgerLoanRows.map((row) => normalizeStaffId(row.staffId)),
-    ...activeLoanRecords.map((loan) => normalizeStaffId(loan.user.staffId) || `user:${loan.user.id}`),
+    ...activeLoanRecords.map(
+      (loan) => normalizeStaffId(loan.user.staffId) || `user:${loan.user.id}`
+    ),
   ]).size
 
   const commodityAmounts = new Map<string, number>()
@@ -172,279 +212,227 @@ export async function AdminAnalytics({ canSwitchToMember = false }: { canSwitchT
   }
   const activeCommodities = commodityAmounts.size
   const outstandingCommodityBalance = sum(Array.from(commodityAmounts.values()))
-  const pendingApprovals = pendingMembers + pendingPayments + pendingLoans + pendingWithdrawals
+  const pendingApprovals = pendingMembers + pendingPayments + pendingLoans + pendingWithdrawals + pendingCommodities
 
   const totalChargesRevenue = sum(trends.map((row) => row.chargeRevenue))
   const totalNewMemberFeeRevenue = sum(trends.map((row) => row.newMemberFeeRevenue))
   const totalFeeRevenue = totalChargesRevenue + totalNewMemberFeeRevenue
 
+  const maxScheduledSavings = Math.max(1, ...trends.map((row) => row.savingsBasis))
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <section className="card relative overflow-hidden p-6 sm:p-7">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.07] via-transparent to-transparent" />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="admin-page">
+      <AdminHeading
+        section="Administration"
+        title="Overview"
+        description={`Your cooperative at a glance. ${currentLabel}.`}
+        actions={
+          <>
+            <span className="admin-date">
+              <CalendarDays size={15} />
+              {currentLabel}
+            </span>
+            {canOpenAdminRoute('/dashboard/vouchers', privilegeCodes) && <Link href="/dashboard/vouchers" className="btn-primary">
+              <FileText size={15} />
+              Generate report
+            </Link>}
+          </>
+        }
+      />
+      <div className="admin-overview-top">
+        <section className="admin-panel admin-savings-focus">
           <div>
-            <p className="label-eyebrow">Admin · Overview</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em]">Cooperative analytics</h1>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              A focused snapshot of the cooperative current workbook month, members,
-              fees, and loan exposure.
-            </p>
+            <span className="admin-eyebrow">This month&apos;s savings</span>
+            {canOpenAdminRoute('/dashboard/member-data', privilegeCodes) && <Link href="/dashboard/member-data" className="admin-inline-link">
+              Open ledger
+              <ArrowUpRight size={15} />
+            </Link>}
           </div>
-
-          <div className="flex flex-wrap items-center gap-2 self-start">
-            <div
-              className="inline-flex items-center gap-2 rounded-full border bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted-foreground"
-              style={{ borderColor: 'rgb(var(--border))' }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Workbook · {currentLabel}
+          <strong className="admin-focus-number">
+            {formatCurrency(currentThriftSavings + currentSpecialSavings)}
+          </strong>
+          <p>Scheduled contributions in the {currentLabel} ledger</p>
+          <div className="admin-savings-split">
+            <div>
+              <span>
+                <i />
+                Thrift savings
+              </span>
+              <strong>{formatCurrency(currentThriftSavings)}</strong>
             </div>
-            {canSwitchToMember && (
-              <Link
-                href="/dashboard?view=member"
-                className="rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent/90"
-              >
-                Switch to member view
-              </Link>
-            )}
+            <div>
+              <span>
+                <i />
+                Special savings
+              </span>
+              <strong>{formatCurrency(currentSpecialSavings)}</strong>
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* Top metric grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <MetricCard
-          label="Members on record"
-          value={activeMemberCount.toLocaleString('en-NG')}
-          icon={<Users className="h-5 w-5" />}
-          tone="slate"
-          caption={currentLabel}
-        />
-        <MetricCard
-          label="Thrift savings"
-          value={formatCurrency(currentThriftSavings)}
-          icon={<Landmark className="h-5 w-5" />}
-          tone="emerald"
-          caption={currentLabel}
-        />
-        <MetricCard
-          label="Special savings"
-          value={formatCurrency(currentSpecialSavings)}
-          icon={<Wallet className="h-5 w-5" />}
-          tone="indigo"
-          caption={currentLabel}
-        />
-        <MetricCard
-          label="Active loans"
-          value={activeLoans.toLocaleString('en-NG')}
-          icon={<CreditCard className="h-5 w-5" />}
-          tone="amber"
-          caption={formatCurrency(outstandingLoanBalance)}
-        />
-        <MetricCard
-          label="Active commodities"
-          value={activeCommodities.toLocaleString('en-NG')}
-          icon={<PackageSearch className="h-5 w-5" />}
-          tone="indigo"
-          caption={formatCurrency(outstandingCommodityBalance)}
-        />
-        <MetricCard
-          label="Pending approvals"
-          value={pendingApprovals.toLocaleString('en-NG')}
-          icon={<BellRing className="h-5 w-5" />}
-          tone="rose"
-          caption="Across all queues"
-        />
+          <div className="admin-savings-bar" aria-hidden="true">
+            <span
+              style={{
+                width: `${(currentThriftSavings / Math.max(1, currentThriftSavings + currentSpecialSavings)) * 100}%`,
+              }}
+            />
+          </div>
+        </section>
+        <AdminPanel
+          title="Pending requests"
+          actions={<span className="admin-tag">{pendingApprovals} pending</span>}
+        >
+          <div className="admin-decision-list">
+            {[
+              {
+                label: 'Memberships',
+                count: pendingMembers,
+                href: '/dashboard/members',
+                icon: UserCheck,
+              },
+              {
+                label: 'Loan requests',
+                count: pendingLoans,
+                href: '/dashboard/loans',
+                icon: CreditCard,
+              },
+              {
+                label: 'Payment reviews',
+                count: pendingPayments,
+                href: '/dashboard/payments',
+                icon: Wallet,
+              },
+              {
+                label: 'Withdrawals',
+                count: pendingWithdrawals,
+                href: '/dashboard/withdrawals',
+                icon: ArrowUpRight,
+              },
+              {
+                label: 'Commodity requests',
+                count: pendingCommodities,
+                href: '/dashboard/commodity?review=true',
+                icon: PackageSearch,
+              },
+            ].map(({ label, count, href, icon: Icon }) => (
+              canOpenAdminRoute(href, privilegeCodes) ? <Link key={label} href={href}>
+                <Icon size={16} />
+                <span>{label}</span>
+                <strong>{count}</strong>
+                <ArrowRight size={14} />
+              </Link> : <div className="admin-decision-readonly" key={label}><Icon size={16}/><span>{label}</span><strong>{count}</strong></div>
+            ))}
+          </div>
+        </AdminPanel>
       </div>
-
-      {/* Revenue group */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          label="Charges revenue"
-          value={formatCurrency(totalChargesRevenue)}
-          icon={<TrendingUp className="h-5 w-5" />}
-          tone="slate"
-          caption={`Up to ${currentLabel}`}
-        />
-        <MetricCard
-          label="New member fees"
-          value={formatCurrency(totalNewMemberFeeRevenue)}
-          icon={<Users className="h-5 w-5" />}
-          tone="emerald"
-          caption="₦1,000 per joining member"
-        />
-        <MetricCard
-          label="Total fee revenue"
-          value={formatCurrency(totalFeeRevenue)}
-          icon={<Landmark className="h-5 w-5" />}
-          tone="indigo"
-          caption="Charges + new fees"
-        />
-      </div>
-
-      {/* Snapshots */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <SnapshotCard
-          title="Current snapshot"
-          subtitle={currentLabel}
-          rows={currentRows.length}
-          newMembers={currentNewMembers}
-          oldMembers={currentOldMembers}
-          fees={currentFees}
-          thriftSavings={currentThriftSavings}
-          specialSavings={currentSpecialSavings}
-          footer="Derived from the current live workbook data."
-        />
-        <SnapshotCard
-          title="Upcoming voucher"
-          subtitle={currentLabel}
-          rows={currentRows.length}
-          newMembers={currentNewMembers}
-          oldMembers={currentOldMembers}
-          fees={currentFees}
-          thriftSavings={currentThriftSavings}
-          specialSavings={currentSpecialSavings}
-          footer={`Stays at ${currentRows.length.toLocaleString('en-NG')} members until fresh registrations arrive.`}
-        />
-      </div>
-
-      {/* Trend table */}
-      <section className="card overflow-hidden">
-        <div className="flex items-end justify-between gap-4 border-b px-6 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
-          <div>
-            <p className="label-eyebrow">Trend</p>
-            <h2 className="mt-1 text-base font-semibold tracking-tight">Last 6 months</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Registrations, charges, new member fees, and savings basis.
+      <AdminStats
+        items={[
+          {
+            label: 'Members on record',
+            value: activeMemberCount.toLocaleString('en-NG'),
+            note: `${currentRows.length} in this month's ledger`,
+          },
+          {
+            label: 'Active loans',
+            value: String(activeLoans),
+            note: `${formatCurrency(outstandingLoanBalance)} recorded exposure`,
+          },
+          {
+            label: 'Active commodities',
+            value: String(activeCommodities),
+            note: `${formatCurrency(outstandingCommodityBalance)} recorded value`,
+          },
+        ]}
+      />
+      <div className="admin-overview-bottom">
+        <AdminPanel
+          title="Contribution schedule"
+          note="Based on current contribution plans"
+          actions={<span className="admin-tag">Last 6 months</span>}
+        >
+          <div
+            className="admin-schedule-bars"
+            role="img"
+            aria-label={trends
+              .map((row) => `${row.label}: ${formatCurrency(row.savingsBasis)}`)
+              .join('; ')}
+          >
+            {trends.map((row, index) => (
+              <div key={row.period}>
+                <span>{formatCurrency(row.savingsBasis)}</span>
+                <i
+                  data-current={index === trends.length - 1}
+                  style={{ height: Math.max(4, (row.savingsBasis / maxScheduledSavings) * 130) }}
+                />
+                <small>{row.label.split(' ')[0]}</small>
+              </div>
+            ))}
+          </div>
+        </AdminPanel>
+        <AdminPanel title="Scheduled fees" note="Last 6 months, not confirmed receipts">
+          <div className="admin-fee-summary">
+            <strong>{formatCurrency(totalFeeRevenue)}</strong>
+            <dl>
+              <div>
+                <dt>Monthly charges</dt>
+                <dd>{formatCurrency(totalChargesRevenue)}</dd>
+              </div>
+              <div>
+                <dt>New member fees</dt>
+                <dd>{formatCurrency(totalNewMemberFeeRevenue)}</dd>
+              </div>
+            </dl>
+            <p>
+              {currentNewMembers} new and {currentOldMembers} existing members in the current
+              ledger. {formatCurrency(currentFees)} scheduled fees this month.
             </p>
           </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+        </AdminPanel>
+      </div>
+      <AdminPanel
+        title="Month by month"
+        note="Scheduled contributions and fees"
+        actions={
+          canOpenAdminRoute('/dashboard/member-data', privilegeCodes) && <Link className="admin-inline-link" href="/dashboard/member-data">
+            Member data
+            <ArrowUpRight size={15} />
+          </Link>
+        }
+      >
+        <div className="admin-table-scroll">
+          <table className="admin-table">
             <thead>
-              <tr className="border-b text-left text-[10px] uppercase tracking-[0.16em] text-muted-foreground" style={{ borderColor: 'rgb(var(--border))' }}>
-                <th className="px-6 py-3 font-semibold">Month</th>
-                <th className="px-6 py-3 font-semibold">Registrations</th>
-                <th className="px-6 py-3 font-semibold">New member</th>
-                <th className="px-6 py-3 font-semibold">Charges</th>
-                <th className="px-6 py-3 font-semibold">Fees</th>
-                <th className="px-6 py-3 font-semibold">Savings</th>
-                <th className="px-6 py-3 font-semibold">Voucher total</th>
+              <tr>
+                {[
+                  'Month',
+                  'Registrations',
+                  'New member fees',
+                  'Monthly charges',
+                  'Savings',
+                  'Voucher total',
+                ].map((label) => (
+                  <th key={label}>{label}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y" style={{ borderColor: 'rgb(var(--border))' }}>
+            <tbody>
               {trends.map((row) => (
-                <tr key={row.period} className="transition-colors hover:bg-surface-2">
-                  <td className="px-6 py-3.5 font-medium">{row.label}</td>
-                  <td className="px-6 py-3.5 text-muted-foreground">{row.registrations.toLocaleString('en-NG')}</td>
-                  <td className="px-6 py-3.5">{formatCurrency(row.newMemberFeeRevenue)}</td>
-                  <td className="px-6 py-3.5">{formatCurrency(row.chargeRevenue)}</td>
-                  <td className="px-6 py-3.5">{formatCurrency(row.voucherFees)}</td>
-                  <td className="px-6 py-3.5 text-muted-foreground">{formatCurrency(row.savingsBasis)}</td>
-                  <td className="px-6 py-3.5 font-semibold">{formatCurrency(row.voucherTotal)}</td>
+                <tr key={row.period}>
+                  <td>{row.label}</td>
+                  <td>{row.registrations}</td>
+                  <td>{formatCurrency(row.newMemberFeeRevenue)}</td>
+                  <td>{formatCurrency(row.chargeRevenue)}</td>
+                  <td>{formatCurrency(row.savingsBasis)}</td>
+                  <td>{formatCurrency(row.voucherTotal)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </section>
-    </div>
-  )
-}
-
-function MetricCard({
-  label,
-  value,
-  caption,
-  icon,
-  tone,
-}: {
-  label: string
-  value: string
-  caption: string
-  icon: ReactNode
-  tone: 'slate' | 'emerald' | 'indigo' | 'amber' | 'rose'
-}) {
-  const tones: Record<typeof tone, string> = {
-    slate: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
-    emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    indigo: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
-    amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-  }
-
-  return (
-    <div className="card card-hover p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="label-eyebrow">{label}</p>
-          <p className="mt-2 truncate text-2xl font-semibold tracking-tight">{value}</p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{caption}</p>
-        </div>
-        <div className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${tones[tone]}`}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SnapshotCard({
-  title,
-  subtitle,
-  rows,
-  newMembers,
-  oldMembers,
-  thriftSavings,
-  specialSavings,
-  fees,
-  footer,
-}: {
-  title: string
-  subtitle: string
-  rows: number
-  newMembers: number
-  oldMembers: number
-  thriftSavings: number
-  specialSavings: number
-  fees: number
-  footer: string
-}) {
-  return (
-    <section className="card p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="label-eyebrow">{subtitle}</p>
-          <h2 className="mt-1 text-base font-semibold tracking-tight">{title}</h2>
-        </div>
-        <div className="text-right">
-          <p className="label-eyebrow">Rows</p>
-          <p className="mt-1 text-xl font-semibold tracking-tight">{rows.toLocaleString('en-NG')}</p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <DetailStat label="New / Old" value={`${newMembers} / ${oldMembers}`} />
-        <DetailStat label="Fees" value={formatCurrency(fees)} />
-        <DetailStat label="Thrift" value={formatCurrency(thriftSavings)} />
-        <DetailStat label="Special" value={formatCurrency(specialSavings)} />
-      </div>
-      <p className="mt-4 text-xs text-muted-foreground">{footer}</p>
-    </section>
-  )
-}
-
-function DetailStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div
-      className="rounded-xl border bg-surface-2 px-4 py-3"
-      style={{ borderColor: 'rgb(var(--border))' }}
-    >
-      <p className="label-eyebrow">{label}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
+      </AdminPanel>
+      {canSwitchToMember && (
+        <Link href="/dashboard?view=member" className="admin-inline-link">
+          Switch to your member account
+          <ArrowUpRight size={15} />
+        </Link>
+      )}
     </div>
   )
 }

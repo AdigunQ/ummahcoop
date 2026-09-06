@@ -1,3 +1,12 @@
+import { SectionedForm } from '@/components/ui/sectioned-form'
+import { AdminHeading, AdminStats } from '@/components/admin/admin-ui'
+import {
+  DEPARTMENT_OPTIONS,
+  GRADE_LEVEL_OPTIONS,
+  ORGANIZATION_OPTIONS,
+  STATION_OPTIONS,
+} from '@/lib/profile-options'
+import { FormSelect } from '@/components/ui/smart-select'
 import Link from 'next/link'
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
@@ -42,7 +51,10 @@ function snapshotNumber(value: unknown): number {
 }
 
 function snapshotStaffId(value: unknown): string {
-  const raw = String(value ?? '').trim().replace(/\s+/g, '').toUpperCase()
+  const raw = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+    .toUpperCase()
   return /^\d+$/.test(raw) ? raw.padStart(6, '0') : raw
 }
 
@@ -51,7 +63,7 @@ function syncLatestSnapshotRows(
   previousStaffId: string,
   staffId: string,
   monthlyContribution: number,
-  specialContribution: number,
+  specialContribution: number
 ): Prisma.InputJsonValue {
   if (!Array.isArray(rows)) return rows as Prisma.InputJsonValue
 
@@ -89,7 +101,14 @@ async function updateMemberRecord(formData: FormData) {
   'use server'
 
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) redirect('/dashboard')
+  if (
+    !session?.user?.id ||
+    !(await canAccessWithPrivileges(
+      { id: session.user.id, role: session.user.role },
+      PRIVILEGE_CODES.EDIT_MEMBERS
+    ))
+  )
+    redirect('/dashboard')
 
   const memberId = String(formData.get('memberId') || '')
   const staffId = normalizeStaffId(String(formData.get('staffId') || ''))
@@ -204,7 +223,7 @@ async function updateMemberRecord(formData: FormData) {
               snapshotStaffId(existingMember.staffId),
               staffId,
               monthlyContribution,
-              specialContribution,
+              specialContribution
             ),
           },
         })
@@ -251,12 +270,19 @@ export default async function MemberProfileEditorPage({
 }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) redirect('/login')
-  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) redirect('/dashboard')
+  if (
+    !session.user.id ||
+    !(await canAccessWithPrivileges(
+      { id: session.user.id, role: session.user.role },
+      PRIVILEGE_CODES.EDIT_MEMBERS
+    ))
+  )
+    redirect('/dashboard')
   const isFullAdmin = session.user.role === 'ADMIN'
 
   const member = await prisma.user.findUnique({
     where: { id: params.memberId },
-      select: {
+    select: {
       id: true,
       name: true,
       staffId: true,
@@ -290,283 +316,303 @@ export default async function MemberProfileEditorPage({
   const saveError = mapSaveError(searchParams?.error)
 
   return (
-    <div className="animate-fadeIn space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Member Profile (Admin Edit)</h1>
-          <p className="mt-1 text-gray-500">Open any member profile and manually correct savings/loan records.</p>
-        </div>
-        <Link
-          href="/dashboard/directory"
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+    <div className="admin-page">
+      <AdminHeading
+        section="Members & data"
+        title={member.name || 'Member profile'}
+        description={`Staff ID ${member.staffId || 'Not assigned'} · Manage membership details and financial records.`}
+        actions={
+          <Link href="/dashboard/directory" className="btn-ghost">
+            Back to directory
+          </Link>
+        }
+      />
+      {justSaved && (
+        <div
+          role="status"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"
         >
-          Back to Directory
-        </Link>
-      </div>
-
-      {searchParams?.saved === '1' && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Saved changes for {member.name || 'member'}.
+          Changes saved for {member.name || 'this member'}.
         </div>
       )}
       {saveError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700"
+        >
           {saveError}
         </div>
       )}
-
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">{member.name || 'Unnamed Member'}</h2>
-        <div className="mt-4 grid grid-cols-1 gap-2 text-sm text-gray-600 md:grid-cols-2">
-          <p><span className="font-medium text-gray-800">Staff ID:</span> {member.staffId || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Department:</span> {member.department || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Savings Plan:</span> {member.savingsPlan || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Organization:</span> {member.organization || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Station:</span> {member.station || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Grade Level:</span> {member.gradeLevel || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Phone:</span> {member.phone || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Next of Kin:</span> {member.nextOfKinName || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Next of Kin Phone:</span> {member.nextOfKinPhone || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Next of Kin Email:</span> {member.nextOfKinEmail || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Relationship:</span> {member.nextOfKinRelationship || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Bank:</span> {member.bankName || 'N/A'} / {member.bankAccountNumber || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Account Name:</span> {member.bankAccountName || 'N/A'}</p>
-          <p><span className="font-medium text-gray-800">Current Savings:</span> {formatCurrency(member.balance)}</p>
-          <p><span className="font-medium text-gray-800">Current Special Savings:</span> {formatCurrency(member.specialBalance || 0)}</p>
-          <p><span className="font-medium text-gray-800">Original Loan Given:</span> {formatCurrency(financeSummary.loanCollected)}</p>
-          <p><span className="font-medium text-gray-800">Loan Paid So Far:</span> {formatCurrency(financeSummary.loanPaid)}</p>
-          <p><span className="font-medium text-gray-800">Loan Outstanding:</span> {formatCurrency(financeSummary.loanOutstanding)}</p>
-          <p><span className="font-medium text-gray-800">Original Commodity Cost:</span> {formatCurrency(financeSummary.commodityCollected)}</p>
-          <p><span className="font-medium text-gray-800">Commodity Paid So Far:</span> {formatCurrency(financeSummary.commodityPaid)}</p>
-          <p><span className="font-medium text-gray-800">Commodity Outstanding:</span> {formatCurrency(financeSummary.commodityOutstanding)}</p>
-          <p><span className="font-medium text-gray-800">Total Contributions:</span> {formatCurrency(member.totalContributions)}</p>
-          <p><span className="font-medium text-gray-800">Status:</span> {member.status}</p>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">Manual Correction</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Enter the original amounts given to the member. Monthly deductions are read from Member Data, then paid and outstanding amounts are calculated automatically.
-        </p>
-        <form action={updateMemberRecord} className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <input type="hidden" name="memberId" value={member.id} />
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Staff ID</label>
-            <input
-              name="staffId"
-              required
-              defaultValue={member.staffId || ''}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Department</label>
-            <input
-              name="department"
-              defaultValue={member.department || ''}
-              placeholder="e.g. Operations"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Savings Plan</label>
-            <select
-              name="savingsPlan"
-              defaultValue={member.savingsPlan || ''}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            >
-              <option value="">Not selected</option>
-              <option value="THRIFT">Thrift savings</option>
-              <option value="SPECIAL">Special savings</option>
-              <option value="BOTH">Thrift + Special</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Organization</label>
-            <input
-              name="organization"
-              defaultValue={member.organization || ''}
-              placeholder="e.g. FAAN"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Station</label>
-            <input
-              name="station"
-              defaultValue={member.station || ''}
-              placeholder="e.g. Lagos"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Staff Grade Level</label>
-            <input
-              name="gradeLevel"
-              defaultValue={member.gradeLevel || ''}
-              placeholder="e.g. 08"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <h3 className="border-b border-gray-100 pb-2 text-sm font-semibold text-gray-800">Next of Kin</h3>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
-            <input
-              name="nextOfKinName"
-              defaultValue={member.nextOfKinName || ''}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Phone number</label>
-            <input
-              name="nextOfKinPhone"
-              defaultValue={member.nextOfKinPhone || ''}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Email address</label>
-            <input
-              type="email"
-              name="nextOfKinEmail"
-              defaultValue={member.nextOfKinEmail || ''}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Relationship</label>
-            <input
-              name="nextOfKinRelationship"
-              defaultValue={member.nextOfKinRelationship || ''}
-              placeholder="e.g. Spouse"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Monthly Savings Amount</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              name="monthlyContribution"
-              defaultValue={member.monthlyContribution || 0}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Special Savings Amount</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              name="specialContribution"
-              defaultValue={member.specialContribution || 0}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Savings Balance</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              name="balance"
-              defaultValue={member.balance}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Special Savings Balance</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              name="specialBalance"
-              defaultValue={member.specialBalance || 0}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Original Loan Amount Given</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              name="loanPrincipal"
-              defaultValue={financeSummary.loanPrincipal}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">Do not enter the monthly deduction here.</p>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Original Commodity Cost</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              name="commodityPrincipal"
-              defaultValue={financeSummary.commodityPrincipal}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">Do not enter the monthly deduction here.</p>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Include in Voucher</label>
-            <select
-              name="voucherEnabled"
-              defaultValue={member.voucherEnabled ? 'true' : 'false'}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
-            >
-              <option value="true">Yes</option>
-              <option value="false">No</option>
-            </select>
-          </div>
-
-          <div className="md:col-span-2">
-            <button
-              type="submit"
-              className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors ${
-                justSaved ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-gray-900 hover:bg-black'
-              }`}
-            >
-              Save
-            </button>
-          </div>
-        </form>
-
-        {isFullAdmin && (
-        <div className="mt-6 border-t border-red-100 pt-5">
-          <p className="text-sm font-medium text-gray-800">Danger Zone</p>
-          <p className="mt-1 text-xs text-gray-500">Delete this member and all associated records.</p>
-          <form action={deleteMemberRecord} className="mt-3">
+      <AdminStats
+        items={[
+          {
+            label: 'Savings balance',
+            value: formatCurrency(member.balance + member.specialBalance),
+            note: `Thrift ${formatCurrency(member.balance)} · Special ${formatCurrency(member.specialBalance)}`,
+          },
+          {
+            label: 'Loan outstanding',
+            value: formatCurrency(financeSummary.loanOutstanding),
+            note: `${formatCurrency(financeSummary.loanPaid)} repaid of ${formatCurrency(financeSummary.loanCollected)}`,
+          },
+          {
+            label: 'Commodity outstanding',
+            value: formatCurrency(financeSummary.commodityOutstanding),
+            note: `${formatCurrency(financeSummary.commodityPaid)} repaid of ${formatCurrency(financeSummary.commodityCollected)}`,
+          },
+        ]}
+      />
+      <SectionedForm
+        key={member.id}
+        action={updateMemberRecord}
+        hiddenFields={<input type="hidden" name="memberId" value={member.id} />}
+        note="Review all amounts carefully. Saving updates this member's records."
+        sections={[
+          {
+            id: 'employment',
+            label: 'Membership & work',
+            description: 'Keep this member’s staff details and employment information current.',
+            content: (
+              <>
+                <EditField label="Staff ID" name="staffId" value={member.staffId || ''} required />
+                <EditChoice
+                  label="Organization"
+                  name="organization"
+                  value={member.organization || ''}
+                  options={ORGANIZATION_OPTIONS}
+                />
+                <EditChoice
+                  label="Department"
+                  name="department"
+                  value={member.department || ''}
+                  options={DEPARTMENT_OPTIONS}
+                />
+                <EditChoice
+                  label="Grade level"
+                  name="gradeLevel"
+                  value={member.gradeLevel || ''}
+                  options={GRADE_LEVEL_OPTIONS}
+                />
+                <div className="sm:col-span-2">
+                  <EditChoice
+                    label="Station"
+                    name="station"
+                    value={member.station || ''}
+                    options={STATION_OPTIONS}
+                  />
+                </div>
+              </>
+            ),
+          },
+          {
+            id: 'kin',
+            label: 'Next of kin',
+            description: 'The person the cooperative can contact on behalf of this member.',
+            content: (
+              <>
+                <EditField
+                  label="Full name"
+                  name="nextOfKinName"
+                  value={member.nextOfKinName || ''}
+                />
+                <EditField
+                  label="Relationship"
+                  name="nextOfKinRelationship"
+                  value={member.nextOfKinRelationship || ''}
+                />
+                <EditField
+                  label="Phone number"
+                  name="nextOfKinPhone"
+                  value={member.nextOfKinPhone || ''}
+                  type="tel"
+                />
+                <EditField
+                  label="Email address"
+                  name="nextOfKinEmail"
+                  value={member.nextOfKinEmail || ''}
+                  type="email"
+                />
+              </>
+            ),
+          },
+          {
+            id: 'savings',
+            label: 'Savings',
+            description:
+              'Contribution amounts are monthly deductions. Savings balances are the amounts already held for this member. These are different values.',
+            content: (
+              <>
+                <div className="sm:col-span-2">
+                  <label className="mb-2.5 block text-xs font-medium">Savings plan</label>
+                  <FormSelect
+                    name="savingsPlan"
+                    aria-label="Savings plan"
+                    defaultValue={member.savingsPlan || ''}
+                  >
+                    <option value="">Not selected</option>
+                    <option value="THRIFT">Thrift savings</option>
+                    <option value="SPECIAL">Special savings</option>
+                    <option value="BOTH">Thrift + Special</option>
+                  </FormSelect>
+                </div>
+                <EditField
+                  label="Monthly thrift contribution"
+                  name="monthlyContribution"
+                  value={member.monthlyContribution || 0}
+                  type="number"
+                />
+                <EditField
+                  label="Monthly special contribution"
+                  name="specialContribution"
+                  value={member.specialContribution || 0}
+                  type="number"
+                />
+                <EditField
+                  label="Thrift savings balance"
+                  name="balance"
+                  value={member.balance}
+                  type="number"
+                />
+                <EditField
+                  label="Special savings balance"
+                  name="specialBalance"
+                  value={member.specialBalance || 0}
+                  type="number"
+                />
+                <div className="sm:col-span-2">
+                  <label className="mb-2.5 block text-xs font-medium">Include in voucher</label>
+                  <FormSelect
+                    name="voucherEnabled"
+                    aria-label="Include in voucher"
+                    defaultValue={member.voucherEnabled ? 'true' : 'false'}
+                  >
+                    <option value="true">Yes, include this member</option>
+                    <option value="false">No, exclude this member</option>
+                  </FormSelect>
+                </div>
+              </>
+            ),
+          },
+          {
+            id: 'credit',
+            label: 'Loans & commodity',
+            description:
+              'Record the original loan amount or commodity cost here, not a monthly deduction. Repayments come from Member Data; outstanding balances are calculated automatically.',
+            content: (
+              <>
+                <EditField
+                  label="Original loan amount given"
+                  name="loanPrincipal"
+                  value={financeSummary.loanPrincipal}
+                  type="number"
+                />
+                <EditField
+                  label="Original commodity cost"
+                  name="commodityPrincipal"
+                  value={financeSummary.commodityPrincipal}
+                  type="number"
+                />
+                <div className="settings-note sm:col-span-2 !mt-0">
+                  Monthly loan and commodity deductions are managed in Member Data. Do not subtract
+                  repayments from the original amounts above.
+                </div>
+              </>
+            ),
+          },
+        ]}
+      />
+      <details className="card p-5">
+        <summary className="cursor-pointer text-sm font-medium">
+          Contact & payout details{' '}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">View only</span>
+        </summary>
+        <dl className="mt-5 grid gap-5 text-sm sm:grid-cols-2">
+          {[
+            ['Phone', member.phone],
+            ['Bank', member.bankName],
+            ['Account number', member.bankAccountNumber],
+            ['Account name', member.bankAccountName],
+            ['Total contributions', formatCurrency(member.totalContributions)],
+            ['Membership status', member.status],
+          ].map(([label, value]) => (
+            <div key={label || ''}>
+              <dt className="text-xs text-muted-foreground">{label}</dt>
+              <dd className="mt-1.5">{value || 'Not provided'}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+      {isFullAdmin && (
+        <details className="rounded-xl border border-rose-200 p-5">
+          <summary className="cursor-pointer text-sm font-medium text-rose-700">
+            Delete membership
+          </summary>
+          <p className="mt-3 text-xs leading-6 text-muted-foreground">
+            Permanently delete this member and all associated records. This cannot be undone.
+          </p>
+          <form action={deleteMemberRecord} className="mt-4">
             <input type="hidden" name="memberId" value={member.id} />
             <ConfirmDeleteButton memberName={member.name || 'this member'} />
           </form>
-        </div>
-        )}
-      </div>
+        </details>
+      )}
+    </div>
+  )
+}
+function EditField({
+  label,
+  name,
+  value,
+  type = 'text',
+  required = false,
+}: {
+  label: string
+  name: string
+  value: string | number
+  type?: string
+  required?: boolean
+}) {
+  return (
+    <div>
+      <label htmlFor={`member-${name}`} className="mb-2.5 block text-xs font-medium">
+        {label}
+      </label>
+      <input
+        id={`member-${name}`}
+        name={name}
+        defaultValue={value}
+        type={type}
+        min={type === 'number' ? 0 : undefined}
+        step={type === 'number' ? 1 : undefined}
+        required={required}
+        className="settings-input"
+      />
+    </div>
+  )
+}
+function EditChoice({
+  label,
+  name,
+  value,
+  options,
+}: {
+  label: string
+  name: string
+  value: string
+  options: readonly string[]
+}) {
+  return (
+    <div>
+      <p className="mb-2.5 text-xs font-medium">{label}</p>
+      <FormSelect name={name} aria-label={label} defaultValue={value}>
+        <option value="">Not provided</option>
+        {value && !options.includes(value) && <option value={value}>{value}</option>}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </FormSelect>
     </div>
   )
 }

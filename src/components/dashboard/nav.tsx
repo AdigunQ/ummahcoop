@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
@@ -24,6 +24,11 @@ import {
   ShieldAlert,
   Settings,
   LineChart,
+  ChevronRight,
+  Search,
+  ShieldCheck,
+  CircleUserRound,
+  CalendarDays,
 } from 'lucide-react'
 import { UmmahLogo } from '@/components/brand/ummah-logo'
 import { cn, getInitials } from '@/lib/utils'
@@ -38,8 +43,6 @@ interface NavProps {
     staffId?: string | null
     role: string
     status: string
-    balance: number
-    loanBalance: number
     privileges?: { code: string }[]
   }
   adminBadges?: {
@@ -64,23 +67,52 @@ const adminNavItems: NavItem[] = [
   { href: '/dashboard/analytics', label: 'Analytics', icon: LineChart, group: 'Main' },
 
   { href: '/dashboard/member-data', label: 'Member Data', icon: FileText, group: 'Members' },
-  { href: '/dashboard/directory', label: 'Update Member', icon: Users, group: 'Members' },
-  { href: '/dashboard/members', label: 'Approvals', icon: UserCheck, badge: 'pending', group: 'Members' },
-  { href: '/dashboard/import-members', label: 'Import Members', icon: ClipboardList, group: 'Members' },
+  { href: '/dashboard/directory', label: 'Member directory', icon: Users, group: 'Members' },
+  {
+    href: '/dashboard/members',
+    label: 'Approvals',
+    icon: UserCheck,
+    badge: 'pending',
+    group: 'Members',
+  },
+  {
+    href: '/dashboard/import-members',
+    label: 'Import Members',
+    icon: ClipboardList,
+    group: 'Members',
+  },
   { href: '/dashboard/admin-access', label: 'Admin Access', icon: ShieldAlert, group: 'Members' },
 
-  { href: '/dashboard/payments', label: 'Payments', icon: ReceiptText, badge: 'payments', group: 'Operations' },
+  {
+    href: '/dashboard/payments',
+    label: 'Payments',
+    icon: ReceiptText,
+    badge: 'payments',
+    group: 'Operations',
+  },
   { href: '/dashboard/withdrawals', label: 'Withdrawals', icon: ArrowDownUp, group: 'Operations' },
   { href: '/dashboard/commodity', label: 'Commodity', icon: ShoppingBag, group: 'Operations' },
-  { href: '/dashboard/loans', label: 'Loans', icon: HandCoins, badge: 'loans', group: 'Operations' },
+  {
+    href: '/dashboard/loans',
+    label: 'Loans',
+    icon: HandCoins,
+    badge: 'loans',
+    group: 'Operations',
+  },
 
   { href: '/dashboard/vouchers', label: 'Reports', icon: ScrollText, group: 'Finance' },
-  { href: '/dashboard/finance-report', label: 'Monthly Report', icon: ClipboardList, group: 'Finance' },
+  {
+    href: '/dashboard/finance-report',
+    label: 'Monthly Report',
+    icon: ClipboardList,
+    group: 'Finance',
+  },
   { href: '/dashboard/transactions', label: 'Transactions', icon: List, group: 'Finance' },
+  { href: '/dashboard/month-end', label: 'Month end', icon: CalendarDays, group: 'Finance' },
 ]
 
 const memberNavItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'Account' },
+  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, group: 'Account' },
   { href: '/dashboard/profile', label: 'Profile', icon: Settings, group: 'Account' },
 
   { href: '/dashboard/apply-loan', label: 'Apply for loan', icon: HandCoins, group: 'Actions' },
@@ -92,19 +124,100 @@ const memberNavItems: NavItem[] = [
 ]
 
 const privilegedNavItems: Array<NavItem & { privilege: PrivilegeCode }> = [
-  { privilege: PRIVILEGE_CODES.VIEW_ANALYTICS, href: '/dashboard/analytics', label: 'Analytics', icon: LineChart, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.VIEW_MEMBER_DATA, href: '/dashboard/member-data', label: 'Member Data', icon: FileText, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.EDIT_MEMBERS, href: '/dashboard/directory', label: 'Update Member', icon: Users, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.APPROVE_MEMBERS, href: '/dashboard/members', label: 'Approvals', icon: UserCheck, badge: 'pending', group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.IMPORT_MEMBERS, href: '/dashboard/import-members', label: 'Import Members', icon: ClipboardList, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.REVIEW_PAYMENTS, href: '/dashboard/payments', label: 'Payments', icon: ReceiptText, badge: 'payments', group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.REVIEW_WITHDRAWALS, href: '/dashboard/withdrawals', label: 'Withdrawals', icon: ArrowDownUp, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.REVIEW_COMMODITY, href: '/dashboard/commodity?review=true', label: 'Commodity', icon: ShoppingBag, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.REVIEW_LOANS, href: '/dashboard/loans', label: 'Loans', icon: HandCoins, badge: 'loans', group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/vouchers', label: 'Reports', icon: ScrollText, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/finance-report', label: 'Monthly Report', icon: ClipboardList, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.VIEW_FINANCE, href: '/dashboard/transactions', label: 'Transactions', icon: List, group: 'Granted access' },
-  { privilege: PRIVILEGE_CODES.MANAGE_ACCESS, href: '/dashboard/admin-access', label: 'Admin Access', icon: ShieldAlert, group: 'Granted access' },
+  {
+    privilege: PRIVILEGE_CODES.VIEW_ANALYTICS,
+    href: '/dashboard/analytics',
+    label: 'Analytics',
+    icon: LineChart,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.VIEW_MEMBER_DATA,
+    href: '/dashboard/member-data',
+    label: 'Member Data',
+    icon: FileText,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.EDIT_MEMBERS,
+    href: '/dashboard/directory',
+    label: 'Member directory',
+    icon: Users,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.APPROVE_MEMBERS,
+    href: '/dashboard/members',
+    label: 'Approvals',
+    icon: UserCheck,
+    badge: 'pending',
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.IMPORT_MEMBERS,
+    href: '/dashboard/import-members',
+    label: 'Import Members',
+    icon: ClipboardList,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.REVIEW_PAYMENTS,
+    href: '/dashboard/payments',
+    label: 'Payments',
+    icon: ReceiptText,
+    badge: 'payments',
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.REVIEW_WITHDRAWALS,
+    href: '/dashboard/withdrawals',
+    label: 'Withdrawals',
+    icon: ArrowDownUp,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.REVIEW_COMMODITY,
+    href: '/dashboard/commodity?review=true',
+    label: 'Commodity',
+    icon: ShoppingBag,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.REVIEW_LOANS,
+    href: '/dashboard/loans',
+    label: 'Loans',
+    icon: HandCoins,
+    badge: 'loans',
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.VIEW_FINANCE,
+    href: '/dashboard/vouchers',
+    label: 'Reports',
+    icon: ScrollText,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.VIEW_FINANCE,
+    href: '/dashboard/finance-report',
+    label: 'Monthly Report',
+    icon: ClipboardList,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.VIEW_FINANCE,
+    href: '/dashboard/transactions',
+    label: 'Transactions',
+    icon: List,
+    group: 'Administration',
+  },
+  {
+    privilege: PRIVILEGE_CODES.MANAGE_ACCESS,
+    href: '/dashboard/admin-access',
+    label: 'Admin Access',
+    icon: ShieldAlert,
+    group: 'Administration',
+  },
 ]
 
 function isGeneratedMemberEmail(email: string, staffId?: string | null) {
@@ -124,235 +237,301 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  const privilegeCodes = new Set((user.privileges || []).map((privilege) => privilege.code))
-  const hasGrantedAccess = privilegeCodes.size > 0
-  const isMemberView = searchParams.get('view') === 'member'
-  const specialItems = user.role === 'ADMIN'
-    ? []
-    : privilegedNavItems.filter((item, index, list) => privilegeCodes.has(item.privilege) && list.findIndex((candidate) => candidate.href === item.href) === index)
-  const privilegedAdminItems: NavItem[] = [
-    { href: '/dashboard', label: 'Admin overview', icon: LayoutDashboard, group: 'Admin' },
-    ...specialItems,
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const sidebar = useRef<HTMLElement>(null)
+  const privilegeCodes = new Set((user.privileges || []).map((p) => p.code))
+  const hasGrantedAccess = user.role === 'MEMBER' && privilegeCodes.size > 0
+  const personalRoutes = [
+    '/dashboard/profile',
+    '/dashboard/apply-loan',
+    '/dashboard/my-loans',
+    '/dashboard/history',
+    '/dashboard/delete-account',
   ]
-  const navItems = user.role === 'ADMIN'
-    ? adminNavItems
-      : hasGrantedAccess && !isMemberView
-      ? privilegedAdminItems
-      : memberNavItems
+  const isMemberView =
+    user.role === 'MEMBER' &&
+    (!hasGrantedAccess ||
+      searchParams.get('view') === 'member' ||
+      personalRoutes.includes(pathname) ||
+      (pathname === '/dashboard/commodity' && searchParams.get('review') !== 'true'))
+  const specialItems = privilegedNavItems.filter((item) => privilegeCodes.has(item.privilege))
+  const navItems =
+    user.role === 'ADMIN'
+      ? adminNavItems
+      : isMemberView
+        ? memberNavItems
+        : [
+            { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, group: 'Workspace' },
+            ...specialItems,
+          ]
   const badgeCounts = {
     pending: adminBadges?.pendingMembers ?? 0,
     payments: adminBadges?.pendingPayments ?? 0,
     loans: adminBadges?.pendingLoans ?? 0,
-  } as const
-  const displayEmail = user.role === 'MEMBER' && isGeneratedMemberEmail(user.email, user.staffId)
-    ? 'Email not set'
-    : user.email
-
-  // group items
-  const groups = navItems.reduce<Record<string, NavItem[]>>((acc, item) => {
-    const key = item.group || 'Main'
-    acc[key] = acc[key] || []
-    acc[key].push(item)
+  }
+  const adminGroups: Record<string, string> = {
+    '/dashboard': 'Workspace',
+    '/dashboard/analytics': 'Workspace',
+    '/dashboard/member-data': 'Members & data',
+    '/dashboard/directory': 'Members & data',
+    '/dashboard/members': 'Members & data',
+    '/dashboard/import-members': 'Members & data',
+    '/dashboard/payments': 'Requests',
+    '/dashboard/withdrawals': 'Requests',
+    '/dashboard/commodity': 'Requests',
+    '/dashboard/loans': 'Requests',
+    '/dashboard/vouchers': 'Finance',
+    '/dashboard/finance-report': 'Finance',
+    '/dashboard/transactions': 'Finance',
+    '/dashboard/month-end': 'Finance',
+    '/dashboard/admin-access': 'Settings',
+  }
+  const groupedItems = isMemberView
+    ? navItems
+    : navItems.map((item) => ({
+        ...item,
+        group: adminGroups[item.href.split('?')[0]] || 'Settings',
+      }))
+  const groups = groupedItems.reduce<Record<string, NavItem[]>>((acc, item) => {
+    ;(acc[item.group || 'Workspace'] ||= []).push(item)
     return acc
   }, {})
+  const currentItem = navItems.find((item) => pathname === item.href.split('?')[0])
+  const pageName =
+    currentItem?.label || (pathname.includes('/directory/') ? 'Member profile' : 'Account')
+  const canFindMember =
+    user.role === 'ADMIN' || (!isMemberView && privilegeCodes.has(PRIVILEGE_CODES.EDIT_MEMBERS))
+  const memberHref = (href: string) =>
+    hasGrantedAccess && isMemberView ? `${href}${href.includes('?') ? '&' : '?'}view=member` : href
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname, searchParams])
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1024px)')
+    const closeOnDesktop = () => { if (desktop.matches) setIsMobileMenuOpen(false) }
+    desktop.addEventListener('change', closeOnDesktop)
+    return () => desktop.removeEventListener('change', closeOnDesktop)
+  }, [])
+  useEffect(() => {
+    if (!isMobileMenuOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const links = sidebar.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')
+    links?.[0]?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false)
+        menuButton.current?.focus()
+      }
+      if (event.key === 'Tab' && links?.length) {
+        const first = links[0],
+          last = links[links.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        }
+        if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [isMobileMenuOpen])
 
   return (
     <>
-      {/* Mobile top bar */}
-      <div
-        className="fixed inset-x-0 top-0 z-30 flex items-center justify-between border-b bg-background/80 px-4 py-3 backdrop-blur-md lg:hidden"
-        style={{ borderColor: 'rgb(var(--border))' }}
+      <a href="#workspace-content" className="skip-link">
+        Skip to content
+      </a>
+      <header
+        className="workspace-topbar no-print"
+        data-workspace={isMemberView ? 'member' : 'admin'}
       >
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <UmmahLogo
-            markClassName="h-8 w-8"
-            textClassName="text-sm text-foreground"
-            compactText
-          />
-        </Link>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
+        <div className="flex min-w-0 items-center gap-3">
           <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            ref={menuButton}
+            type="button"
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="Open navigation"
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="workspace-navigation"
             data-testid="mobile-menu-toggle"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-surface"
-            style={{ borderColor: 'rgb(var(--border))' }}
+            className="rounded-lg border bg-surface p-2 lg:hidden"
           >
-            {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            {isMemberView ? 'My account' : 'Administration'}
+          </span>
+          <ChevronRight className="hidden h-3 w-3 text-muted-foreground sm:inline" />
+          <span className="truncate text-sm font-medium">{pageName}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {canFindMember && (
+            <Link
+              href="/dashboard/directory"
+              className="hidden items-center gap-2 rounded-lg border bg-surface px-3 py-2 text-xs text-muted-foreground md:flex"
+            >
+              <Search className="h-3.5 w-3.5" /> Find a member
+            </Link>
+          )}
+          <ThemeToggle data-testid="sidebar-theme-toggle" />
+          <span className="hidden h-6 border-l sm:inline" />
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
+              {getInitials(user.name)}
+            </span>
+            <div className="hidden sm:block">
+              <p className="max-w-[140px] truncate text-xs font-semibold">
+                {user.name || 'Administrator'}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {isMemberView ? `Staff ID ${user.staffId || 'not set'}` : 'Admin workspace'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
+      {isMobileMenuOpen && (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Close navigation"
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 z-30 bg-black/35 backdrop-blur-[2px] lg:hidden"
+        />
+      )}
+      <aside
+        ref={sidebar}
+        id="workspace-navigation"
+        data-workspace={isMemberView ? 'member' : 'admin'}
+        className={cn(
+          'workspace-sidebar transition-transform duration-200',
+          isMobileMenuOpen
+            ? 'translate-x-0'
+            : 'invisible -translate-x-full lg:visible lg:translate-x-0'
+        )}
+      >
+        <div className="flex h-[88px] shrink-0 items-center justify-between px-6">
+          <Link href={memberHref('/dashboard')} aria-label="Ummah Coop overview">
+            <UmmahLogo compactText markClassName="h-9 w-9" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setIsMobileMenuOpen(false)
+              menuButton.current?.focus()
+            }}
+            aria-label="Close navigation"
+            className="rounded-lg p-2 lg:hidden"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
-      </div>
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          'fixed top-0 left-0 z-40 h-screen w-72 border-r bg-surface transition-transform duration-300 ease-out',
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        )}
-        style={{ borderColor: 'rgb(var(--border))' }}
-      >
-        <div className="flex h-full flex-col">
-          {/* Brand */}
-          <div className="flex items-center justify-between border-b px-5 py-5" style={{ borderColor: 'rgb(var(--border))' }}>
-            <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setIsMobileMenuOpen(false)}>
-              <UmmahLogo
-                markClassName="h-9 w-9"
-                textClassName="text-foreground"
-                compactText
-              />
-            </Link>
-            <ThemeToggle data-testid="sidebar-theme-toggle" />
-          </div>
-
-          {/* User summary (member) */}
-          {user.role === 'MEMBER' && (
-            <div className="border-b px-4 py-4" style={{ borderColor: 'rgb(var(--border))' }}>
-              <div
-                className="flex items-center gap-3 rounded-xl border bg-surface-2 p-3"
-                style={{ borderColor: 'rgb(var(--border))' }}
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/15 text-sm font-semibold text-accent">
-                  {getInitials(user.name)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{user.name || 'Member'}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">{displayEmail}</p>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div
-                  className="rounded-lg border bg-surface px-3 py-2.5"
-                  style={{ borderColor: 'rgb(var(--border))' }}
-                >
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Savings</p>
-                  <p className="mt-0.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                    ₦{user.balance.toLocaleString()}
-                  </p>
-                </div>
-                <div
-                  className="rounded-lg border bg-surface px-3 py-2.5"
-                  style={{ borderColor: 'rgb(var(--border))' }}
-                >
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Loan</p>
-                  <p
-                    className={`mt-0.5 text-sm font-semibold ${
-                      user.loanBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'
-                    }`}
-                  >
-                    ₦{user.loanBalance.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              {hasGrantedAccess && (
-                <Link
-                  href={isMemberView ? '/dashboard' : '/dashboard?view=member'}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="mt-3 flex items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
-                  style={{ borderColor: 'rgb(var(--border))' }}
-                >
-                  {isMemberView ? 'Switch to admin view' : 'Switch to member view'}
-                </Link>
+        {hasGrantedAccess ? (
+          <div
+            className="mx-4 mb-4 grid grid-cols-2 rounded-xl bg-surface-2 p-1"
+            aria-label="Switch workspace"
+          >
+            <Link
+              href="/dashboard?view=member"
+              data-testid="switch-to-member-view"
+              aria-current={isMemberView ? 'page' : undefined}
+              className={cn(
+                'flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-medium',
+                isMemberView ? 'bg-surface text-accent shadow-sm' : 'text-muted-foreground'
               )}
-            </div>
-          )}
-
-          {/* Nav */}
-          <nav className="flex-1 overflow-y-auto px-3 py-4">
-            {Object.entries(groups).map(([groupName, items]) => (
-              <div key={groupName} className="mb-5">
-                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {groupName}
+            >
+              <CircleUserRound className="h-3.5 w-3.5" /> Member
+            </Link>
+            <Link
+              href="/dashboard"
+              data-testid="switch-to-admin-view"
+              aria-current={!isMemberView ? 'page' : undefined}
+              className={cn(
+                'flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-medium',
+                !isMemberView ? 'bg-surface text-accent shadow-sm' : 'text-muted-foreground'
+              )}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> Admin
+            </Link>
+          </div>
+        ) : (
+          <div className="mx-6 mb-6 flex items-center gap-2 text-xs font-semibold normal-case tracking-normal text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            {isMemberView ? 'Member space' : 'Administration'}
+          </div>
+        )}
+        <nav
+          aria-label={isMemberView ? 'Member navigation' : 'Admin navigation'}
+          className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-6"
+        >
+          {Object.entries(groups)
+            .sort(([a], [b]) =>
+              isMemberView
+                ? 0
+                : ['Workspace', 'Members & data', 'Requests', 'Finance', 'Settings'].indexOf(a) -
+                  ['Workspace', 'Members & data', 'Requests', 'Finance', 'Settings'].indexOf(b)
+            )
+            .map(([group, items]) => (
+              <div key={group}>
+                <p className="mb-2 px-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">
+                  {group}
                 </p>
                 <div className="space-y-0.5">
-                  {items.map((item) => {
-                    const href = item.href === '/dashboard' && isMemberView ? '/dashboard?view=member' : item.href
-                    const active = pathname === item.href && (!isMemberView || item.href === '/dashboard')
+                  {items.map(({ href, label, icon: Icon, badge }) => {
+                    const active =
+                      pathname === href.split('?')[0] ||
+                      (href.includes('/directory') && pathname.startsWith('/dashboard/directory/'))
                     return (
                       <Link
-                        key={item.href}
-                        href={href}
-                        data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={cn(
-                          'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-                          active
-                            ? 'bg-accent/10 text-accent'
-                            : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'
-                        )}
+                        key={href}
+                        href={memberHref(href)}
+                        aria-current={active ? 'page' : undefined}
+                        className={cn('nav-item', active && 'active')}
+                        data-testid={`nav-${href.split('/').pop()?.split('?')[0]}`}
                       >
-                        {active && (
-                          <span className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-accent" />
-                        )}
-                        <item.icon className="h-4 w-4 flex-none" />
-                        <span className="flex-1 truncate">{item.label}</span>
-                        {(user.role === 'ADMIN' || hasGrantedAccess) && item.badge && badgeCounts[item.badge] > 0 && (
-                          <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500/15 px-1.5 text-[10px] font-bold text-rose-600 dark:text-rose-400">
-                            {badgeCounts[item.badge]}
+                        <Icon className="h-[18px] w-[18px] shrink-0" />
+                        <span className="flex-1">{label}</span>
+                        {badge && badgeCounts[badge] > 0 && (
+                          <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-xs font-semibold text-accent">
+                            {badgeCounts[badge]}
                           </span>
                         )}
+                        {active && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
                       </Link>
                     )
                   })}
                 </div>
               </div>
             ))}
-          </nav>
-
-          {/* Footer */}
-          <div className="border-t p-4" style={{ borderColor: 'rgb(var(--border))' }}>
-            {user.role !== 'MEMBER' && (
-              <div
-                className="mb-3 flex items-center gap-3 rounded-xl border bg-surface-2 p-3"
-                style={{ borderColor: 'rgb(var(--border))' }}
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-sm font-semibold text-accent">
-                  {getInitials(user.name)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{user.name || user.email}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">{user.role}</p>
-                </div>
-              </div>
-            )}
-
-            {user.role === 'MEMBER' && (
-              <Link
-                href="/dashboard/delete-account"
-                onClick={() => setIsMobileMenuOpen(false)}
-                data-testid="nav-delete-account"
-                className={cn(
-                  'mb-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                  pathname === '/dashboard/delete-account'
-                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                    : 'text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400'
-                )}
-              >
-                <ShieldAlert className="h-4 w-4" />
-                <span>Close account</span>
-              </Link>
-            )}
-
-            <button
-              onClick={() => signOut({ callbackUrl: '/login' })}
-              data-testid="nav-sign-out"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400"
+        </nav>
+        <div className="shrink-0 border-t p-4">
+          {isMemberView && (
+            <Link
+              href="/dashboard/delete-account"
+              className="nav-item !text-xs"
+              data-testid="nav-delete-account"
             >
-              <LogOut className="h-4 w-4" />
-              <span>Sign out</span>
-            </button>
-          </div>
+              <ShieldAlert className="h-4 w-4" /> Membership closure
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            data-testid="nav-sign-out"
+            className="nav-item w-full"
+          >
+            <LogOut className="h-4 w-4" /> Sign out
+          </button>
         </div>
       </aside>
-
-      {/* Mobile overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
     </>
   )
 }

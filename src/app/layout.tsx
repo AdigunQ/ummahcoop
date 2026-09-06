@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Source_Sans_3 } from 'next/font/google'
 import './globals.css'
+import './admin-workspace.css'
+import './auth-pages.css'
 import { Providers } from '@/components/providers'
 import { Toaster } from 'react-hot-toast'
 
-const inter = Inter({
+const sans = Source_Sans_3({
   subsets: ['latin'],
-  variable: '--font-inter',
+  weight: ['400', '700'],
+  variable: '--font-body',
   display: 'swap',
 })
 
@@ -23,20 +26,15 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f9fc' },
-    { media: '(prefers-color-scheme: dark)', color: '#080c16' },
+    { media: '(prefers-color-scheme: light)', color: '#f6f7f2' },
+    { media: '(prefers-color-scheme: dark)', color: '#111c18' },
   ],
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang="en" suppressHydrationWarning className={sans.variable}>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -53,11 +51,12 @@ export default function RootLayout({
               duration: 4000,
               className: 'toast-custom',
               style: {
-                background: 'rgb(17 23 38)',
-                color: '#f1f5f9',
-                border: '1px solid rgb(36 47 70)',
+                background: 'rgb(var(--surface))',
+                color: 'rgb(var(--fg))',
+                border: '1px solid rgb(var(--border))',
                 borderRadius: '12px',
-                fontSize: '13px',
+                fontSize: '1.0625rem',
+                lineHeight: 1.5,
                 fontWeight: 500,
                 padding: '12px 14px',
               },

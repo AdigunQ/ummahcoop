@@ -1,3 +1,4 @@
+import { FormSelect } from '@/components/ui/smart-select'
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -8,7 +9,11 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 function resolveBank(
   useProfileBank: boolean,
   formData: FormData,
-  profile: { bankName: string | null; bankAccountNumber: string | null; bankAccountName: string | null }
+  profile: {
+    bankName: string | null
+    bankAccountNumber: string | null
+    bankAccountName: string | null
+  }
 ) {
   if (useProfileBank) {
     if (!profile.bankName || !profile.bankAccountNumber || !profile.bankAccountName) return null
@@ -119,8 +124,8 @@ export default async function DeleteAccountPage() {
   return (
     <div className="animate-fadeIn space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Close Account</h1>
-        <p className="mt-1 text-gray-500">
+        <h1 className="page-title">Close Account</h1>
+        <p className="mt-1 text-muted-foreground">
           Request full membership withdrawal. You must clear all outstanding loans first.
         </p>
       </div>
@@ -135,10 +140,11 @@ export default async function DeleteAccountPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Closure Request Form</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Current savings balance: {formatCurrency(member.balance)} · Outstanding loan: {formatCurrency(member.loanBalance)}
+        <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Closure Request Form</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Current savings balance: {formatCurrency(member.balance)} · Outstanding loan:{' '}
+            {formatCurrency(member.loanBalance)}
           </p>
           {outstandingLoan && (
             <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -153,65 +159,74 @@ export default async function DeleteAccountPage() {
 
           <form action={requestAccountClosure} className="mt-6 space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Payout Account Choice</label>
-              <select
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Payout Account Choice
+              </label>
+              <FormSelect
+                aria-label="Use Profile Bank"
                 name="useProfileBank"
                 defaultValue="yes"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+                className="min-w-40 w-full"
                 disabled={outstandingLoan || hasPendingClosure}
               >
                 <option value="yes">Use profile bank account</option>
                 <option value="no">Enter a new payout account</option>
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Profile bank: {member.bankName || 'N/A'} / {member.bankAccountNumber || 'N/A'} / {member.bankAccountName || 'N/A'}
+              </FormSelect>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Profile bank: {member.bankName || 'N/A'} / {member.bankAccountNumber || 'N/A'} /{' '}
+                {member.bankAccountName || 'N/A'}
               </p>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <input
+                aria-label="Payout Bank Name"
                 name="payoutBankName"
                 type="text"
                 placeholder="New bank name"
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+                className="rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
                 disabled={outstandingLoan || hasPendingClosure}
               />
               <input
+                aria-label="Payout Account Number"
                 name="payoutAccountNumber"
                 type="text"
                 placeholder="New account number"
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+                className="rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
                 disabled={outstandingLoan || hasPendingClosure}
               />
               <input
+                aria-label="Payout Account Name"
                 name="payoutAccountName"
                 type="text"
                 placeholder="New account name"
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+                className="rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
                 disabled={outstandingLoan || hasPendingClosure}
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Reason</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Reason</label>
               <textarea
+                aria-label="Reason"
                 name="reason"
                 rows={3}
                 placeholder="Optional reason for account closure"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
                 disabled={outstandingLoan || hasPendingClosure}
               />
             </div>
 
-            <label className="flex items-start gap-2 text-sm text-gray-700">
+            <label className="flex items-start gap-2 text-sm text-foreground">
               <input
                 type="checkbox"
                 name="consent"
                 value="yes"
-                className="mt-1 h-4 w-4 rounded border-gray-300"
+                className="mt-1 h-4 w-4 rounded border-border"
                 disabled={outstandingLoan || hasPendingClosure}
               />
-              I consent to full membership withdrawal, understand the up-to-3-month settlement timeline, and confirm my payout bank details are correct.
+              I consent to full membership withdrawal, understand the up-to-3-month settlement
+              timeline, and confirm my payout bank details are correct.
             </label>
 
             <button
@@ -224,23 +239,37 @@ export default async function DeleteAccountPage() {
           </form>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Closure Request History</h2>
+        <div className="rounded-xl border border-border bg-surface shadow-sm">
+          <div className="border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-foreground">Closure Request History</h2>
           </div>
           {member.withdrawals.length === 0 ? (
-            <div className="px-6 py-8 text-center text-gray-500">No account closure request yet.</div>
+            <div className="px-6 py-8 text-center text-muted-foreground">
+              No account closure request yet.
+            </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-border">
               {member.withdrawals.map((row) => (
                 <div key={row.id} className="px-6 py-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(row.requestedAmount)}</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatCurrency(row.requestedAmount)}
+                    </p>
                     <StatusBadge status={row.status} />
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">Requested: {formatDateTime(row.requestedAt)}</p>
-                  {row.reviewedAt && <p className="text-xs text-gray-500">Reviewed: {formatDateTime(row.reviewedAt)}</p>}
-                  {row.closureDate && <p className="text-xs text-gray-500">Settlement target date: {formatDateTime(row.closureDate)}</p>}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Requested: {formatDateTime(row.requestedAt)}
+                  </p>
+                  {row.reviewedAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Reviewed: {formatDateTime(row.reviewedAt)}
+                    </p>
+                  )}
+                  {row.closureDate && (
+                    <p className="text-xs text-muted-foreground">
+                      Settlement target date: {formatDateTime(row.closureDate)}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -258,7 +287,9 @@ function StatusBadge({ status }: { status: string }) {
     REJECTED: 'bg-red-100 text-red-800',
   }
   return (
-    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-700'}`}>
+    <span
+      className={`rounded-full px-2 py-1 text-xs font-semibold ${styles[status as keyof typeof styles] || 'bg-surface-2 text-foreground'}`}
+    >
       {status}
     </span>
   )

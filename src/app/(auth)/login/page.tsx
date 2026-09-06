@@ -5,17 +5,8 @@ import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Hash,
-  Loader2,
-  Lock,
-  ShieldCheck,
-} from 'lucide-react'
-import { UmmahLogo } from '@/components/brand/ummah-logo'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { ArrowRight, Eye, EyeOff, Hash, Loader2, Lock } from 'lucide-react'
+import { AuthShell } from '@/components/public/auth-shell'
 
 function getLoginErrorMessage(error?: string | null) {
   if (!error || error === 'undefined') {
@@ -54,6 +45,7 @@ export default function LoginPage() {
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (isLoading) return
     setIdentifierError(null)
     setPasswordError(null)
 
@@ -98,179 +90,122 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      {/* Ambient background */}
-      <div className="pointer-events-none absolute inset-0 grid-pattern opacity-[0.35] dark:opacity-[0.18]" />
-      <div className="pointer-events-none absolute inset-0 glow-radial" />
-
-      {/* Top bar */}
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6 lg:px-10">
-        <Link href="/" className="flex items-center gap-3" data-testid="login-back-home">
-          <UmmahLogo
-            markClassName="h-9 w-9"
-            textClassName="text-foreground"
-            compactText
-          />
-        </Link>
-        <ThemeToggle data-testid="login-theme-toggle" />
-      </header>
-
-      <section className="relative z-10 mx-auto grid min-h-[calc(100vh-6rem)] w-full max-w-6xl gap-12 px-6 pb-12 lg:grid-cols-[1fr_1fr] lg:items-center lg:px-10">
-        {/* Left — brand panel */}
-        <div className="hidden lg:block">
-          <div
-            className="inline-flex items-center gap-2 rounded-full border bg-surface px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground"
-            style={{ borderColor: 'rgb(var(--border))' }}
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-            Secure access
-          </div>
-
-          <h1 className="mt-6 text-5xl font-semibold tracking-[-0.02em] leading-[1.05]">
-            Welcome back.
-            <br />
-            <span className="text-muted-foreground">Continue managing your cooperative.</span>
-          </h1>
-
-          <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-            Sign in to view your thrift savings, special contributions, loan history,
-            and submit new requests — all from one quiet dashboard.
-          </p>
-
-          <div className="mt-12 space-y-4">
-            {[
-              { label: 'Encrypted credentials', detail: 'bcrypt hashed & session-secured' },
-              { label: 'Member-only routes', detail: 'admin approval required to access' },
-              { label: 'Audit-ready records', detail: 'every transaction is logged' },
-            ].map((item) => (
-              <div key={item.label} className="flex items-start gap-3">
-                <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-md bg-accent/10 text-accent">
-                  <Lock className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">{item.label}</p>
-                  <p className="text-xs text-muted-foreground">{item.detail}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right — form card */}
-        <div className="w-full">
-          <div className="card mx-auto w-full max-w-md p-7 sm:p-9">
-            <div className="mb-7">
-              <p className="label-eyebrow">Member portal</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight">Sign in to your account</h2>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                Use your Staff ID and password to continue.
+    <AuthShell>
+      <div className="auth-form-heading">
+        <h1>Welcome back.</h1>
+        <p>Sign in with your Staff ID and password.</p>
+      </div>
+      <form onSubmit={onSubmit} noValidate>
+        <fieldset disabled={isLoading} className="space-y-5">
+          <div>
+            <label htmlFor="identifier" className="mb-2 block text-sm font-medium text-foreground">
+              Staff ID
+            </label>
+            <div className="relative">
+              <Hash className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="identifier"
+                data-testid="login-identifier-input"
+                type="text"
+                name="identifier"
+                placeholder="e.g. 009709"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                autoComplete="username"
+                spellCheck={false}
+                required
+                aria-invalid={!!identifierError}
+                aria-describedby={identifierError ? 'identifier-error' : undefined}
+                className="input-base pl-10"
+              />
+            </div>
+            {identifierError && (
+              <p
+                className="mt-1.5 text-xs font-medium text-rose-500"
+                data-testid="login-identifier-error"
+                id="identifier-error"
+                role="alert"
+              >
+                {identifierError}
               </p>
-            </div>
-
-            <form onSubmit={onSubmit} className="space-y-5" noValidate>
-              <div>
-                <label htmlFor="identifier" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Staff ID
-                </label>
-                <div className="relative">
-                  <Hash className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    id="identifier"
-                    data-testid="login-identifier-input"
-                    type="text"
-                    name="identifier"
-                    placeholder="e.g. OPS-1042"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    autoComplete="username"
-                    spellCheck={false}
-                    required
-                    className="input-base pl-10"
-                  />
-                </div>
-                {identifierError && (
-                  <p className="mt-1.5 text-xs font-medium text-rose-500" data-testid="login-identifier-error">{identifierError}</p>
-                )}
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Password
-                  </label>
-                </div>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    id="password"
-                    data-testid="login-password-input"
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    placeholder="Your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    required
-                    className="input-base pl-10 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    data-testid="login-password-toggle"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {passwordError && (
-                  <p className="mt-1.5 text-xs font-medium text-rose-500" data-testid="login-password-error">{passwordError}</p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                data-testid="login-submit-button"
-                disabled={isLoading}
-                className="btn-primary w-full !py-3.5"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Signing in…
-                  </>
-                ) : (
-                  <>
-                    Sign in
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className="mt-6 flex items-center gap-4">
-              <span className="h-px flex-1 bg-border" />
-              <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">or</span>
-              <span className="h-px flex-1 bg-border" />
-            </div>
-
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              New to the cooperative?{' '}
-              <Link
-                href="/register"
-                data-testid="login-register-link"
-                className="font-semibold text-accent transition-colors hover:underline"
-              >
-                Open an account
-              </Link>
-            </p>
+            )}
           </div>
 
-          <p className="mx-auto mt-5 max-w-md text-center text-[11px] leading-5 text-muted-foreground">
-            By continuing you confirm you are an authorized FAAN staff member.
-          </p>
-        </div>
-      </section>
-    </main>
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
+                Password
+              </label>
+            </div>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="password"
+                data-testid="login-password-input"
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                placeholder="Your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                aria-invalid={!!passwordError}
+                aria-describedby={passwordError ? 'password-error' : undefined}
+                className="input-base pl-10 pr-14"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                data-testid="login-password-toggle"
+                className="auth-password-toggle"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {passwordError && (
+              <p
+                className="mt-1.5 text-xs font-medium text-rose-500"
+                data-testid="login-password-error"
+                id="password-error"
+                role="alert"
+              >
+                {passwordError}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            data-testid="login-submit-button"
+            disabled={isLoading}
+            className="btn-primary w-full !py-3.5"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Signing in…
+              </>
+            ) : (
+              <>
+                Sign in
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        </fieldset>
+      </form>
+
+      <p className="auth-form-alternate">
+        New to Ummah Coop?{' '}
+        <Link
+          href="/register"
+          data-testid="login-register-link"
+          className="font-semibold text-accent hover:underline"
+        >
+          Register <ArrowRight className="inline h-4 w-4" />
+        </Link>
+      </p>
+    </AuthShell>
   )
 }

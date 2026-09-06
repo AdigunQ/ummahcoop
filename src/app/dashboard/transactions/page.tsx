@@ -1,3 +1,4 @@
+import { AdminHeading } from '@/components/admin/admin-ui'
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
@@ -12,7 +13,13 @@ export default async function TransactionsPage() {
     redirect('/login')
   }
 
-  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.VIEW_FINANCE))) {
+  if (
+    !session.user.id ||
+    !(await canAccessWithPrivileges(
+      { id: session.user.id, role: session.user.role },
+      PRIVILEGE_CODES.VIEW_FINANCE
+    ))
+  ) {
     redirect('/dashboard')
   }
 
@@ -41,22 +48,23 @@ export default async function TransactionsPage() {
   const pendingCount = transactions.filter((txn) => txn.status === 'PENDING').length
 
   return (
-    <div className="animate-fadeIn space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
-        <p className="mt-1 text-gray-500">Detailed records of contributions, repayments, and disbursements.</p>
-      </div>
+    <div className="admin-page">
+      <AdminHeading
+        section="Finance"
+        title="Transactions"
+        description={<>Detailed records of contributions, repayments, and disbursements.</>}
+      />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total Records" value={transactions.length.toString()} tone="blue" />
         <MetricCard label="Completed" value={completedCount.toString()} tone="green" />
         <MetricCard label="Pending" value={pendingCount.toString()} tone="amber" />
         <MetricCard label="Total Volume" value={formatCurrency(totalVolume)} tone="purple" />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">
         <table className="w-full min-w-[1100px]">
-          <thead className="bg-gray-50">
+          <thead className="bg-surface-2">
             <tr>
               <HeadCell label="Date" />
               <HeadCell label="Member" />
@@ -68,28 +76,38 @@ export default async function TransactionsPage() {
               <HeadCell label="Description" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-border">
             {transactions.map((txn) => (
-              <tr key={txn.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm text-gray-600">{formatDateTime(txn.createdAt)}</td>
-                <td className="px-6 py-4">
-                  <p className="font-medium text-gray-900">{txn.user?.name || 'Unknown Member'}</p>
-                  <p className="text-sm text-gray-500">{txn.user?.email}</p>
+              <tr key={txn.id} className="hover:bg-surface-2">
+                <td className="px-6 py-4 text-sm text-muted-foreground">
+                  {formatDateTime(txn.createdAt)}
                 </td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-800">{txn.reference}</td>
                 <td className="px-6 py-4">
-                  <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+                  <p className="font-medium text-foreground">
+                    {txn.user?.name || 'Unknown Member'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{txn.user?.email}</p>
+                </td>
+                <td className="px-6 py-4 text-sm font-medium text-foreground">{txn.reference}</td>
+                <td className="px-6 py-4">
+                  <span className="rounded-full bg-surface-2 px-2 py-1 text-xs font-semibold text-foreground">
                     {txn.type.replace('_', ' ')}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(txn.amount)}</td>
+                <td className="px-6 py-4 text-sm font-semibold text-foreground">
+                  {formatCurrency(txn.amount)}
+                </td>
                 <td className="px-6 py-4">
                   <StatusBadge status={txn.status} />
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {txn.payment ? `${txn.payment.type.replace('_', ' ')} · ${txn.payment.status}` : '—'}
+                <td className="px-6 py-4 text-sm text-muted-foreground">
+                  {txn.payment
+                    ? `${txn.payment.type.replace('_', ' ')} · ${txn.payment.status}`
+                    : '—'}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{txn.description || '—'}</td>
+                <td className="px-6 py-4 text-sm text-muted-foreground">
+                  {txn.description || '—'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -112,19 +130,23 @@ function MetricCard({
     blue: 'border-blue-200 bg-blue-50 text-blue-800',
     green: 'border-green-200 bg-green-50 text-green-800',
     amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    purple: 'border-purple-200 bg-purple-50 text-purple-800',
+    purple: 'border-primary-200 bg-primary-50 text-primary-800',
   }
 
   return (
-    <div className={`rounded-xl border p-4 ${tones[tone]}`}>
-      <p className="text-xs uppercase tracking-wide">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+    <div className="card p-5">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="metric-value">{value}</p>
     </div>
   )
 }
 
 function HeadCell({ label }: { label: string }) {
-  return <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</th>
+  return (
+    <th className="px-6 py-3 text-left text-xs font-semibold normal-case tracking-normal text-muted-foreground">
+      {label}
+    </th>
+  )
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -135,7 +157,9 @@ function StatusBadge({ status }: { status: string }) {
   }
 
   return (
-    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-700'}`}>
+    <span
+      className={`rounded-full px-2 py-1 text-xs font-semibold ${styles[status as keyof typeof styles] || 'bg-surface-2 text-foreground'}`}
+    >
       {status}
     </span>
   )

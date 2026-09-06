@@ -1,3 +1,4 @@
+import { AdminHeading, AdminStats } from '@/components/admin/admin-ui'
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -43,7 +44,13 @@ export default async function DirectoryPage({ searchParams }: { searchParams?: S
     redirect('/login')
   }
 
-  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) {
+  if (
+    !session.user.id ||
+    !(await canAccessWithPrivileges(
+      { id: session.user.id, role: session.user.role },
+      PRIVILEGE_CODES.EDIT_MEMBERS
+    ))
+  ) {
     redirect('/dashboard')
   }
 
@@ -70,27 +77,24 @@ export default async function DirectoryPage({ searchParams }: { searchParams?: S
     memberId: memberIdByStaffId.get(normalizeStaffId(row.staffId)) || null,
   }))
 
-  const savingsPool = members.reduce((sum, member) => sum + member.monthlySavings + member.specialSavings, 0)
+  const savingsPool = members.reduce(
+    (sum, member) => sum + member.monthlySavings + member.specialSavings,
+    0
+  )
   const liveLabel = formatPeriodLabel(liveDataset.period)
 
   return (
-    <div className="animate-fadeIn space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Update Member</h1>
-          <p className="mt-1 text-gray-500">
-            Showing the current live member data for {liveLabel}. Rows carried forward from the previous snapshot stay active until fresh members are added.
-          </p>
-        </div>
-
-        <Link
-          href="/dashboard/directory/add"
-          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          Add new member
-        </Link>
-      </div>
-
+    <div className="admin-page">
+      <AdminHeading
+        section="Members & data"
+        title="Member directory"
+        description={'Profiles and contribution plans for ' + liveLabel + '.'}
+        actions={
+          <Link href="/dashboard/directory/add" className="btn-primary">
+            Add member
+          </Link>
+        }
+      />
       {searchParams?.deleted === '1' && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           Member deleted successfully.
@@ -103,13 +107,20 @@ export default async function DirectoryPage({ searchParams }: { searchParams?: S
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <MetricCard label="Current Members" value={members.length.toString()} tone="blue" />
-        <MetricCard label="With Monthly Saving" value={members.filter((m) => m.monthlySavings > 0).length.toString()} tone="green" />
-        <MetricCard label="With Special Savings" value={members.filter((m) => m.specialSavings > 0).length.toString()} tone="amber" />
-        <MetricCard label="Amount Pool" value={formatCurrency(savingsPool)} tone="purple" />
-      </div>
-
+      <AdminStats
+        items={[
+          { label: 'Current members', value: String(members.length) },
+          {
+            label: 'Thrift savers',
+            value: String(members.filter((m) => m.monthlySavings > 0).length),
+          },
+          {
+            label: 'Special savers',
+            value: String(members.filter((m) => m.specialSavings > 0).length),
+          },
+          { label: 'Monthly savings', value: formatCurrency(savingsPool) },
+        ]}
+      />
       <MemberDirectoryTable members={members} />
     </div>
   )
@@ -128,13 +139,13 @@ function MetricCard({
     blue: 'border-blue-200 bg-blue-50 text-blue-800',
     green: 'border-green-200 bg-green-50 text-green-800',
     amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    purple: 'border-purple-200 bg-purple-50 text-purple-800',
+    purple: 'border-primary-200 bg-primary-50 text-primary-800',
   }
 
   return (
-    <div className={`rounded-xl border p-4 ${tones[tone]}`}>
-      <p className="text-xs uppercase tracking-wide">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+    <div className="card p-5">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="metric-value">{value}</p>
     </div>
   )
 }

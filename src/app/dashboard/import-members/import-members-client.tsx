@@ -91,26 +91,31 @@ export default function ImportMembersClient() {
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
         <p className="font-semibold">Danger zone</p>
         <p className="mt-1 text-sm">
-          This action will permanently delete all users with role <span className="font-mono">MEMBER</span> (including their loans,
-          payments, withdrawals, transactions, vouchers, etc.) and replace them with the uploaded spreadsheet records.
+          This action will permanently delete all users with role{' '}
+          <span className="font-mono">MEMBER</span> (including their loans, payments, withdrawals,
+          transactions, vouchers, etc.) and replace them with the uploaded spreadsheet records.
         </p>
         <p className="mt-2 text-sm">
-          Imported members are forced to <span className="font-semibold">OLD</span> member type for voucher fees.
+          Imported members are forced to <span className="font-semibold">OLD</span> member type for
+          voucher fees.
         </p>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
         <div>
-          <label className="mb-2 block text-sm font-semibold text-gray-900">Members Excel File (.xlsx)</label>
+          <label className="mb-2 block text-sm font-semibold text-foreground">
+            Members Excel File (.xlsx)
+          </label>
           <input
             type="file"
             accept=".xlsx,.xls"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             className="block w-full text-sm"
           />
-          <p className="mt-2 text-xs text-gray-500">
-            Required columns: Employee No., Employee Name, Monthly Saving. Optional: Special Saving, Month Joined, Phone. If multiple
-            sheets exist, the importer uses the most complete sheet (prefers “feb 2026”).
+          <p className="mt-2 text-xs text-muted-foreground">
+            Required columns: Employee No., Employee Name, Monthly Saving. Optional: Special Saving,
+            Month Joined, Phone. If multiple sheets exist, the importer uses the most complete sheet
+            (prefers “feb 2026”).
           </p>
         </div>
 
@@ -119,13 +124,13 @@ export default function ImportMembersClient() {
             type="button"
             disabled={!canPreview}
             onClick={() => post('preview')}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? 'Working…' : 'Preview Import'}
           </button>
           <Link
             href="/dashboard/directory"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-2"
           >
             Back to Update Member
           </Link>
@@ -133,24 +138,25 @@ export default function ImportMembersClient() {
       </div>
 
       {preview && (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Preview</h2>
+        <div className="rounded-xl border border-border bg-surface shadow-sm">
+          <div className="border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-foreground">Preview</h2>
             {preview.error && <p className="mt-1 text-sm text-red-600">{preview.error}</p>}
             {preview.ok && preview.counts && (
-              <p className="mt-1 text-sm text-gray-500">
-                {preview.counts.members} members • {preview.counts.withSpecialSavings} with special savings
+              <p className="mt-1 text-sm text-muted-foreground">
+                {preview.counts.members} members • {preview.counts.withSpecialSavings} with special
+                savings
               </p>
             )}
             {preview.ok && preview.sheetName && (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Source sheet: <span className="font-mono">{preview.sheetName}</span>
               </p>
             )}
           </div>
 
           {preview.ok && preview.counts && (
-            <div className="grid grid-cols-2 gap-4 px-6 py-5 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
               <Stat label="Members" value={preview.counts.members} />
               <Stat label="With special savings" value={preview.counts.withSpecialSavings} />
               <Stat label="Join dates" value={preview.counts.joinDates} />
@@ -171,9 +177,9 @@ export default function ImportMembersClient() {
           )}
 
           {preview.ok && preview.sample && preview.sample.length > 0 && (
-            <div className="overflow-x-auto border-t border-gray-200">
+            <div className="overflow-x-auto border-t border-border">
               <table className="w-full min-w-[920px] text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <thead className="bg-surface-2 text-left text-xs normal-case tracking-normal text-muted-foreground">
                   <tr>
                     <th className="px-6 py-3">Employee No.</th>
                     <th className="px-6 py-3">Employee Name</th>
@@ -183,14 +189,18 @@ export default function ImportMembersClient() {
                     <th className="px-6 py-3">Warnings</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {preview.sample.map((row) => (
                     <tr key={row.staffId}>
-                      <td className="px-6 py-3 font-medium text-gray-800">{row.staffId}</td>
-                      <td className="px-6 py-3 text-gray-900">{row.name}</td>
-                      <td className="px-6 py-3 text-gray-800">₦{Number(row.monthlySavings || 0).toLocaleString()}</td>
-                      <td className="px-6 py-3 text-gray-800">₦{Number(row.specialSavings || 0).toLocaleString()}</td>
-                      <td className="px-6 py-3 text-gray-700">{row.joinedAt || '—'}</td>
+                      <td className="px-6 py-3 font-medium text-foreground">{row.staffId}</td>
+                      <td className="px-6 py-3 text-foreground">{row.name}</td>
+                      <td className="px-6 py-3 text-foreground">
+                        ₦{Number(row.monthlySavings || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-3 text-foreground">
+                        ₦{Number(row.specialSavings || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-3 text-foreground">{row.joinedAt || '—'}</td>
                       <td className="px-6 py-3 text-xs text-amber-700">
                         {row.warnings?.length ? row.warnings.join(' • ') : '—'}
                       </td>
@@ -201,10 +211,10 @@ export default function ImportMembersClient() {
             </div>
           )}
 
-          <div className="border-t border-gray-200 px-6 py-5">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <p className="text-sm font-semibold text-gray-900">Confirm & Replace</p>
-              <p className="mt-1 text-sm text-gray-600">
+          <div className="border-t border-border px-6 py-5">
+            <div className="rounded-lg border border-border bg-surface-2 p-4">
+              <p className="text-sm font-semibold text-foreground">Confirm & Replace</p>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Type <span className="font-mono">REPLACE MEMBERS</span> to enable the button.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -212,7 +222,7 @@ export default function ImportMembersClient() {
                   value={confirmText}
                   onChange={(e) => setConfirmText(e.target.value)}
                   placeholder="REPLACE MEMBERS"
-                  className="w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+                  className="w-56 rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
                 />
                 <button
                   type="button"
@@ -233,9 +243,9 @@ export default function ImportMembersClient() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
+    <div className="rounded-xl border border-border bg-surface p-4">
+      <p className="text-xs normal-case tracking-normal text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-foreground">{value.toLocaleString()}</p>
     </div>
   )
 }

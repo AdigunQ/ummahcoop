@@ -1,3 +1,4 @@
+import { AdminHeading } from '@/components/admin/admin-ui'
 import Link from 'next/link'
 import bcrypt from 'bcryptjs'
 import { getServerSession } from 'next-auth/next'
@@ -34,7 +35,14 @@ async function createMember(formData: FormData) {
   'use server'
 
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) redirect('/dashboard')
+  if (
+    !session?.user?.id ||
+    !(await canAccessWithPrivileges(
+      { id: session.user.id, role: session.user.role },
+      PRIVILEGE_CODES.EDIT_MEMBERS
+    ))
+  )
+    redirect('/dashboard')
 
   const staffId = normalizeStaffId(String(formData.get('staffId') || ''))
   const name = String(formData.get('name') || '').trim()
@@ -44,8 +52,10 @@ async function createMember(formData: FormData) {
 
   if (!staffId || !name || !phone) redirect('/dashboard/directory/add?error=invalid')
   if (!/^[A-Z0-9-]+$/.test(staffId)) redirect('/dashboard/directory/add?error=invalid')
-  if (!Number.isFinite(monthlyContribution) || monthlyContribution <= 0) redirect('/dashboard/directory/add?error=invalid')
-  if (!Number.isFinite(specialContribution) || specialContribution < 0) redirect('/dashboard/directory/add?error=invalid')
+  if (!Number.isFinite(monthlyContribution) || monthlyContribution <= 0)
+    redirect('/dashboard/directory/add?error=invalid')
+  if (!Number.isFinite(specialContribution) || specialContribution < 0)
+    redirect('/dashboard/directory/add?error=invalid')
 
   const email = buildMemberEmail(staffId)
 
@@ -97,7 +107,8 @@ async function createMember(formData: FormData) {
           monthlyDeduction: monthlyContribution + specialContribution,
           effectiveStartDate,
           status: 'GENERATED',
-          notes: 'Created by admin. New member fee (₦1,000) applies automatically in first report month.',
+          notes:
+            'Created by admin. New member fee (₦1,000) applies automatically in first report month.',
         },
       })
     })
@@ -116,28 +127,30 @@ async function createMember(formData: FormData) {
 export default async function AddMemberPage({ searchParams }: { searchParams?: SearchParams }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) redirect('/login')
-  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS))) redirect('/dashboard')
+  if (
+    !session.user.id ||
+    !(await canAccessWithPrivileges(
+      { id: session.user.id, role: session.user.role },
+      PRIVILEGE_CODES.EDIT_MEMBERS
+    ))
+  )
+    redirect('/dashboard')
 
   const error = mapError(searchParams?.error)
   const created = searchParams?.created === '1'
 
   return (
-    <div className="animate-fadeIn space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Add new member</h1>
-          <p className="mt-1 text-gray-500">
-            Enter Feb-2026 style fields only. Registration date and new member fee are handled automatically.
-          </p>
-        </div>
-        <Link
-          href="/dashboard/directory"
-          className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-        >
-          Back to Update Member
-        </Link>
-      </div>
-
+    <div className="admin-page">
+      <AdminHeading
+        section="Members & data"
+        title="Add a member"
+        description="Set up membership details and monthly contribution plans."
+        actions={
+          <Link href="/dashboard/directory" className="btn-ghost">
+            Back to directory
+          </Link>
+        }
+      />
       {created && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           Member created successfully.
@@ -150,77 +163,82 @@ export default async function AddMemberPage({ searchParams }: { searchParams?: S
         </div>
       )}
 
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-        <p className="font-semibold">Auto-handled fields</p>
+      <details className="admin-panel admin-form-note">
+        <summary>How registration dates and fees are set</summary>
         <ul className="mt-1 list-disc space-y-1 pl-5">
           <li>Registration date = current date/time</li>
           <li>Month Joined = auto from registration date</li>
           <li>New Member FEE = ₦1,000 in first report month</li>
           <li>Monthly Charges / Total are computed in report export</li>
         </ul>
-      </div>
+      </details>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
         <form action={createMember} className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Staff ID</label>
+            <label className="mb-1 block text-sm font-medium text-foreground">Staff ID</label>
             <input
+              aria-label="Staff Id"
               name="staffId"
               required
               placeholder="e.g. 001234"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+            <label className="mb-1 block text-sm font-medium text-foreground">Name</label>
             <input
+              aria-label="Name"
               name="name"
               required
               placeholder="Full name"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Thrift Savings</label>
+            <label className="mb-1 block text-sm font-medium text-foreground">Thrift Savings</label>
             <input
+              aria-label="Monthly Contribution"
               name="monthlyContribution"
               type="number"
               min={1}
               step={1}
               required
               defaultValue={10000}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Special Saving</label>
+            <label className="mb-1 block text-sm font-medium text-foreground">Special Saving</label>
             <input
+              aria-label="Special Contribution"
               name="specialContribution"
               type="number"
               min={0}
               step={1}
               defaultValue={0}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+            <label className="mb-1 block text-sm font-medium text-foreground">Phone</label>
             <input
+              aria-label="Phone"
               name="phone"
               required
               placeholder="e.g. 08012345678"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
 
           <div className="md:col-span-2">
             <button
               type="submit"
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-black"
             >
               Add member
             </button>

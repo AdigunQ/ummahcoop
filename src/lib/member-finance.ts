@@ -19,7 +19,10 @@ export type MemberFinanceSummary = {
 }
 
 function normalizeStaffId(value: unknown): string {
-  return String(value ?? '').trim().replace(/\s+/g, '').toUpperCase()
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+    .toUpperCase()
 }
 
 function toNumber(value: unknown): number {
@@ -40,7 +43,8 @@ function pickNumber(row: SnapshotRow | undefined, keys: string[]): number {
   if (!row) return 0
   for (const key of keys) {
     const value = row[key]
-    if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) continue
+    if (value === undefined || value === null || (typeof value === 'string' && !value.trim()))
+      continue
     return toNumber(value)
   }
   return 0
@@ -82,7 +86,11 @@ export function sumLedgerDeductions(
     })
 
     const loanDeduction = pickNumber(ledgerRow, ['Loan', 'Loan Originated'])
-    const commodityDeduction = pickNumber(ledgerRow, ['Commodity', 'Commodity Requests', 'Comodity'])
+    const commodityDeduction = pickNumber(ledgerRow, [
+      'Commodity',
+      'Commodity Requests',
+      'Comodity',
+    ])
 
     if (loanDeduction > 0) {
       loanPaid += loanDeduction
@@ -105,8 +113,9 @@ export function sumLedgerDeductions(
 async function readMemberPrincipals(userId: string) {
   // Read through JSON so an older production database can still render the
   // dashboard while the additive principal-column migration is being applied.
-  try {
-    const rows = await prisma.$queryRaw<Array<{ loanPrincipal: number | null; commodityPrincipal: number | null }>>`
+  const rows = await prisma.$queryRaw<
+    Array<{ loanPrincipal: number | null; commodityPrincipal: number | null }>
+  >`
       SELECT
         COALESCE((to_jsonb(u)->>'loan_principal')::double precision, 0) AS "loanPrincipal",
         COALESCE((to_jsonb(u)->>'commodity_principal')::double precision, 0) AS "commodityPrincipal"
@@ -115,10 +124,8 @@ async function readMemberPrincipals(userId: string) {
       LIMIT 1
     `
 
-    return rows[0] || { loanPrincipal: 0, commodityPrincipal: 0 }
-  } catch {
-    return { loanPrincipal: 0, commodityPrincipal: 0 }
-  }
+  if (!rows[0]) throw new Error('Member financial record is unavailable.')
+  return rows[0]
 }
 
 /**
@@ -130,45 +137,53 @@ async function loadMemberFinanceSummary(
   userId: string,
   staffId: string | null | undefined
 ): Promise<MemberFinanceSummary> {
-  const commodityRepaymentAggregate = prisma.commodityRepayment
-    .aggregate({
-      where: { userId },
-      _sum: { amount: true },
-    })
-    .catch(() => ({ _sum: { amount: 0 } }))
+  const commodityRepaymentAggregate = prisma.commodityRepayment.aggregate({
+    where: { userId },
+    _sum: { amount: true },
+  })
 
-  const [member, approvedLoans, loanRepaymentPayments, approvedCommodities, commodityRepayments, snapshots] =
-    await Promise.all([
-      readMemberPrincipals(userId),
-      prisma.loan.findMany({
-        where: { userId, status: { in: ['APPROVED', 'COMPLETED'] } },
-        select: {
-          amount: true,
-          balance: true,
-          repayments: { select: { amount: true } },
-        },
-      }),
-      prisma.payment.aggregate({
-        where: { userId, type: 'LOAN_REPAYMENT', status: 'APPROVED' },
-        _sum: { amount: true },
-      }),
-      prisma.commodityRequest.findMany({
-        where: { userId, status: 'APPROVED' },
-        select: { adminQuotedPrice: true, preferredBudget: true },
-      }),
-      commodityRepaymentAggregate,
-      prisma.memberDataMonth.findMany({
-        orderBy: { period: 'asc' },
-        select: { period: true, rows: true },
-      }),
-    ])
+  const [
+    member,
+    approvedLoans,
+    loanRepaymentPayments,
+    approvedCommodities,
+    commodityRepayments,
+    snapshots,
+  ] = await Promise.all([
+    readMemberPrincipals(userId),
+    prisma.loan.findMany({
+      where: { userId, status: { in: ['APPROVED', 'COMPLETED'] } },
+      select: {
+        amount: true,
+        balance: true,
+        repayments: { select: { amount: true } },
+      },
+    }),
+    prisma.payment.aggregate({
+      where: { userId, type: 'LOAN_REPAYMENT', status: 'APPROVED' },
+      _sum: { amount: true },
+    }),
+    prisma.commodityRequest.findMany({
+      where: { userId, status: 'APPROVED' },
+      select: { adminQuotedPrice: true, preferredBudget: true },
+    }),
+    commodityRepaymentAggregate,
+    prisma.memberDataMonth.findMany({
+      orderBy: { period: 'asc' },
+      select: { period: true, rows: true },
+    }),
+  ])
 
   const ledgerTotals = sumLedgerDeductions(snapshots, staffId)
 
   const workflowLoanCollected = approvedLoans.reduce((sum, loan) => sum + loan.amount, 0)
-  const workflowLoanOutstanding = approvedLoans.reduce((sum, loan) => sum + Math.max(0, loan.balance), 0)
+  const workflowLoanOutstanding = approvedLoans.reduce(
+    (sum, loan) => sum + Math.max(0, loan.balance),
+    0
+  )
   const loanPaidFromRepayments = approvedLoans.reduce(
-    (sum, loan) => sum + loan.repayments.reduce((loanSum, repayment) => loanSum + repayment.amount, 0),
+    (sum, loan) =>
+      sum + loan.repayments.reduce((loanSum, repayment) => loanSum + repayment.amount, 0),
     0
   )
   const loanPaidFromPayments = loanRepaymentPayments._sum.amount || 0
@@ -177,27 +192,35 @@ async function loadMemberFinanceSummary(
   const loanCollected = loanPrincipal
   const loanPaid = ledgerTotals.loanPaid > 0 ? ledgerTotals.loanPaid : workflowLoanPaid
   const loanOutstanding =
-    loanPrincipal > 0
-      ? Math.max(loanPrincipal - loanPaid, 0)
-      : Math.max(workflowLoanOutstanding, 0)
+    loanPrincipal > 0 ? Math.max(loanPrincipal - loanPaid, 0) : Math.max(workflowLoanOutstanding, 0)
 
   const workflowCommodityCollected = approvedCommodities.reduce(
     (sum, request) => sum + (request.adminQuotedPrice || request.preferredBudget || 0),
     0
   )
-  const commodityPrincipal = Math.max(toNumber(member?.commodityPrincipal), workflowCommodityCollected)
+  const commodityPrincipal = Math.max(
+    toNumber(member?.commodityPrincipal),
+    workflowCommodityCollected
+  )
   const commodityCollected = commodityPrincipal
   const workflowCommodityPaid = commodityRepayments._sum.amount || 0
-  const commodityPaid = ledgerTotals.commodityPaid > 0 ? ledgerTotals.commodityPaid : workflowCommodityPaid
+  const commodityPaid =
+    ledgerTotals.commodityPaid > 0 ? ledgerTotals.commodityPaid : workflowCommodityPaid
 
   return {
-    loanCount: Math.max(approvedLoans.length, loanPrincipal > 0 || ledgerTotals.loanPaid > 0 ? 1 : 0),
+    loanCount: Math.max(
+      approvedLoans.length,
+      loanPrincipal > 0 || ledgerTotals.loanPaid > 0 ? 1 : 0
+    ),
     loanPrincipal,
     loanCollected,
     loanPaid,
     loanOutstanding,
     loanRepaymentStartPeriod: ledgerTotals.loanRepaymentStartPeriod,
-    commodityCount: Math.max(approvedCommodities.length, commodityPrincipal > 0 || ledgerTotals.commodityPaid > 0 ? 1 : 0),
+    commodityCount: Math.max(
+      approvedCommodities.length,
+      commodityPrincipal > 0 || ledgerTotals.commodityPaid > 0 ? 1 : 0
+    ),
     commodityPrincipal,
     commodityCollected,
     commodityPaid,
@@ -215,20 +238,8 @@ export async function getMemberFinanceSummary(
     return await loadMemberFinanceSummary(userId, staffId)
   } catch (error) {
     console.error('[member-finance] summary unavailable', error)
-    return {
-      loanCount: 0,
-      loanPrincipal: 0,
-      loanCollected: 0,
-      loanPaid: 0,
-      loanOutstanding: 0,
-      loanRepaymentStartPeriod: null,
-      commodityCount: 0,
-      commodityPrincipal: 0,
-      commodityCollected: 0,
-      commodityPaid: 0,
-      commodityOutstanding: 0,
-      commodityRepaymentStartPeriod: null,
-      ledgerPeriod: null,
-    }
+    // An unavailable record is not a zero balance. Callers must not render or
+    // approve requests using invented financial figures during an outage.
+    throw new Error('Member financial records are temporarily unavailable.')
   }
 }

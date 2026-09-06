@@ -1,3 +1,4 @@
+import { AdminHeading, AdminStats } from '@/components/admin/admin-ui'
 import Link from 'next/link'
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
@@ -12,15 +13,18 @@ type SearchParams = {
   period?: string
 }
 
-export default async function VouchersPage({
-  searchParams,
-}: {
-  searchParams?: SearchParams
-}) {
+export default async function VouchersPage({ searchParams }: { searchParams?: SearchParams }) {
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) redirect('/login')
-  if (!session.user.id || !(await canAccessWithPrivileges({ id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.VIEW_FINANCE))) redirect('/dashboard')
+  if (
+    !session.user.id ||
+    !(await canAccessWithPrivileges(
+      { id: session.user.id, role: session.user.role },
+      PRIVILEGE_CODES.VIEW_FINANCE
+    ))
+  )
+    redirect('/dashboard')
 
   const resolved = resolveVoucherPeriod(searchParams?.period)
   const currentPeriod = resolveVoucherPeriod().period
@@ -56,28 +60,33 @@ export default async function VouchersPage({
   ] as const
 
   return (
-    <div className="animate-fadeIn space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Generate Report</h1>
-        <p className="mt-1 text-gray-500">
-          Monthly salary deduction report generated from uploaded monthly data when available, otherwise from live member records.
-        </p>
-      </div>
+    <div className="admin-page">
+      <AdminHeading
+        section="Finance"
+        title="Generate report"
+        description={
+          <>
+            Monthly salary deduction report generated from uploaded monthly data when available,
+            otherwise from live member records.
+          </>
+        }
+      />
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
         <form className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Report Period</label>
+            <label className="mb-1 block text-sm font-medium text-foreground">Report Period</label>
             <input
+              aria-label="Period"
               type="month"
               name="period"
               defaultValue={resolved.period}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500"
+              className="rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
           </div>
           <button
             type="submit"
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-black"
           >
             Load Period
           </button>
@@ -89,7 +98,7 @@ export default async function VouchersPage({
           </Link>
           <Link
             href={`/dashboard/member-data?period=${resolved.period}`}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-2"
           >
             View Member Data
           </Link>
@@ -98,9 +107,12 @@ export default async function VouchersPage({
 
       {isLivePeriod && !uploadedMonth && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-          <p className="font-semibold">Using current live member data for {formatPeriodLabel(resolved.period)}</p>
+          <p className="font-semibold">
+            Using current live member data for {formatPeriodLabel(resolved.period)}
+          </p>
           <p className="mt-1 text-sm">
-            This period carries the latest snapshot forward until fresh members are added, so the report stays in step with the current live workbook.
+            This period carries the latest snapshot forward until fresh members are added, so the
+            report stays in step with the current live workbook.
           </p>
         </div>
       )}
@@ -110,30 +122,35 @@ export default async function VouchersPage({
           <p className="font-semibold">Uploaded snapshot found for {uploadedMonth.label}</p>
           <p className="mt-1 text-sm">
             Report output for this period uses the uploaded snapshot. Snapshot rows:{' '}
-            {uploadedMonth.rowCount.toLocaleString()} • Uploaded {new Date(uploadedMonth.uploadedAt).toLocaleString()}
+            {uploadedMonth.rowCount.toLocaleString()} • Uploaded{' '}
+            {new Date(uploadedMonth.uploadedAt).toLocaleString()}
           </p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-        <MetricCard label="Members" value={dataset.rows.length.toString()} tone="blue" />
-        <MetricCard label="New Members" value={dataset.totals.newMembers.toString()} tone="green" />
-        <MetricCard label="Old Members" value={dataset.totals.oldMembers.toString()} tone="amber" />
-        <MetricCard label="Fees Total" value={formatCurrency(dataset.totals.fees)} tone="purple" />
-        <MetricCard label="Total Savings" value={formatCurrency(dataset.totals.totalSavings)} tone="slate" />
-      </div>
+      <AdminStats
+        items={[
+          { label: 'Members', value: dataset.rows.length.toString() },
+          { label: 'New Members', value: dataset.totals.newMembers.toString() },
+          { label: 'Old Members', value: dataset.totals.oldMembers.toString() },
+          { label: 'Fees Total', value: formatCurrency(dataset.totals.fees) },
+          { label: 'Total Savings', value: formatCurrency(dataset.totals.totalSavings) },
+        ]}
+      />
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Report Preview</h2>
+      <div className="rounded-xl border border-border bg-surface shadow-sm">
+        <div className="border-b border-border px-6 py-4">
+          <h2 className="text-lg font-semibold text-foreground">Report Preview</h2>
         </div>
 
         {dataset.rows.length === 0 ? (
-          <div className="px-6 py-10 text-center text-gray-500">No active members available for report generation.</div>
+          <div className="px-6 py-10 text-center text-muted-foreground">
+            No active members available for report generation.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1280px] text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <thead className="bg-surface-2 text-left text-xs normal-case tracking-normal text-muted-foreground">
                 <tr>
                   {abanoColumns.map((column) => (
                     <th key={column} className="px-6 py-3">
@@ -142,21 +159,37 @@ export default async function VouchersPage({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {dataset.rows.map((row) => (
                   <tr key={`${row.staffId}-${row.serial}`}>
-                    <td className="px-6 py-3 text-gray-800">{row.staffId || '-'}</td>
-                    <td className="px-6 py-3 font-medium text-gray-800">{row.name || 'Unnamed Member'}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatCurrency(row.monthlySavings + row.specialSavings)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatPeriodLabel(dataset.period)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatCurrency(row.monthlySavings)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatCurrency(row.specialSavings)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatCurrency(0)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatCurrency(0)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatCurrency(0)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatMaybeCurrency(row.monthlyCharges)}</td>
-                    <td className="px-6 py-3 text-gray-800">{formatMaybeCurrency(row.newMemberFee)}</td>
-                    <td className="px-6 py-3 font-semibold text-gray-900">{formatCurrency(row.totalSavings)}</td>
+                    <td className="px-6 py-3 text-foreground">{row.staffId || '-'}</td>
+                    <td className="px-6 py-3 font-medium text-foreground">
+                      {row.name || 'Unnamed Member'}
+                    </td>
+                    <td className="px-6 py-3 text-foreground">
+                      {formatCurrency(row.monthlySavings + row.specialSavings)}
+                    </td>
+                    <td className="px-6 py-3 text-foreground">
+                      {formatPeriodLabel(dataset.period)}
+                    </td>
+                    <td className="px-6 py-3 text-foreground">
+                      {formatCurrency(row.monthlySavings)}
+                    </td>
+                    <td className="px-6 py-3 text-foreground">
+                      {formatCurrency(row.specialSavings)}
+                    </td>
+                    <td className="px-6 py-3 text-foreground">{formatCurrency(0)}</td>
+                    <td className="px-6 py-3 text-foreground">{formatCurrency(0)}</td>
+                    <td className="px-6 py-3 text-foreground">{formatCurrency(0)}</td>
+                    <td className="px-6 py-3 text-foreground">
+                      {formatMaybeCurrency(row.monthlyCharges)}
+                    </td>
+                    <td className="px-6 py-3 text-foreground">
+                      {formatMaybeCurrency(row.newMemberFee)}
+                    </td>
+                    <td className="px-6 py-3 font-semibold text-foreground">
+                      {formatCurrency(row.totalSavings)}
+                    </td>
                     <td className="px-6 py-3">
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-semibold ${
@@ -196,29 +229,4 @@ function formatPeriodLabel(period: string): string {
 function formatMaybeCurrency(value: number): string {
   if (!value) return '—'
   return formatCurrency(value)
-}
-
-function MetricCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: 'amber' | 'blue' | 'green' | 'purple' | 'slate'
-}) {
-  const tones = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-800',
-    blue: 'border-blue-200 bg-blue-50 text-blue-800',
-    green: 'border-green-200 bg-green-50 text-green-800',
-    purple: 'border-purple-200 bg-purple-50 text-purple-800',
-    slate: 'border-slate-200 bg-slate-50 text-slate-800',
-  }
-
-  return (
-    <div className={`rounded-xl border p-4 ${tones[tone]}`}>
-      <p className="text-xs uppercase tracking-wide">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
-    </div>
-  )
 }

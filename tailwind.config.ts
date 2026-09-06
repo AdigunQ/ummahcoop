@@ -24,16 +24,16 @@ const config: Config = {
 
         // Brand kept for backward compatibility but remapped to neutral fintech
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          50: '#f0f7ef',
+          100: '#e0efdb',
+          200: '#c4dfbb',
+          300: '#a1c796',
+          400: '#7ba770',
+          500: '#54874e',
+          600: '#316745',
+          700: '#24513a',
+          800: '#193f2e',
+          900: '#123326',
         },
         secondary: {
           50: '#fff7ed',
@@ -51,9 +51,19 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        sans: ['var(--font-body)', 'sans-serif'],
+        display: ['var(--font-body)', 'sans-serif'],
+        mono: ['var(--font-body)', 'sans-serif'],
+      },
+      // Keep secondary text readable instead of shrinking it to 10-12px.
+      fontSize: {
+        xs: ['1rem', { lineHeight: '1.5' }],
+        sm: ['1.0625rem', { lineHeight: '1.55' }],
+        base: ['1.125rem', { lineHeight: '1.6' }],
+      },
+      fontWeight: {
+        medium: '700',
+        semibold: '700',
       },
       boxShadow: {
         card: '0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06)',

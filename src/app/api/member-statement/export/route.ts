@@ -3,8 +3,15 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { LOAN_REQUEST_POLICY } from '@/lib/loan-request'
-import { buildVoucherDataset, firstVoucherPeriodForCreatedAt, resolveVoucherPeriod } from '@/lib/vouchers'
+import {
+  buildVoucherDataset,
+  firstVoucherPeriodForCreatedAt,
+  resolveVoucherPeriod,
+} from '@/lib/vouchers'
 import { getMemberFinanceSummary } from '@/lib/member-finance'
+
+// Statements depend on the signed-in member and must never be prerendered.
+export const dynamic = 'force-dynamic'
 
 function normalizeStaffId(value: unknown): string {
   return String(value || '')
@@ -94,7 +101,7 @@ function buildCommodityHeader(): string[] {
   ]
 }
 
-export async function GET() {
+async function buildStatementResponse() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email || !session.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -187,22 +194,7 @@ export async function GET() {
   lines.push(buildSavingsHeader())
 
   if (savingsRows.length === 0) {
-    lines.push([
-      'Savings',
-      staffId,
-      targetName,
-      0,
-      '',
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      '',
-    ])
+    lines.push(['Savings', staffId, targetName, 0, '', 0, 0, 0, 0, 0, 0, 0, 0, ''])
   } else {
     for (const row of savingsRows) {
       lines.push([
@@ -314,7 +306,10 @@ export async function GET() {
     ])
   } else {
     for (const commodity of commodities) {
-      const paid = commodity.repayments.reduce((sum, repayment) => sum + safeNumber(repayment.amount), 0)
+      const paid = commodity.repayments.reduce(
+        (sum, repayment) => sum + safeNumber(repayment.amount),
+        0
+      )
       const collected = safeNumber(commodity.adminQuotedPrice || commodity.preferredBudget)
       lines.push([
         'Commodity',
@@ -343,4 +338,16 @@ export async function GET() {
       'Cache-Control': 'no-store',
     },
   })
+}
+
+export async function GET() {
+  try {
+    return await buildStatementResponse()
+  } catch (error) {
+    console.error('[member-statement] export unavailable', error)
+    return NextResponse.json(
+      { error: 'Your statement is temporarily unavailable. Please try again.' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+    )
+  }
 }

@@ -3,9 +3,16 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
-import { MemberDashboard } from '@/components/dashboard/member-dashboard'
+import {
+  MemberDashboard,
+  type DashboardPayment,
+  type DashboardLoan,
+} from '@/components/dashboard/member-dashboard'
 import { getMemberFinanceSummary } from '@/lib/member-finance'
 import { getLoanLimit } from '@/lib/loan-request'
+import { getUserPrivilegeCodes } from '@/lib/access'
+import { canViewAdminOverview } from '@/components/admin/overview-access'
+import { AdminWorkspaceStart } from '@/components/admin/workspace-start'
 
 type RecentCommodity = {
   id: string
@@ -31,17 +38,19 @@ export default async function DashboardPage({
     return <AdminAnalytics />
   }
 
-  let grantedAccessCount = 0
+  let grantedCodes: string[] = []
   if (session.user?.id) {
     try {
-      grantedAccessCount = await prisma.memberPrivilege.count({ where: { userId: session.user.id } })
+      grantedCodes = await getUserPrivilegeCodes(session.user.id)
     } catch (error) {
       console.error('[dashboard] privilege lookup unavailable', error)
     }
   }
 
+  const grantedAccessCount = grantedCodes.length
   if (grantedAccessCount > 0 && searchParams?.view !== 'member') {
-    return <AdminAnalytics canSwitchToMember />
+    if (!canViewAdminOverview(grantedCodes)) return <AdminWorkspaceStart codes={grantedCodes} />
+    return <AdminAnalytics canSwitchToMember privilegeCodes={grantedCodes} />
   }
 
   // Select only the fields this page needs so older deployments can still
@@ -65,7 +74,7 @@ export default async function DashboardPage({
   let user: DashboardUser | null = null
   try {
     user = await prisma.user.findUnique({
-      where: { email },
+      where: session.user?.id ? { id: session.user.id } : { email },
       select: {
         id: true,
         name: true,
@@ -84,29 +93,13 @@ export default async function DashboardPage({
     })
   } catch (error) {
     console.error('[dashboard] member profile lookup unavailable', error)
+    throw new Error('Your member profile is temporarily unavailable.')
   }
 
-  // A valid auth session is enough to show the member shell during a short
-  // database/schema outage. Fresh financial data is still loaded when it is
-  // available, while the page remains usable instead of returning HTTP 500.
-  user ||= {
-    id: session.user?.id || email,
-    name: session.user?.name || null,
-    email,
-    status: session.user?.status || 'ACTIVE',
-    staffId: null,
-    department: null,
-    createdAt: new Date(),
-    balance: 0,
-    specialBalance: 0,
-    totalContributions: 0,
-    loanBalance: 0,
-    monthlyContribution: null,
-    specialContribution: null,
-  }
+  if (!user) throw new Error('Your member profile could not be found.')
 
-  let recentPayments: Array<Record<string, unknown>> = []
-  let recentLoans: Array<Record<string, unknown>> = []
+  let recentPayments: DashboardPayment[] = []
+  let recentLoans: DashboardLoan[] = []
   let recentCommodities: RecentCommodity[] = []
   try {
     ;[recentPayments, recentLoans, recentCommodities] = await Promise.all([
@@ -133,6 +126,7 @@ export default async function DashboardPage({
           duration: true,
           amount: true,
           status: true,
+          createdAt: true,
         },
       }),
       prisma.commodityRequest.findMany({
@@ -150,6 +144,7 @@ export default async function DashboardPage({
     ])
   } catch (error) {
     console.error('[dashboard] recent activity unavailable', error)
+    throw new Error('Your recent activity is temporarily unavailable.')
   }
 
   const financeSummary = await getMemberFinanceSummary(user.id, user.staffId)
