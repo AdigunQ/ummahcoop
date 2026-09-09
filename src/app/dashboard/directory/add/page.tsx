@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth'
 import { getInitialMemberPassword } from '@/lib/default-member-password'
 import { prisma } from '@/lib/prisma'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
+import { parseMemberRegistrationDate, registrationDateInputValue } from '@/lib/member-registration-date'
 
 type SearchParams = {
   created?: string
@@ -26,6 +27,7 @@ function normalizeStaffId(input: string): string {
 function mapError(error?: string): string | null {
   if (!error) return null
   if (error === 'invalid') return 'Please fill all required fields correctly.'
+  if (error === 'invalid_date') return 'Enter a valid registration date. It cannot be in the future.'
   if (error === 'duplicate_staff') return 'Staff ID already exists.'
   if (error === 'duplicate_email') return 'Generated email already exists for this Staff ID.'
   return 'Could not create member. Please try again.'
@@ -49,7 +51,9 @@ async function createMember(formData: FormData) {
   const phone = String(formData.get('phone') || '').trim()
   const monthlyContribution = Number(formData.get('monthlyContribution') || 0)
   const specialContribution = Number(formData.get('specialContribution') || 0)
+  const registrationDate = parseMemberRegistrationDate(formData.get('registrationDate'))
 
+  if (!registrationDate) redirect('/dashboard/directory/add?error=invalid_date')
   if (!staffId || !name || !phone) redirect('/dashboard/directory/add?error=invalid')
   if (!/^[A-Z0-9-]+$/.test(staffId)) redirect('/dashboard/directory/add?error=invalid')
   if (!Number.isFinite(monthlyContribution) || monthlyContribution <= 0)
@@ -95,6 +99,8 @@ async function createMember(formData: FormData) {
           totalContributions: 0,
           loanBalance: 0,
           voucherEnabled: true,
+          // Existing profile, tenure and report logic use createdAt as the joining date.
+          createdAt: registrationDate,
         },
       })
 
@@ -140,6 +146,7 @@ export default async function AddMemberPage({ searchParams: searchParamsInput }:
 
   const error = mapError(searchParams?.error)
   const created = searchParams?.created === '1'
+  const today = registrationDateInputValue()
 
   return (
     <div className="admin-page">
@@ -168,8 +175,9 @@ export default async function AddMemberPage({ searchParams: searchParamsInput }:
       <details className="admin-panel admin-form-note">
         <summary>How registration dates and fees are set</summary>
         <ul className="mt-1 list-disc space-y-1 pl-5">
-          <li>Registration date = current date/time</li>
-          <li>Month Joined = auto from registration date</li>
+          <li>Enter the date the member actually registered, even if you are adding them later.</li>
+          <li>Month Joined and membership duration use the registration date you select.</li>
+          <li>An earlier registration date does not add past contributions or payments.</li>
           <li>New Member FEE = ₦1,000 in first report month</li>
           <li>Monthly Charges / Total are computed in report export</li>
         </ul>
@@ -226,7 +234,7 @@ export default async function AddMemberPage({ searchParams: searchParamsInput }:
             />
           </div>
 
-          <div className="md:col-span-2">
+          <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Phone</label>
             <input
               aria-label="Phone"
@@ -235,6 +243,25 @@ export default async function AddMemberPage({ searchParams: searchParamsInput }:
               placeholder="e.g. 08012345678"
               className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
             />
+          </div>
+
+          <div>
+            <label htmlFor="registrationDate" className="mb-1 block text-sm font-medium text-foreground">
+              Registration date
+            </label>
+            <input
+              id="registrationDate"
+              name="registrationDate"
+              type="date"
+              required
+              defaultValue={today}
+              max={today}
+              aria-describedby="registration-date-help"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary-500"
+            />
+            <p id="registration-date-help" className="mt-2 text-sm text-muted-foreground">
+              The date they joined the cooperative, not the date you are entering their details.
+            </p>
           </div>
 
           <div className="md:col-span-2">
