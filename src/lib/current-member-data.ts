@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { calculateMemberFees } from '@/lib/member-fees'
 import {
   buildVoucherDataset,
   firstVoucherPeriodForCreatedAt,
@@ -79,9 +80,7 @@ function buildCurrentLiveRow(
   const isNew = joinedPeriod === period
   const monthlySavings = member.monthlyContribution || 0
   const specialSavings = member.specialContribution || 0
-  const monthlyCharges = isNew ? 0 : 100
-  const newMemberFee = isNew ? 1000 : 0
-  const memberFee = monthlyCharges + newMemberFee
+  const { monthlyCharges, newMemberFee, memberFee } = calculateMemberFees(isNew)
   const totalSavings = monthlySavings + specialSavings + memberFee
 
   return {
@@ -103,9 +102,7 @@ function buildCurrentLiveRow(
 function rollForwardExistingRow(row: VoucherRow): VoucherRow {
   const monthlySavings = row.monthlySavings || 0
   const specialSavings = row.specialSavings || 0
-  const monthlyCharges = 100
-  const newMemberFee = 0
-  const memberFee = monthlyCharges + newMemberFee
+  const { monthlyCharges, newMemberFee, memberFee } = calculateMemberFees(false)
   const totalSavings = monthlySavings + specialSavings + memberFee
 
   return {
@@ -149,6 +146,7 @@ export async function getCurrentMemberLiveDataset(periodInput?: string): Promise
 
   const newMembers = members
     .filter((member) => !baseKeys.has(normalizeKey(member.staffId)))
+    .filter((member) => firstVoucherPeriodForCreatedAt(member.createdAt) <= period)
     .map((member, index) => buildCurrentLiveRow(member, carriedForwardRows.length + index + 1, period))
 
   const rows = [...carriedForwardRows, ...newMembers]

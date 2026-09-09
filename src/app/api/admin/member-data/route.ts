@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 import { getInitialMemberPassword } from '@/lib/default-member-password'
+import { calculateMemberFees } from '@/lib/member-fees'
 
 export const runtime = 'nodejs'
 
@@ -308,10 +309,11 @@ function applyFeeLogic(
   }
 
   if (isSameMonth(memberJoinedMonth, currentSheetMonth)) {
-    row.monthlyCharges = 0
-    row.newMemberFee = 1000
+    const fees = calculateMemberFees(true)
+    row.monthlyCharges = fees.monthlyCharges
+    row.newMemberFee = fees.newMemberFee
   } else if (isAfter(currentSheetMonth, memberJoinedMonth)) {
-    row.monthlyCharges = 100
+    row.monthlyCharges = calculateMemberFees(false).monthlyCharges
     row.newMemberFee = null
   }
 

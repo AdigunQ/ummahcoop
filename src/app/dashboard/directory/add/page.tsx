@@ -114,7 +114,7 @@ async function createMember(formData: FormData) {
           effectiveStartDate,
           status: 'GENERATED',
           notes:
-            'Created by admin. New member fee (₦1,000) applies automatically in first report month.',
+            'Created by admin. First report: ₦1,000 form fee plus ₦100 monthly charges. Subsequent months: ₦100 charges only.',
         },
       })
     })
@@ -178,7 +178,8 @@ export default async function AddMemberPage({ searchParams: searchParamsInput }:
           <li>Enter the date the member actually registered, even if you are adding them later.</li>
           <li>Month Joined and membership duration use the registration date you select.</li>
           <li>An earlier registration date does not add past contributions or payments.</li>
-          <li>New Member FEE = ₦1,000 in first report month</li>
+          <li>First report month: ₦1,000 form fee plus ₦100 monthly charges (₦1,100 in fees).</li>
+          <li>Subsequent months: ₦100 monthly charges only. Fees are separate from savings.</li>
           <li>Monthly Charges / Total are computed in report export</li>
         </ul>
       </details>

@@ -1,9 +1,12 @@
 import { prisma } from '@/lib/prisma'
+import {
+  calculateMemberFees,
+  MEMBER_MONTHLY_CHARGE as VOUCHER_MONTHLY_CHARGE,
+  MEMBER_FORM_FEE as VOUCHER_NEW_MEMBER_FEE,
+} from '@/lib/member-fees'
 
 export const VOUCHER_TITLE = 'LIST OF NAIA MULTIPUPOSE COOPERATIVES MEMBERS'
 export const VOUCHER_CUTOFF_DAY = 15
-const VOUCHER_MONTHLY_CHARGE = 100
-const VOUCHER_NEW_MEMBER_FEE = 1000
 
 const MONTH_NAME_TO_INDEX: Record<string, number> = {
   jan: 1,
@@ -223,6 +226,7 @@ type VoucherSourceRow = {
   rawLoan: number
   rawCommodity: number
   hasMonthJoined: boolean
+  preserveRecordedFees?: boolean
 }
 
 function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow | null {
@@ -235,7 +239,7 @@ function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow |
 
   const isNew = hasJoinedPeriod ? comparePeriods(source.joinedPeriod as string, period) === 0 : source.rawMemberType === 'NEW' || source.rawNewMemberFee >= VOUCHER_NEW_MEMBER_FEE
 
-  if (!hasJoinMetadata) {
+  if (source.preserveRecordedFees || !hasJoinMetadata) {
     const monthlyCharges = source.rawCharges
     const newMemberFee = source.rawNewMemberFee
     const memberFee = monthlyCharges + newMemberFee
@@ -257,9 +261,7 @@ function buildVoucherRow(source: VoucherSourceRow, period: string): VoucherRow |
     }
   }
 
-  const monthlyCharges = isNew ? 0 : VOUCHER_MONTHLY_CHARGE
-  const newMemberFee = isNew ? VOUCHER_NEW_MEMBER_FEE : 0
-  const memberFee = monthlyCharges + newMemberFee
+  const { monthlyCharges, newMemberFee, memberFee } = calculateMemberFees(isNew)
   const totalSavings = source.monthlySavings + source.specialSavings + memberFee
 
   return {
@@ -297,6 +299,8 @@ function buildRowsFromSnapshot(snapshotRows: SnapshotRow[], period: string): Vou
           rawLoan: pickNumber(row, ['Loan', 'Loan Originated']),
           rawCommodity: pickNumber(row, ['Commodity', 'Commodity Requests', 'Comodity']),
           hasMonthJoined: Boolean(monthJoined),
+          // Saved ledger fees must not change when the current registration policy changes.
+          preserveRecordedFees: true,
         },
         period
       )
@@ -357,7 +361,7 @@ export async function buildVoucherDataset(periodInput?: string): Promise<Voucher
           rawMemberType: 'OLD',
           rawLoan: 0,
           rawCommodity: 0,
-          hasMonthJoined: false,
+          hasMonthJoined: true,
         },
         period
       )

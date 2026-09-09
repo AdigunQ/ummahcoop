@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { AuthShell } from '@/components/public/auth-shell'
 import { registerPayloadSchema } from '@/lib/registration'
+import { calculateMemberFees } from '@/lib/member-fees'
 
 type FormState = {
   staffId: string
@@ -44,6 +45,7 @@ type FormErrors = Partial<
 >
 
 export default function RegisterPage() {
+  const joiningFees = calculateMemberFees(true)
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [form, setForm] = useState<FormState>({
@@ -241,6 +243,11 @@ export default function RegisterPage() {
               </div>
             )}
           </section>
+          <p className="text-sm text-muted-foreground">
+            Joining fees: ₦{joiningFees.memberFee.toLocaleString('en-NG')} (₦{joiningFees.newMemberFee.toLocaleString('en-NG')} form fee
+            {' '}+ ₦{joiningFees.monthlyCharges} charges). Thereafter, ₦{joiningFees.monthlyCharges} monthly.
+            Fees are separate from your savings.
+          </p>
           <section className="auth-register-section" aria-labelledby="registration-password">
             <h2 id="registration-password" className="auth-section-title">
               <span aria-hidden="true">3</span> Create your password

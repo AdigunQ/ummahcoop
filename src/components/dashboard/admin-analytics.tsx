@@ -12,10 +12,10 @@ import {
   UserCheck,
   Wallet,
 } from 'lucide-react'
-import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
+import { getCurrentMemberLiveDataset, getCurrentMemberReportDataset } from '@/lib/current-member-data'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
-import { firstVoucherPeriodForCreatedAt, resolveVoucherPeriod } from '@/lib/vouchers'
+import { resolveVoucherPeriod } from '@/lib/vouchers'
 import { canOpenAdminRoute } from '@/components/admin/overview-access'
 
 type TrendRow = {
@@ -68,6 +68,7 @@ export async function AdminAnalytics({
   const now = new Date()
   const currentMonth = resolveVoucherPeriod().period
   const currentLabel = formatPeriodLabel(currentMonth)
+  const currentDatasetPromise = getCurrentMemberLiveDataset(currentMonth)
 
   const [
     currentDataset,
@@ -77,7 +78,7 @@ export async function AdminAnalytics({
     queueCounts,
     trends,
   ] = await Promise.all([
-    getCurrentMemberLiveDataset(currentMonth),
+    currentDatasetPromise,
     prisma.user.count({ where: { role: 'MEMBER', status: 'ACTIVE' } }),
     prisma.loan.findMany({
       where: { status: 'APPROVED', balance: { gt: 0 } },
@@ -107,44 +108,20 @@ export async function AdminAnalytics({
         const end = new Date(start.getFullYear(), start.getMonth() + 1, 1)
         const period = toPeriod(start)
 
-        const [registrations, eligibleMembers] = await Promise.all([
+        const [registrations, periodDataset] = await Promise.all([
           prisma.user.count({
             where: {
               role: 'MEMBER',
               createdAt: { gte: start, lt: end },
             },
           }),
-          prisma.user.findMany({
-            where: {
-              role: 'MEMBER',
-              status: 'ACTIVE',
-              voucherEnabled: true,
-              OR: [{ monthlyContribution: { gt: 0 } }, { specialContribution: { gt: 0 } }],
-              createdAt: { lt: end },
-            },
-            select: {
-              createdAt: true,
-              monthlyContribution: true,
-              specialContribution: true,
-            },
-          }),
+          period === currentMonth ? currentDatasetPromise : getCurrentMemberReportDataset(period),
         ])
 
-        const included = eligibleMembers.filter(
-          (member) => firstVoucherPeriodForCreatedAt(member.createdAt) <= period
-        )
-        const newCount = included.filter(
-          (member) => firstVoucherPeriodForCreatedAt(member.createdAt) === period
-        ).length
-        const oldCount = Math.max(0, included.length - newCount)
-        const newMemberFeeRevenue = newCount * 1000
-        const chargeRevenue = oldCount * 100
+        const newMemberFeeRevenue = sum(periodDataset.rows.map((row) => row.newMemberFee))
+        const chargeRevenue = sum(periodDataset.rows.map((row) => row.monthlyCharges))
         const voucherFees = newMemberFeeRevenue + chargeRevenue
-        const savingsBasis = included.reduce(
-          (acc, member) =>
-            acc + (member.monthlyContribution || 0) + (member.specialContribution || 0),
-          0
-        )
+        const savingsBasis = sum(periodDataset.rows.map((row) => row.monthlySavings + row.specialSavings))
 
         return {
           period,
