@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
+import { UnscheduledMembers } from '@/components/admin/unscheduled-members'
 import type { VoucherRow } from '@/lib/vouchers'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 import MemberDirectoryTable from './member-directory-table'
@@ -97,6 +98,7 @@ export default async function DirectoryPage({ searchParams: searchParamsInput }:
           </Link>
         }
       />
+      <UnscheduledMembers members={liveDataset.unscheduledMembers} canEdit />
       {searchParams?.deleted === '1' && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           Member deleted successfully.
@@ -111,7 +113,12 @@ export default async function DirectoryPage({ searchParams: searchParamsInput }:
 
       <AdminStats
         items={[
-          { label: 'Current members', value: String(members.length) },
+          {
+            label: 'Current members',
+            value: String(members.length + liveDataset.unscheduledMembers.length),
+            note: liveDataset.unscheduledMembers.length
+              ? `${liveDataset.unscheduledMembers.length} awaiting deductions` : undefined,
+          },
           {
             label: 'Thrift savers',
             value: String(members.filter((m) => m.monthlySavings > 0).length),

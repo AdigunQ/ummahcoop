@@ -8,8 +8,21 @@ import {
   type VoucherRow,
 } from '@/lib/vouchers'
 
-export async function getLatestMemberDataMonth() {
+export type UnscheduledMember = {
+  id: string
+  staffId: string | null
+  name: string | null
+  monthlyContribution: number
+  specialContribution: number
+  firstReportPeriod: string
+  reason: 'SAVINGS_NOT_SET' | 'VOUCHER_DISABLED' | 'NEXT_PERIOD'
+}
+
+export type CurrentMemberDataset = VoucherDataset & { unscheduledMembers: UnscheduledMember[] }
+
+export async function getLatestMemberDataMonth(period?: string) {
   return prisma.memberDataMonth.findFirst({
+    where: period ? { period: { lte: period } } : undefined,
     orderBy: { period: 'desc' },
     select: {
       period: true,
@@ -46,8 +59,8 @@ export async function getCurrentMemberReportDataset(periodInput?: string): Promi
   return buildVoucherDataset(period)
 }
 
-function normalizeKey(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase()
+export function normalizeMemberDataStaffId(value: unknown): string {
+  return String(value ?? '').trim().replace(/\s+/g, '').toUpperCase()
 }
 
 function computeTotals(rows: VoucherRow[]) {
@@ -115,41 +128,55 @@ function rollForwardExistingRow(row: VoucherRow): VoucherRow {
   }
 }
 
-export async function getCurrentMemberLiveDataset(periodInput?: string): Promise<VoucherDataset> {
+export async function getCurrentMemberLiveDataset(periodInput?: string): Promise<CurrentMemberDataset> {
   const { period, start, end } = resolveVoucherPeriod(periodInput)
-  const latestMonth = await getLatestMemberDataMonth()
-
-  if (!latestMonth || latestMonth.period === period) {
-    return buildVoucherDataset(period)
-  }
-
-  const baseDataset = await buildVoucherDataset(latestMonth.period)
-  const carriedForwardRows = baseDataset.rows.map((row) => rollForwardExistingRow(row))
-  const baseKeys = new Set(carriedForwardRows.map((row) => normalizeKey(row.staffId)))
+  const latestMonth = await getLatestMemberDataMonth(period)
+  const baseDataset = latestMonth ? await buildVoucherDataset(latestMonth.period) : null
+  const baseRows = !baseDataset ? [] : latestMonth?.period === period
+    ? baseDataset.rows
+    : baseDataset.rows.map(rollForwardExistingRow)
+  const baseKeys = new Set(baseRows.map((row) => normalizeMemberDataStaffId(row.staffId)))
 
   const members = await prisma.user.findMany({
     where: {
       role: 'MEMBER',
       status: 'ACTIVE',
-      voucherEnabled: true,
-      OR: [{ monthlyContribution: { gt: 0 } }, { specialContribution: { gt: 0 } }],
     },
     select: {
+      id: true,
       name: true,
       staffId: true,
       monthlyContribution: true,
       specialContribution: true,
       createdAt: true,
+      voucherEnabled: true,
     },
     orderBy: [{ staffId: 'asc' }, { name: 'asc' }],
   })
 
   const newMembers = members
-    .filter((member) => !baseKeys.has(normalizeKey(member.staffId)))
+    .filter((member) => !baseKeys.has(normalizeMemberDataStaffId(member.staffId)))
+    .filter((member) => member.voucherEnabled && ((member.monthlyContribution || 0) > 0 || (member.specialContribution || 0) > 0))
     .filter((member) => firstVoucherPeriodForCreatedAt(member.createdAt) <= period)
-    .map((member, index) => buildCurrentLiveRow(member, carriedForwardRows.length + index + 1, period))
+    .map((member, index) => buildCurrentLiveRow(member, baseRows.length + index + 1, period))
 
-  const rows = [...carriedForwardRows, ...newMembers]
+  const rows = [...baseRows, ...newMembers]
+  const displayedKeys = new Set(rows.map((row) => normalizeMemberDataStaffId(row.staffId)))
+  // Approval controls membership visibility; payroll eligibility must not hide accounts.
+  const unscheduledMembers: UnscheduledMember[] = members
+    .filter((member) => member.createdAt.toISOString().slice(0, 7) <= period)
+    .filter((member) => !displayedKeys.has(normalizeMemberDataStaffId(member.staffId)))
+    .map((member) => ({
+      id: member.id,
+      staffId: member.staffId,
+      name: member.name,
+      monthlyContribution: member.monthlyContribution || 0,
+      specialContribution: member.specialContribution || 0,
+      firstReportPeriod: firstVoucherPeriodForCreatedAt(member.createdAt),
+      reason: !member.voucherEnabled ? 'VOUCHER_DISABLED'
+        : (member.monthlyContribution || 0) <= 0 && (member.specialContribution || 0) <= 0
+          ? 'SAVINGS_NOT_SET' : 'NEXT_PERIOD',
+    }))
   const totals = computeTotals(rows)
 
   return {
@@ -158,6 +185,7 @@ export async function getCurrentMemberLiveDataset(periodInput?: string): Promise
     end,
     rows,
     totals,
+    unscheduledMembers,
   }
 }
 

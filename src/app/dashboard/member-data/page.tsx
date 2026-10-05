@@ -5,11 +5,12 @@ import { Upload, Users, UserPlus, Wallet, Receipt, PiggyBank } from 'lucide-reac
 import { AdminHeading, AdminStats } from '@/components/admin/admin-ui'
 import { PeriodPicker } from '@/components/admin/period-picker'
 import { LedgerTable } from '@/components/ui/ledger-table'
+import { UnscheduledMembers } from '@/components/admin/unscheduled-members'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { buildVoucherDataset, resolveVoucherPeriod, type VoucherRow } from '@/lib/vouchers'
-import { getCurrentMemberLiveDataset } from '@/lib/current-member-data'
+import { getCurrentMemberLiveDataset, normalizeMemberDataStaffId, type UnscheduledMember } from '@/lib/current-member-data'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
 type SearchParams = {
@@ -327,13 +328,14 @@ export default async function MemberDataPage({ searchParams: searchParamsInput }
     comparePeriods(selectedPeriod, latestUploadedMonth?.period || '') > 0 &&
     comparePeriods(selectedPeriod, currentPeriod) <= 0
 
-  const liveDataset = shouldUseLiveProjection
+  const isCurrentLiveView = selectedPeriod === currentPeriod || shouldUseLiveProjection
+  const liveDataset = isCurrentLiveView
     ? await getCurrentMemberLiveDataset(selectedPeriod)
     : await buildVoucherDataset(selectedPeriod)
 
   const monthOptions: MonthOption[] = months.map((month) => ({
     period: month.period,
-    label: month.label,
+    label: month.period === currentPeriod ? `${month.label} (Live)` : month.label,
     isUploaded: true,
   }))
 
@@ -372,12 +374,23 @@ export default async function MemberDataPage({ searchParams: searchParamsInput }
   const snapshotStyle: SnapshotStyle = detectSnapshotStyle(
     uploadedColumns.length ? uploadedColumns : firstSnapshotKeys
   )
-  const isCurrentLiveView = shouldUseLiveProjection
-  let displayRows: DisplayRow[] = usingSnapshot
+  const displayRows: DisplayRow[] = usingSnapshot
     ? snapshotRows.map((row, index) =>
         toDisplayRowFromSnapshot(row, index, snapshotStyle, selectedPeriod)
       )
     : liveDataset.rows.map((row) => toDisplayRowFromVoucher(row, selectedPeriod))
+
+  if (usingSnapshot && isCurrentLiveView) {
+    const savedIds = new Set(displayRows.map((row) => normalizeMemberDataStaffId(row.staffId)))
+    displayRows.push(...liveDataset.rows
+      .filter((row) => !savedIds.has(normalizeMemberDataStaffId(row.staffId)))
+      .map((row) => toDisplayRowFromVoucher(row, selectedPeriod)))
+  }
+  const unscheduledMembers = isCurrentLiveView && 'unscheduledMembers' in liveDataset
+    ? liveDataset.unscheduledMembers as UnscheduledMember[] : []
+  const canEditMembers = unscheduledMembers.length > 0 && await canAccessWithPrivileges(
+    { id: session.user.id, role: session.user.role }, PRIVILEGE_CODES.EDIT_MEMBERS
+  )
 
   const tableColumns = ABANO_COLUMNS
 
@@ -388,11 +401,6 @@ export default async function MemberDataPage({ searchParams: searchParamsInput }
     fees: displayRows.reduce((sum, row) => sum + row.charges + row.newMemberFee, 0),
     savings: displayRows.reduce((sum, row) => sum + row.thriftSavings + row.specialSavings, 0),
   }
-
-  const currentLiveNote =
-    isCurrentLiveView && latestUploadedMonth
-      ? `${formatPeriodLabel(selectedPeriod)} keeps the same member list as ${latestUploadedMonth.label}. Rows carried forward from the previous snapshot show as OLD with Monthly Fee = 100 and Form Fee blank until fresh registrations are added.`
-      : null
 
   return (
     <div className="admin-page">
@@ -416,8 +424,10 @@ export default async function MemberDataPage({ searchParams: searchParamsInput }
         items={[
           {
             label: 'Members',
-            value: String(totals.rows),
-            note: totals.newMembers + ' new / ' + totals.oldMembers + ' existing',
+            value: String(totals.rows + unscheduledMembers.length),
+            note: unscheduledMembers.length
+              ? `${totals.rows} in ledger / ${unscheduledMembers.length} awaiting deductions`
+              : totals.newMembers + ' new / ' + totals.oldMembers + ' existing',
           },
           {
             label: 'Savings this month',
@@ -431,12 +441,20 @@ export default async function MemberDataPage({ searchParams: searchParamsInput }
           },
         ]}
       />
-      {isCurrentLiveView && latestUploadedMonth && (
+      {isCurrentLiveView ? (
         <p className="rounded-xl border border-accent/15 bg-accent/5 px-4 py-3 text-xs leading-6 text-muted-foreground">
-          The live month carries forward members from {latestUploadedMonth.label}, with new
-          registrations included as they join.
+          Approved members are included automatically. Saved monthly rows are preserved; accounts
+          awaiting savings setup or a later deduction date are listed separately below.
+        </p>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          This is the saved {formatPeriodLabel(selectedPeriod)} sheet. Later approvals do not change it.{' '}
+          <Link className="admin-inline-link" href={`/dashboard/member-data?period=${currentPeriod}`}>
+            View current members
+          </Link>
         </p>
       )}
+      <UnscheduledMembers members={unscheduledMembers} canEdit={canEditMembers} />
       <LedgerTable
         key={selectedPeriod}
         title={

@@ -7,11 +7,13 @@ type SavedRow = Record<string, string | number>
 const snapshots = new Map<string, SavedRow[]>()
 let latestPeriod: string | null = null
 let members: Array<{
+  id: string
   name: string
   staffId: string
   monthlyContribution: number
   specialContribution: number
   createdAt: Date
+  voucherEnabled: boolean
 }> = []
 
 // Read-only fakes keep fee regression tests completely off the real database.
@@ -31,6 +33,7 @@ function reset() {
   snapshots.clear()
   latestPeriod = null
   members = [{
+    id: 'new-member-test', voucherEnabled: true,
     name: 'New member test', staffId: '018525', monthlyContribution: 50000,
     specialContribution: 0, createdAt: new Date('2026-09-08T10:03:44Z'),
   }]
