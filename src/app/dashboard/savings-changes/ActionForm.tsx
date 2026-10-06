@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type ReactNode, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import { parseSavingsChangePlan } from '@/lib/savings-change-policy'
 
 export function SavingsActionForm({ action, children, label, review = false }: {
   action: (data: FormData) => Promise<{ error?: string; success?: string }>
@@ -19,6 +20,14 @@ export function SavingsActionForm({ action, children, label, review = false }: {
     const button = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
     if (review) data.set('decision', button?.value || '')
     setResult({})
+    if (data.has('thrift') || data.has('special')) {
+      try {
+        parseSavingsChangePlan(data.get('thrift'), data.get('special'))
+      } catch (error) {
+        setResult({ error: error instanceof Error ? error.message : 'Check your savings amounts.' })
+        return
+      }
+    }
     startTransition(async () => {
       try {
         const response = await action(data)

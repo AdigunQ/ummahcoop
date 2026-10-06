@@ -23,6 +23,20 @@ export function parseSavingsAmount(value: unknown): number {
   return amount
 }
 
+export const MIN_MONTHLY_SAVINGS = 10000
+
+export function parseSavingsChangePlan(thriftInput: unknown, specialInput: unknown) {
+  const thrift = parseSavingsAmount(thriftInput)
+  const special = parseSavingsAmount(specialInput)
+  for (const [label, amount] of [['Thrift', thrift], ['Special', special]] as const) {
+    if (amount > 0 && amount < MIN_MONTHLY_SAVINGS) {
+      throw new Error(`${label} savings must be at least 10,000 per month. Enter 0 if you do not want this plan.`)
+    }
+  }
+  if (thrift + special === 0) throw new Error('Keep at least one savings plan of 10,000 or more. Contact the admin if you want to stop saving entirely.')
+  return { thrift, special }
+}
+
 export function savingsPlanName(thrift: number, special: number): string {
   return thrift > 0 && special > 0 ? 'BOTH' : thrift > 0 ? 'THRIFT' : 'SPECIAL'
 }

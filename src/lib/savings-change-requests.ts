@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { resolveContributionPlans } from '@/lib/contribution-plans'
-import { parseSavingsAmount, savingsPeriod, validateSavingsPeriod } from '@/lib/savings-change-policy'
+import { parseSavingsChangePlan, savingsPeriod, validateSavingsPeriod } from '@/lib/savings-change-policy'
 import { lockContributionPeriod } from '@/lib/contribution-period-lock'
 
 async function activeMember(tx: Prisma.TransactionClient, userId: string) {
@@ -36,8 +36,7 @@ function serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
 export async function requestSavingsChange(userId: string, input: {
   thrift: unknown; special: unknown; requestedPeriod: string; reason?: string
 }, now = new Date()) {
-  const thrift = parseSavingsAmount(input.thrift), special = parseSavingsAmount(input.special)
-  if (thrift + special <= 0) throw new Error('Keep at least one savings plan above zero. Contact the admin if you want to stop saving entirely.')
+  const { thrift, special } = parseSavingsChangePlan(input.thrift, input.special)
   const reason = (input.reason || '').trim()
   if (reason.length > 1000) throw new Error('Keep the reason under 1,000 characters.')
   return serializable(async tx => {
@@ -79,6 +78,7 @@ export async function reviewSavingsChange(reviewerId: string, input: {
     if (!request || request.status !== 'PENDING') throw new Error('This request has already been reviewed or cancelled.')
     if (request.userId === reviewerId) throw new Error('Another authorised admin must review your own savings change.')
     if (input.decision === 'approve') {
+      parseSavingsChangePlan(request.requestedThrift, request.requestedSpecial)
       await activeMember(tx, request.userId)
       await requireOpenPeriod(tx, input.effectivePeriod, now)
       if (input.effectivePeriod < request.requestedPeriod) throw new Error('The effective month cannot be earlier than the month requested by the member.')

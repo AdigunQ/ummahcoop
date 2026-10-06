@@ -10,6 +10,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { AdminHeading, AdminPanel, AdminStats } from '@/components/admin/admin-ui'
 import { AdminCollection, AdminReviewItem } from '@/components/admin/admin-collection'
 import { SavingsActionForm } from './ActionForm'
+import { SavingsComparison } from './SavingsComparison'
 import { submitSavingsChange, cancelSavingsChangeAction, reviewSavingsChangeAction } from './actions'
 
 function monthLabel(period: string) {
@@ -59,10 +60,10 @@ export default async function SavingsChangesPage({ searchParams }: { searchParam
           Pending requests can be cancelled before submitting another.</p> :
           <div className="p-5 sm:p-7"><SavingsActionForm action={submitSavingsChange} label="Send request for review">
             <div className="grid gap-5 sm:grid-cols-2">
-              <label className="space-y-2"><span className="block">New monthly thrift (naira)</span><input className="settings-input" name="thrift" type="number" required min="0" max="100000000" step="1" defaultValue={current.monthlyContribution || 0} /></label>
-              <label className="space-y-2"><span className="block">New monthly special (naira)</span><input className="settings-input" name="special" type="number" required min="0" max="100000000" step="1" defaultValue={current.specialContribution || 0} /></label>
+              <label className="space-y-2"><span className="block">New monthly thrift</span><input className="settings-input" name="thrift" type="number" required min="0" max="100000000" step="1" defaultValue={current.monthlyContribution || 0} /></label>
+              <label className="space-y-2"><span className="block">New monthly special</span><input className="settings-input" name="special" type="number" required min="0" max="100000000" step="1" defaultValue={current.specialContribution || 0} /></label>
             </div>
-            <p className="text-sm text-muted-foreground">Enter 0 for a plan you do not want. Keep at least one plan above zero.</p>
+            <p className="text-sm text-muted-foreground">Each selected plan must be at least ₦10,000 per month. Enter 0 for a plan you do not want. Keep at least one plan selected.</p>
             <label className="block space-y-2"><span className="block">Requested start month</span><input className="settings-input" type="month" name="requestedPeriod" required min={minimum} max={maximum} defaultValue={minimum} /></label>
             <label className="block space-y-2"><span className="block">Reason (optional)</span><textarea name="reason" className="settings-input" rows={3} maxLength={1000} /></label>
           </SavingsActionForm></div>}
@@ -76,9 +77,9 @@ export default async function SavingsChangesPage({ searchParams }: { searchParam
             heading={reviewing ? request.user.name || 'Unnamed member' : `Requested ${monthLabel(request.requestedPeriod)}`}
             meta={reviewing ? `Staff ID ${request.user.staffId || 'Not set'} · ${formatDateTime(request.createdAt)}` : formatDateTime(request.createdAt)}
             status={request.status} searchText={`${request.user.name} ${request.user.staffId} ${request.status}`}>
+            <SavingsComparison previousThrift={request.previousThrift} previousSpecial={request.previousSpecial}
+              requestedThrift={request.requestedThrift} requestedSpecial={request.requestedSpecial} />
             <dl className="grid gap-5 sm:grid-cols-2">
-              <div><dt className="text-sm text-muted-foreground">Monthly thrift</dt><dd className="mt-1 font-semibold">{formatCurrency(request.previousThrift)} → {formatCurrency(request.requestedThrift)}</dd></div>
-              <div><dt className="text-sm text-muted-foreground">Monthly special</dt><dd className="mt-1 font-semibold">{formatCurrency(request.previousSpecial)} → {formatCurrency(request.requestedSpecial)}</dd></div>
               <div><dt className="text-sm text-muted-foreground">Requested month</dt><dd>{monthLabel(request.requestedPeriod)}</dd></div>
               {request.effectivePeriod && <div><dt className="text-sm text-muted-foreground">Approved start month</dt><dd>{monthLabel(request.effectivePeriod)}{request.effectivePeriod <= period ? ' · In effect' : ' · Scheduled'}</dd></div>}
             </dl>

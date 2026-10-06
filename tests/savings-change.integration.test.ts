@@ -11,7 +11,7 @@ let plans: typeof import('../src/lib/contribution-plans')
 let datasets: typeof import('../src/lib/current-member-data')
 let vouchers: typeof import('../src/lib/vouchers')
 const now = new Date('2026-10-06T12:00:00Z')
-const input = { thrift: '10000', special: '8000', requestedPeriod: '2026-11' }
+const input = { thrift: '10000', special: '15000', requestedPeriod: '2026-11' }
 
 before(async () => {
   if (!url) return
@@ -85,9 +85,9 @@ integration('request -> review -> effective month keeps every stored balance, sh
   for (const dataset of [november, december]) {
     const row = dataset.rows.find(row => row.staffId === '009709')!
     assert.equal(row.monthlySavings, 10000)
-    assert.equal(row.specialSavings, 8000)
+    assert.equal(row.specialSavings, 15000)
     assert.equal(row.memberFee, 100)
-    assert.equal(row.totalSavings, 18100)
+    assert.equal(row.totalSavings, 25100)
   }
   assert.equal((await vouchers.buildVoucherDataset('2026-11')).rows.find(row => row.staffId === '009709')!.monthlySavings, 10000)
   assert.deepEqual(await financialState(), before)
@@ -168,7 +168,7 @@ integration('scheduled changes prevent conflicting requests until they take effe
   await assert.rejects(service.requestSavingsChange('member', { ...input, thrift: '12000' }, now), /pending or scheduled/)
   const next = await service.requestSavingsChange('member', { ...input, thrift: '12000', requestedPeriod: '2026-12' }, new Date('2026-11-02T12:00:00Z'))
   assert.equal(next.previousThrift, 10000)
-  assert.equal(next.previousSpecial, 8000)
+  assert.equal(next.previousSpecial, 15000)
 })
 
 integration('amount validation rejects empty, zero-total, negative, huge and unchanged plans', async () => {
@@ -230,4 +230,27 @@ integration('database constraint also blocks duplicate pending requests', async 
   const { id, createdAt, updatedAt, ...data } = request
   await assert.rejects(db.savingsChangeRequest.create({ data }), (error: any) => error.code === 'P2002')
   assert.equal(await db.savingsChangeRequest.count(), 1)
+})
+
+integration('below-minimum plans are rejected server-side without changing existing savings', async () => {
+  const before = await financialState()
+  for (const [thrift, special] of [[9999, 20000], [20000, 9999], [5000, 5000], [0, 9999]]) {
+    await assert.rejects(service.requestSavingsChange('member', { ...input, thrift, special }, now), /10,000/)
+  }
+  assert.equal(await db.savingsChangeRequest.count(), 0)
+  assert.deepEqual(await financialState(), before)
+  const request = await service.requestSavingsChange('member', { ...input, thrift: '10000', special: '0' }, now)
+  await approve(request.id)
+  assert.deepEqual(await financialState(), before)
+})
+
+integration('older pending requests below the new minimum cannot be approved but can be declined', async () => {
+  const request = await db.savingsChangeRequest.create({ data: {
+    userId: 'member', previousThrift: 20000, previousSpecial: 5000,
+    requestedThrift: 9000, requestedSpecial: 20000, requestedPeriod: '2026-11',
+  } })
+  await assert.rejects(approve(request.id), /Thrift savings must be at least 10,000/)
+  assert.equal((await db.savingsChangeRequest.findUniqueOrThrow({ where: { id: request.id } })).status, 'PENDING')
+  await service.reviewSavingsChange('manager', { requestId: request.id, decision: 'reject', effectivePeriod: '' }, now)
+  assert.equal((await db.savingsChangeRequest.findUniqueOrThrow({ where: { id: request.id } })).status, 'REJECTED')
 })
