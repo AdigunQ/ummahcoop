@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
+import { resolveContributionPlans } from '@/lib/contribution-plans'
 
 function monthRange(baseDate: Date) {
   const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1)
@@ -28,7 +29,7 @@ export default async function FinanceReportPage() {
   const today = new Date()
   const { start, end } = monthRange(today)
 
-  const [activeSavers, approvedLoans, directRepaymentsThisMonth] = await Promise.all([
+  const [storedSavers, approvedLoans, directRepaymentsThisMonth] = await Promise.all([
     prisma.user.findMany({
       where: {
         role: 'MEMBER',
@@ -36,6 +37,7 @@ export default async function FinanceReportPage() {
         voucherEnabled: true,
       },
       select: {
+        id: true,
         name: true,
         staffId: true,
         department: true,
@@ -82,6 +84,7 @@ export default async function FinanceReportPage() {
       },
     }),
   ])
+  const activeSavers = await resolveContributionPlans(storedSavers)
 
   const directRepaymentByUser = new Map<string, number>()
   for (const payment of directRepaymentsThisMonth) {

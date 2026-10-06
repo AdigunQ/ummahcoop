@@ -87,8 +87,42 @@ model User {
   privilegesGranted MemberPrivilege[] @relation("PrivilegeGrantedBy")
   payrollLines  PayrollLine[]
   memberDataMonths MemberDataMonth[] @relation("MemberDataMonthUploader")
+  savingsChanges SavingsChangeRequest[] @relation("SavingsChangeMember")
+  savingsChangesReviewed SavingsChangeRequest[] @relation("SavingsChangeReviewer")
 
   @@map("users")
+}
+
+enum SavingsChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model SavingsChangeRequest {
+  id                String @id @default(cuid())
+  userId            String @map("user_id")
+  previousThrift    Float @map("previous_thrift")
+  previousSpecial   Float @map("previous_special")
+  requestedThrift   Float @map("requested_thrift")
+  requestedSpecial  Float @map("requested_special")
+  requestedPeriod   String @map("requested_period")
+  effectivePeriod   String? @map("effective_period")
+  reason            String?
+  status            SavingsChangeStatus @default(PENDING)
+  reviewedById      String? @map("reviewed_by_id")
+  reviewNote        String? @map("review_note")
+  reviewedAt        DateTime? @map("reviewed_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation("SavingsChangeMember", fields: [userId], references: [id], onDelete: Restrict)
+  reviewedBy User? @relation("SavingsChangeReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, effectivePeriod])
+  @@index([status, createdAt])
+  @@map("savings_change_requests")
 }
 
 model VerificationToken {

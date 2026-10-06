@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma'
+import { resolveContributionPlans } from '@/lib/contribution-plans'
+import { savingsPeriod } from '@/lib/savings-change-policy'
 import {
   calculateMemberFees,
   MEMBER_MONTHLY_CHARGE as VOUCHER_MONTHLY_CHARGE,
@@ -70,10 +72,10 @@ type SnapshotRow = {
 }
 
 export function resolveVoucherPeriod(periodInput?: string) {
-  const fallback = new Date()
+  const fallback = savingsPeriod()
   const value = (periodInput || '').trim()
   const valid = /^\d{4}-\d{2}$/.test(value)
-  const [year, month] = (valid ? value : `${fallback.getFullYear()}-${String(fallback.getMonth() + 1).padStart(2, '0')}`)
+  const [year, month] = (valid ? value : fallback)
     .split('-')
     .map(Number)
 
@@ -328,14 +330,14 @@ export async function buildVoucherDataset(periodInput?: string): Promise<Voucher
     }
   }
 
-  const members = await prisma.user.findMany({
+  const storedMembers = await prisma.user.findMany({
     where: {
       role: 'MEMBER',
       status: 'ACTIVE',
       voucherEnabled: true,
-      OR: [{ monthlyContribution: { gt: 0 } }, { specialContribution: { gt: 0 } }],
     },
     select: {
+      id: true,
       name: true,
       staffId: true,
       monthlyContribution: true,
@@ -344,6 +346,8 @@ export async function buildVoucherDataset(periodInput?: string): Promise<Voucher
     },
     orderBy: [{ staffId: 'asc' }, { name: 'asc' }],
   })
+  const members = (await resolveContributionPlans(storedMembers, period))
+    .filter(member => (member.monthlyContribution || 0) > 0 || (member.specialContribution || 0) > 0)
 
   const rows: VoucherRow[] = members
     .map((member, index) =>

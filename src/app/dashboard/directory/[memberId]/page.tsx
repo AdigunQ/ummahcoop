@@ -18,6 +18,7 @@ import { formatCurrency } from '@/lib/utils'
 import ConfirmDeleteButton from './confirm-delete-button'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 import { getMemberFinanceSummary } from '@/lib/member-finance'
+import { resolveContributionPlans } from '@/lib/contribution-plans'
 
 type SearchParams = {
   saved?: string
@@ -33,6 +34,7 @@ function mapSaveError(error?: string): string | null {
   if (error === 'invalid_staff') return 'Staff ID must contain only letters, numbers, or hyphen.'
   if (error === 'duplicate_staff') return 'Staff ID already belongs to another member.'
   if (error === 'save_failed') return 'Could not save this profile. Please try again.'
+  if (error === 'savings_history') return 'This member has savings-change review history and cannot be permanently deleted.'
   return 'Could not save this profile.'
 }
 
@@ -42,12 +44,6 @@ function revalidateMemberViews(memberId?: string) {
   // Member data is read by many dashboard pages. Invalidate the dashboard
   // layout so no sibling page keeps an older server-rendered snapshot.
   revalidatePath('/dashboard', 'layout')
-}
-
-function snapshotNumber(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  const parsed = Number(String(value ?? '').replace(/[,₦\s]/g, ''))
-  return Number.isFinite(parsed) ? parsed : 0
 }
 
 function snapshotStaffId(value: unknown): string {
@@ -61,9 +57,7 @@ function snapshotStaffId(value: unknown): string {
 function syncLatestSnapshotRows(
   rows: unknown,
   previousStaffId: string,
-  staffId: string,
-  monthlyContribution: number,
-  specialContribution: number
+  staffId: string
 ): Prisma.InputJsonValue {
   if (!Array.isArray(rows)) return rows as Prisma.InputJsonValue
 
@@ -76,23 +70,6 @@ function syncLatestSnapshotRows(
 
     if ('Employee No.' in row || !('Staff ID' in row)) row['Employee No.'] = staffId
     if ('Staff ID' in row) row['Staff ID'] = staffId
-    if ('Monthly Saving' in row) row['Monthly Saving'] = monthlyContribution
-    if ('Thrift Savings' in row) row['Thrift Savings'] = monthlyContribution
-    if ('Special Saving' in row) row['Special Saving'] = specialContribution
-    if ('Special Savings' in row) row['Special Savings'] = specialContribution
-    if ('Amount' in row) row.Amount = monthlyContribution + specialContribution
-
-    const total =
-      monthlyContribution +
-      specialContribution +
-      snapshotNumber(row.Loan) +
-      snapshotNumber(row['Management Fee']) +
-      snapshotNumber(row.Commodity) +
-      snapshotNumber(row['Monthly Fee'] ?? row.Charges) +
-      snapshotNumber(row['Form Fee'] ?? row['New Member Fee'])
-
-    if ('Total' in row) row.Total = total
-    if ('Expected Total' in row) row['Expected Total'] = total
     return row
   }) as Prisma.InputJsonValue
 }
@@ -112,10 +89,7 @@ async function updateMemberRecord(formData: FormData) {
 
   const memberId = String(formData.get('memberId') || '')
   const staffId = normalizeStaffId(String(formData.get('staffId') || ''))
-  const monthlyContribution = Number(formData.get('monthlyContribution') || 0)
-  const specialContribution = Number(formData.get('specialContribution') || 0)
   const department = String(formData.get('department') || '').trim()
-  const savingsPlan = String(formData.get('savingsPlan') || '').trim()
   const organization = String(formData.get('organization') || '').trim()
   const station = String(formData.get('station') || '').trim()
   const gradeLevel = String(formData.get('gradeLevel') || '').trim()
@@ -134,12 +108,6 @@ async function updateMemberRecord(formData: FormData) {
   if (!memberId) redirect('/dashboard/directory')
   if (!staffId || !/^[A-Z0-9-]+$/.test(staffId)) {
     redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=invalid_staff`)
-  }
-  if (!Number.isFinite(monthlyContribution) || monthlyContribution < 0) {
-    redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
-  }
-  if (!Number.isFinite(specialContribution) || specialContribution < 0) {
-    redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
   }
   if (!Number.isFinite(balance) || balance < 0) {
     redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=save_failed`)
@@ -181,7 +149,6 @@ async function updateMemberRecord(formData: FormData) {
         data: {
           staffId,
           department: department || null,
-          savingsPlan: savingsPlan || null,
           organization: organization || null,
           station: station || null,
           gradeLevel: gradeLevel || null,
@@ -189,8 +156,6 @@ async function updateMemberRecord(formData: FormData) {
           nextOfKinPhone: nextOfKinPhone || null,
           nextOfKinEmail: nextOfKinEmail || null,
           nextOfKinRelationship: nextOfKinRelationship || null,
-          monthlyContribution,
-          specialContribution,
           balance,
           specialBalance,
           loanPrincipal,
@@ -206,7 +171,6 @@ async function updateMemberRecord(formData: FormData) {
         data: {
           staffId,
           department: department || 'N/A',
-          monthlyDeduction: monthlyContribution + specialContribution,
         },
       })
 
@@ -214,16 +178,14 @@ async function updateMemberRecord(formData: FormData) {
         orderBy: { period: 'desc' },
         select: { id: true, rows: true },
       })
-      if (latestSnapshot) {
+      if (latestSnapshot && snapshotStaffId(existingMember.staffId) !== staffId) {
         await tx.memberDataMonth.update({
           where: { id: latestSnapshot.id },
           data: {
             rows: syncLatestSnapshotRows(
               latestSnapshot.rows,
               snapshotStaffId(existingMember.staffId),
-              staffId,
-              monthlyContribution,
-              specialContribution
+              staffId
             ),
           },
         })
@@ -245,6 +207,9 @@ async function deleteMemberRecord(formData: FormData) {
 
   const memberId = String(formData.get('memberId') || '')
   if (!memberId) redirect('/dashboard/directory?deleteError=1')
+  if (await prisma.savingsChangeRequest.count({ where: { userId: memberId } })) {
+    redirect(`/dashboard/directory/${encodeURIComponent(memberId)}?error=savings_history`)
+  }
 
   const deleted = await prisma.user.deleteMany({
     where: {
@@ -283,7 +248,7 @@ export default async function MemberProfileEditorPage({
     redirect('/dashboard')
   const isFullAdmin = session.user.role === 'ADMIN'
 
-  const member = await prisma.user.findUnique({
+  let member = await prisma.user.findUnique({
     where: { id: params.memberId },
     select: {
       id: true,
@@ -314,6 +279,7 @@ export default async function MemberProfileEditorPage({
   })
 
   if (!member) redirect('/dashboard/directory')
+  ;[member] = await resolveContributionPlans([member])
   const financeSummary = await getMemberFinanceSummary(member.id, member.staffId)
   const justSaved = searchParams?.saved === '1'
   const saveError = mapSaveError(searchParams?.error)
@@ -445,31 +411,12 @@ export default async function MemberProfileEditorPage({
               'Contribution amounts are monthly deductions. Savings balances are the amounts already held for this member. These are different values.',
             content: (
               <>
-                <div className="sm:col-span-2">
-                  <label className="mb-2.5 block text-xs font-medium">Savings plan</label>
-                  <FormSelect
-                    name="savingsPlan"
-                    aria-label="Savings plan"
-                    defaultValue={member.savingsPlan || ''}
-                  >
-                    <option value="">Not selected</option>
-                    <option value="THRIFT">Thrift savings</option>
-                    <option value="SPECIAL">Special savings</option>
-                    <option value="BOTH">Thrift + Special</option>
-                  </FormSelect>
-                </div>
-                <EditField
-                  label="Monthly thrift contribution"
-                  name="monthlyContribution"
-                  value={member.monthlyContribution || 0}
-                  type="number"
-                />
-                <EditField
-                  label="Monthly special contribution"
-                  name="specialContribution"
-                  value={member.specialContribution || 0}
-                  type="number"
-                />
+                <div><p className="text-sm text-muted-foreground">Current monthly thrift</p><p className="font-semibold">{formatCurrency(member.monthlyContribution || 0)}</p></div>
+                <div><p className="text-sm text-muted-foreground">Current monthly special</p><p className="font-semibold">{formatCurrency(member.specialContribution || 0)}</p></div>
+                <p className="sm:col-span-2 text-sm leading-7">Members can request a new monthly amount from their account.{' '}
+                  <Link href="/dashboard/savings-changes" className="admin-inline-link">Review savings changes</Link>{' '}
+                  to approve an effective month without changing past deductions.
+                </p>
                 <EditField
                   label="Thrift savings balance"
                   name="balance"

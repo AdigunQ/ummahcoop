@@ -98,6 +98,7 @@ export async function AdminAnalytics({
       prisma.loan.count({ where: { status: 'PENDING' } }),
       prisma.withdrawal.count({ where: { status: 'PENDING' } }),
       prisma.commodityRequest.count({ where: { status: 'PENDING' } }),
+      prisma.savingsChangeRequest.count({ where: { status: 'PENDING' } }),
     ]),
     Promise.all(
       Array.from(
@@ -137,7 +138,7 @@ export async function AdminAnalytics({
     ),
   ])
 
-  const [pendingMembers, pendingPayments, pendingLoans, pendingWithdrawals, pendingCommodities] = queueCounts
+  const [pendingMembers, pendingPayments, pendingLoans, pendingWithdrawals, pendingCommodities, pendingSavingsChanges] = queueCounts
   const currentRows = currentDataset.rows
   const currentThriftSavings = sum(currentRows.map((row) => row.monthlySavings))
   const currentSpecialSavings = sum(currentRows.map((row) => row.specialSavings))
@@ -189,7 +190,7 @@ export async function AdminAnalytics({
   }
   const activeCommodities = commodityAmounts.size
   const outstandingCommodityBalance = sum(Array.from(commodityAmounts.values()))
-  const pendingApprovals = pendingMembers + pendingPayments + pendingLoans + pendingWithdrawals + pendingCommodities
+  const pendingApprovals = pendingMembers + pendingPayments + pendingLoans + pendingWithdrawals + pendingCommodities + pendingSavingsChanges
 
   const totalChargesRevenue = sum(trends.map((row) => row.chargeRevenue))
   const totalNewMemberFeeRevenue = sum(trends.map((row) => row.newMemberFeeRevenue))
@@ -258,6 +259,12 @@ export async function AdminAnalytics({
         >
           <div className="admin-decision-list">
             {[
+              {
+                label: 'Savings changes',
+                count: pendingSavingsChanges,
+                href: '/dashboard/savings-changes',
+                icon: Wallet,
+              },
               {
                 label: 'Memberships',
                 count: pendingMembers,

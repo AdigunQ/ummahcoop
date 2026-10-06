@@ -76,16 +76,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const canSeeAdminBadges = user.role === 'ADMIN' || privilegeCount > 0
 
   let adminBadges:
-    | { pendingMembers: number; pendingPayments: number; pendingLoans: number }
+    | { pendingMembers: number; pendingPayments: number; pendingLoans: number; pendingSavingsChanges: number }
     | undefined
   if (canSeeAdminBadges) {
     try {
-      const [pendingMembers, pendingPayments, pendingLoans] = await Promise.all([
+      const [pendingMembers, pendingPayments, pendingLoans, pendingSavingsChanges] = await Promise.all([
         prisma.user.count({ where: { role: 'MEMBER', status: 'PENDING' } }),
         prisma.payment.count({ where: { status: 'PENDING' } }),
         prisma.loan.count({ where: { status: 'PENDING' } }),
+        prisma.savingsChangeRequest.count({ where: { status: 'PENDING' } }),
       ])
-      adminBadges = { pendingMembers, pendingPayments, pendingLoans }
+      adminBadges = { pendingMembers, pendingPayments, pendingLoans, pendingSavingsChanges }
     } catch (error) {
       console.error('[dashboard-layout] admin badges unavailable', error)
     }

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { calculateMemberFees } from '@/lib/member-fees'
+import { getApprovedSavingsPlans } from '@/lib/contribution-plans'
 import {
   buildVoucherDataset,
   firstVoucherPeriodForCreatedAt,
@@ -137,7 +138,7 @@ export async function getCurrentMemberLiveDataset(periodInput?: string): Promise
     : baseDataset.rows.map(rollForwardExistingRow)
   const baseKeys = new Set(baseRows.map((row) => normalizeMemberDataStaffId(row.staffId)))
 
-  const members = await prisma.user.findMany({
+  const storedMembers = await prisma.user.findMany({
     where: {
       role: 'MEMBER',
       status: 'ACTIVE',
@@ -154,13 +155,25 @@ export async function getCurrentMemberLiveDataset(periodInput?: string): Promise
     orderBy: [{ staffId: 'asc' }, { name: 'asc' }],
   })
 
+  const plans = await getApprovedSavingsPlans(period, storedMembers.map(member => member.id), latestMonth?.period)
+  const plansByStaffId = new Map(storedMembers.map(member => [normalizeMemberDataStaffId(member.staffId), plans.get(member.id)]))
+  const effectiveBaseRows = baseRows.map(row => {
+    const plan = plansByStaffId.get(normalizeMemberDataStaffId(row.staffId))
+    return plan ? { ...row, monthlySavings: plan.requestedThrift, specialSavings: plan.requestedSpecial,
+      totalSavings: row.totalSavings - row.monthlySavings - row.specialSavings + plan.requestedThrift + plan.requestedSpecial } : row
+  })
+  const members = storedMembers.map(member => {
+    const plan = plans.get(member.id)
+    return plan ? { ...member, monthlyContribution: plan.requestedThrift, specialContribution: plan.requestedSpecial } : member
+  })
+
   const newMembers = members
     .filter((member) => !baseKeys.has(normalizeMemberDataStaffId(member.staffId)))
     .filter((member) => member.voucherEnabled && ((member.monthlyContribution || 0) > 0 || (member.specialContribution || 0) > 0))
     .filter((member) => firstVoucherPeriodForCreatedAt(member.createdAt) <= period)
     .map((member, index) => buildCurrentLiveRow(member, baseRows.length + index + 1, period))
 
-  const rows = [...baseRows, ...newMembers]
+  const rows = [...effectiveBaseRows, ...newMembers]
   const displayedKeys = new Set(rows.map((row) => normalizeMemberDataStaffId(row.staffId)))
   // Approval controls membership visibility; payroll eligibility must not hide accounts.
   const unscheduledMembers: UnscheduledMember[] = members

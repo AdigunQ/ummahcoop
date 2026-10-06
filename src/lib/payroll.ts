@@ -1,6 +1,8 @@
-import { PayrollLineType, PayrollLineStatus } from '@prisma/client'
+import { PayrollLineType, PayrollLineStatus, type Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { generateReference } from '@/lib/utils'
+import { resolveContributionPlans } from '@/lib/contribution-plans'
+import { lockContributionPeriod } from '@/lib/contribution-period-lock'
 
 type DraftLine = {
   cycleId: string
@@ -24,24 +26,23 @@ export function getMonthRange(period: string) {
   return { start, end }
 }
 
-async function buildDraftLines(cycleId: string, period: string): Promise<DraftLine[]> {
+async function buildDraftLines(cycleId: string, period: string, db: Prisma.TransactionClient): Promise<DraftLine[]> {
   const { start, end } = getMonthRange(period)
 
-  const [savers, activeLoans, directRepayments] = await Promise.all([
-    prisma.user.findMany({
+  const [storedSavers, activeLoans, directRepayments] = await Promise.all([
+    db.user.findMany({
       where: {
         role: 'MEMBER',
         status: 'ACTIVE',
         voucherEnabled: true,
-        monthlyContribution: { gt: 0 },
       },
       select: { id: true, monthlyContribution: true },
     }),
-    prisma.loan.findMany({
+    db.loan.findMany({
       where: { status: 'APPROVED', balance: { gt: 0 } },
       select: { id: true, userId: true, monthlyPayment: true, balance: true },
     }),
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: {
         type: 'LOAN_REPAYMENT',
         status: 'APPROVED',
@@ -50,6 +51,7 @@ async function buildDraftLines(cycleId: string, period: string): Promise<DraftLi
       select: { userId: true, amount: true },
     }),
   ])
+  const savers = await resolveContributionPlans(storedSavers, period, db)
 
   const directByUser = new Map<string, number>()
   for (const row of directRepayments) {
@@ -91,29 +93,32 @@ async function buildDraftLines(cycleId: string, period: string): Promise<DraftLi
 }
 
 export async function ensureCycleDraft(period: string) {
-  const cycle = await prisma.payrollCycle.upsert({
-    where: { period },
-    update: {},
-    create: { period, status: 'DRAFT' },
-  })
+  return prisma.$transaction(async tx => {
+    await lockContributionPeriod(tx, period)
+    const cycle = await tx.payrollCycle.upsert({
+      where: { period },
+      update: {},
+      create: { period, status: 'DRAFT' },
+    })
 
-  const existingLineCount = await prisma.payrollLine.count({ where: { cycleId: cycle.id } })
-  if (existingLineCount === 0) {
-    const lines = await buildDraftLines(cycle.id, period)
-    if (lines.length > 0) {
-      await prisma.payrollLine.createMany({ data: lines })
+    const existingLineCount = await tx.payrollLine.count({ where: { cycleId: cycle.id } })
+    if (cycle.status === 'DRAFT' && existingLineCount === 0) {
+      const lines = await buildDraftLines(cycle.id, period, tx)
+      if (lines.length > 0) {
+        await tx.payrollLine.createMany({ data: lines })
+      }
     }
-  }
 
-  return prisma.payrollCycle.findUnique({
-    where: { id: cycle.id },
-    include: {
-      lines: {
-        where: { status: { in: ['PENDING', 'EXCLUDED'] } },
-        include: { loan: true },
+    return tx.payrollCycle.findUnique({
+      where: { id: cycle.id },
+      include: {
+        lines: {
+          where: { status: { in: ['PENDING', 'EXCLUDED'] } },
+          include: { loan: true },
+        },
       },
-    },
-  })
+    })
+  }, { isolationLevel: 'ReadCommitted', timeout: 15000 })
 }
 
 export async function postFinanceConfirmedCycle(cycleId: string, actor: string) {

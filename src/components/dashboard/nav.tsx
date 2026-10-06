@@ -49,10 +49,11 @@ interface NavProps {
     pendingMembers: number
     pendingPayments: number
     pendingLoans: number
+    pendingSavingsChanges?: number
   }
 }
 
-type BadgeKey = 'pending' | 'payments' | 'loans'
+type BadgeKey = 'pending' | 'payments' | 'loans' | 'savings'
 
 type NavItem = {
   href: string
@@ -68,6 +69,7 @@ const adminNavItems: NavItem[] = [
 
   { href: '/dashboard/member-data', label: 'Member Data', icon: FileText, group: 'Members' },
   { href: '/dashboard/directory', label: 'Member directory', icon: Users, group: 'Members' },
+  { href: '/dashboard/savings-changes', label: 'Savings changes', icon: PiggyBank, badge: 'savings', group: 'Members' },
   {
     href: '/dashboard/members',
     label: 'Approvals',
@@ -114,6 +116,7 @@ const adminNavItems: NavItem[] = [
 const memberNavItems: NavItem[] = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, group: 'Account' },
   { href: '/dashboard/profile', label: 'Profile', icon: Settings, group: 'Account' },
+  { href: '/dashboard/savings-changes', label: 'Change savings', icon: PiggyBank, group: 'Actions' },
 
   { href: '/dashboard/apply-loan', label: 'Apply for loan', icon: HandCoins, group: 'Actions' },
   { href: '/dashboard/withdrawals', label: 'Withdraw', icon: ArrowDownUp, group: 'Actions' },
@@ -124,6 +127,7 @@ const memberNavItems: NavItem[] = [
 ]
 
 const privilegedNavItems: Array<NavItem & { privilege: PrivilegeCode }> = [
+  { privilege: PRIVILEGE_CODES.EDIT_MEMBERS, href: '/dashboard/savings-changes', label: 'Savings changes', icon: PiggyBank, badge: 'savings', group: 'Administration' },
   {
     privilege: PRIVILEGE_CODES.VIEW_ANALYTICS,
     href: '/dashboard/analytics',
@@ -268,6 +272,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
     pending: adminBadges?.pendingMembers ?? 0,
     payments: adminBadges?.pendingPayments ?? 0,
     loans: adminBadges?.pendingLoans ?? 0,
+    savings: adminBadges?.pendingSavingsChanges ?? 0,
   }
   const adminGroups: Record<string, string> = {
     '/dashboard': 'Workspace',
@@ -275,6 +280,7 @@ export function DashboardNav({ user, adminBadges }: NavProps) {
     '/dashboard/member-data': 'Members & data',
     '/dashboard/directory': 'Members & data',
     '/dashboard/members': 'Members & data',
+    '/dashboard/savings-changes': 'Requests',
     '/dashboard/import-members': 'Members & data',
     '/dashboard/payments': 'Requests',
     '/dashboard/withdrawals': 'Requests',

@@ -13,6 +13,7 @@ import { getLoanLimit } from '@/lib/loan-request'
 import { getUserPrivilegeCodes } from '@/lib/access'
 import { canViewAdminOverview } from '@/components/admin/overview-access'
 import { AdminWorkspaceStart } from '@/components/admin/workspace-start'
+import { resolveContributionPlans } from '@/lib/contribution-plans'
 
 type RecentCommodity = {
   id: string
@@ -99,6 +100,7 @@ export default async function DashboardPage({
   }
 
   if (!user) throw new Error('Your member profile could not be found.')
+  ;[user] = await resolveContributionPlans([user])
 
   let recentPayments: DashboardPayment[] = []
   let recentLoans: DashboardLoan[] = []

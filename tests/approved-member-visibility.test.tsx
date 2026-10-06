@@ -25,6 +25,7 @@ type Snapshot = { period: string; label: string; rows: Record<string, unknown>[]
 let members: Member[] = []
 const snapshots = new Map<string, Snapshot>()
 const client = {
+  savingsChangeRequest: { findMany: async () => [] },
   user: {
     findMany: async ({ where }: { where: { role?: string; status?: string; voucherEnabled?: boolean; OR?: unknown[] } }) =>
       members.filter(member => (!where.role || member.role === where.role)

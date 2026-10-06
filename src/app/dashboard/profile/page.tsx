@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import ProfileView from './ProfileView'
+import Link from 'next/link'
 
 type SearchParams = {
   password?: string
@@ -73,6 +74,10 @@ export default async function ProfilePage({ searchParams: searchParamsInput }: {
 
   return (
     <div className="space-y-6">
+      <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
+        <div><h2 className="font-semibold">Monthly savings</h2><p className="text-sm text-muted-foreground">Request an increase or reduction for the admin to review.</p></div>
+        <Link className="btn-secondary" href="/dashboard/savings-changes?view=member">Request savings change</Link>
+      </div>
       <ProfileView
         member={{
           ...profileMember,

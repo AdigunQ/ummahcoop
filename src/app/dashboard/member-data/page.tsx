@@ -328,7 +328,7 @@ export default async function MemberDataPage({ searchParams: searchParamsInput }
     comparePeriods(selectedPeriod, latestUploadedMonth?.period || '') > 0 &&
     comparePeriods(selectedPeriod, currentPeriod) <= 0
 
-  const isCurrentLiveView = selectedPeriod === currentPeriod || shouldUseLiveProjection
+  const isCurrentLiveView = selectedPeriod >= currentPeriod || shouldUseLiveProjection
   const liveDataset = isCurrentLiveView
     ? await getCurrentMemberLiveDataset(selectedPeriod)
     : await buildVoucherDataset(selectedPeriod)
@@ -365,6 +365,15 @@ export default async function MemberDataPage({ searchParams: searchParamsInput }
     })
   }
 
+  const scheduledPeriods = await prisma.savingsChangeRequest.findMany({
+    where: { status: 'APPROVED', effectivePeriod: { gt: currentPeriod } },
+    select: { effectivePeriod: true }, distinct: ['effectivePeriod'],
+  })
+  for (const change of scheduledPeriods) {
+    if (change.effectivePeriod && !monthOptions.some(month => month.period === change.effectivePeriod)) {
+      monthOptions.push({ period: change.effectivePeriod, label: `${formatPeriodLabel(change.effectivePeriod)} (Scheduled)`, isUploaded: false })
+    }
+  }
   monthOptions.sort((a, b) => a.period.localeCompare(b.period))
 
   const snapshotRows = uploadedMonth ? toSnapshotRows(uploadedMonth.rows) : []

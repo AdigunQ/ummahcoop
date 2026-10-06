@@ -1,4 +1,5 @@
 'use server'
+import { resolveContributionPlans } from '@/lib/contribution-plans'
 
 import { getServerSession } from 'next-auth/next'
 import { redirect } from 'next/navigation'
@@ -59,7 +60,7 @@ export async function submitLoanRequest(formData: FormData) {
     return { error: 'Please confirm the declaration before submitting the loan request.' }
   }
 
-  const member = await prisma.user.findUnique({
+  let member = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
       id: true,
@@ -87,6 +88,8 @@ export async function submitLoanRequest(formData: FormData) {
   if (!member || !member.staffId) {
     return { error: 'Member record could not be loaded.' }
   }
+  ;[member] = await resolveContributionPlans([member])
+  if (!member.staffId) return { error: 'Member Staff ID is required.' }
 
   const financeSummary = await getMemberFinanceSummary(member.id, member.staffId)
 

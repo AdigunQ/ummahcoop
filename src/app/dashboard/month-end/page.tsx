@@ -7,17 +7,10 @@ import { revalidatePath } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDateTime, generateReference } from '@/lib/utils'
-import { PayrollLineType } from '@prisma/client'
+import { ensureCycleDraft } from '@/lib/payroll'
 
 function isValidPeriod(period: string) {
   return /^\d{4}-\d{2}$/.test(period)
-}
-
-function getMonthRange(period: string) {
-  const [year, month] = period.split('-').map(Number)
-  const start = new Date(year, month - 1, 1)
-  const end = new Date(year, month, 1)
-  return { start, end }
 }
 
 async function generateCycle(formData: FormData) {
@@ -29,88 +22,7 @@ async function generateCycle(formData: FormData) {
   const period = String(formData.get('period') || '')
   if (!isValidPeriod(period)) return
 
-  const existing = await prisma.payrollCycle.findUnique({ where: { period } })
-  if (existing) return
-
-  const cycle = await prisma.payrollCycle.create({
-    data: { period, status: 'DRAFT' },
-  })
-
-  const { start, end } = getMonthRange(period)
-
-  const [savers, activeLoans, directRepayments] = await Promise.all([
-    prisma.user.findMany({
-      where: {
-        role: 'MEMBER',
-        status: 'ACTIVE',
-        voucherEnabled: true,
-        monthlyContribution: { gt: 0 },
-      },
-      select: { id: true, monthlyContribution: true },
-    }),
-    prisma.loan.findMany({
-      where: { status: 'APPROVED', balance: { gt: 0 } },
-      select: { id: true, userId: true, monthlyPayment: true, balance: true },
-    }),
-    prisma.payment.findMany({
-      where: {
-        type: 'LOAN_REPAYMENT',
-        status: 'APPROVED',
-        date: { gte: start, lt: end },
-      },
-      select: { userId: true, amount: true },
-    }),
-  ])
-
-  const directByUser = new Map<string, number>()
-  for (const row of directRepayments) {
-    directByUser.set(row.userId, (directByUser.get(row.userId) || 0) + row.amount)
-  }
-
-  const lines: Array<{
-    cycleId: string
-    userId: string
-    loanId?: string
-    lineType: PayrollLineType
-    expectedAmount: number
-    actualAmount: number
-    reason?: string
-  }> = []
-
-  for (const saver of savers) {
-    const amount = saver.monthlyContribution || 0
-    if (amount <= 0) continue
-    lines.push({
-      cycleId: cycle.id,
-      userId: saver.id,
-      lineType: 'SAVINGS',
-      expectedAmount: amount,
-      actualAmount: amount,
-    })
-  }
-
-  for (const loan of activeLoans) {
-    const scheduled = Math.min(loan.monthlyPayment || 0, loan.balance)
-    const directPaid = directByUser.get(loan.userId) || 0
-    const due = Math.max(0, scheduled - directPaid)
-    if (due <= 0) continue
-    lines.push({
-      cycleId: cycle.id,
-      userId: loan.userId,
-      loanId: loan.id,
-      lineType: 'LOAN_REPAYMENT',
-      expectedAmount: due,
-      actualAmount: due,
-      reason:
-        directPaid > 0
-          ? `Adjusted for direct repayment (${formatCurrency(directPaid)})`
-          : undefined,
-    })
-  }
-
-  if (lines.length > 0) {
-    await prisma.payrollLine.createMany({ data: lines })
-  }
+  await ensureCycleDraft(period)
 
   revalidatePath('/dashboard/month-end')
 }

@@ -98,6 +98,7 @@ export const PRIVILEGE_ROUTE_MAP: Array<{
   { code: PRIVILEGE_CODES.VIEW_ANALYTICS, href: '/dashboard/analytics', label: 'Analytics', group: 'Special access' },
   { code: PRIVILEGE_CODES.VIEW_MEMBER_DATA, href: '/dashboard/member-data', label: 'Member Data', group: 'Special access' },
   { code: PRIVILEGE_CODES.EDIT_MEMBERS, href: '/dashboard/directory', label: 'Update Member', group: 'Special access' },
+  { code: PRIVILEGE_CODES.EDIT_MEMBERS, href: '/dashboard/savings-changes', label: 'Savings changes', group: 'Special access' },
   { code: PRIVILEGE_CODES.APPROVE_MEMBERS, href: '/dashboard/members', label: 'Approvals', group: 'Special access' },
   { code: PRIVILEGE_CODES.IMPORT_MEMBERS, href: '/dashboard/import-members', label: 'Import Members', group: 'Special access' },
   { code: PRIVILEGE_CODES.REVIEW_PAYMENTS, href: '/dashboard/payments', label: 'Payments', group: 'Special access' },

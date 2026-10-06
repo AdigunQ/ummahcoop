@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { LOAN_REQUEST_POLICY, getLoanLimit } from '@/lib/loan-request'
 import { getMemberFinanceSummary } from '@/lib/member-finance'
 import { LoanRequestForm } from './LoanRequestForm'
+import { resolveContributionPlans } from '@/lib/contribution-plans'
 
 export default async function ApplyLoanPage() {
   const session = await getServerSession(authOptions)
@@ -14,7 +15,7 @@ export default async function ApplyLoanPage() {
     redirect('/login')
   }
 
-  const member = await prisma.user.findUnique({
+  let member = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
       id: true,
@@ -53,6 +54,7 @@ export default async function ApplyLoanPage() {
   if (!member) {
     redirect('/login')
   }
+  ;[member] = await resolveContributionPlans([member])
 
   const financeSummary = await getMemberFinanceSummary(member.id, member.staffId)
   const monthsServed = Math.max(0, differenceInMonths(new Date(), member.createdAt))
