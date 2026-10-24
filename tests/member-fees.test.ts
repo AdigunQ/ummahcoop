@@ -18,6 +18,7 @@ let members: Array<{
 
 // Read-only fakes keep fee regression tests completely off the real database.
 const client = {
+  loan: { findMany: async () => [] },
   savingsChangeRequest: { findMany: async () => [] },
   user: { findMany: async () => members },
   memberDataMonth: {
