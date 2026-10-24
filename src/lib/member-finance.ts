@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getReconciledPayrollRepayments } from '@/lib/payroll-reconciliation'
 
 type SnapshotRow = Record<string, unknown>
 
@@ -71,13 +72,15 @@ type LedgerDeductionTotals = {
  */
 export function sumLedgerDeductions(
   snapshots: Array<{ period: string; rows: unknown }>,
-  staffId: string | null | undefined
+  staffId: string | null | undefined,
+  verifiedLoanRepayments: ReadonlyMap<string, number> = new Map()
 ): LedgerDeductionTotals {
   const normalizedStaffId = normalizeStaffId(staffId)
   let loanPaid = 0
   let commodityPaid = 0
   let loanRepaymentStartPeriod: string | null = null
   let commodityRepaymentStartPeriod: string | null = null
+  const processedPeriods = new Set<string>()
 
   for (const snapshot of snapshots) {
     const ledgerRow = rowsFromJson(snapshot.rows).find((row) => {
@@ -85,7 +88,9 @@ export function sumLedgerDeductions(
       return normalizeStaffId(rowStaffId) === normalizedStaffId
     })
 
-    const loanDeduction = pickNumber(ledgerRow, ['Loan', 'Loan Originated'])
+    const loanDeduction = verifiedLoanRepayments.get(snapshot.period)
+      ?? pickNumber(ledgerRow, ['Loan', 'Loan Originated'])
+    processedPeriods.add(snapshot.period)
     const commodityDeduction = pickNumber(ledgerRow, [
       'Commodity',
       'Commodity Requests',
@@ -99,6 +104,14 @@ export function sumLedgerDeductions(
     if (commodityDeduction > 0) {
       commodityPaid += commodityDeduction
       commodityRepaymentStartPeriod = commodityRepaymentStartPeriod || snapshot.period
+    }
+  }
+
+  for (const [period, amount] of verifiedLoanRepayments) {
+    if (processedPeriods.has(period) || amount <= 0) continue
+    loanPaid += amount
+    if (!loanRepaymentStartPeriod || period < loanRepaymentStartPeriod) {
+      loanRepaymentStartPeriod = period
     }
   }
 
@@ -156,7 +169,8 @@ async function loadMemberFinanceSummary(
       select: {
         amount: true,
         balance: true,
-        repayments: { select: { amount: true } },
+        applicationData: true,
+        repayments: { select: { amount: true, date: true } },
       },
     }),
     prisma.payment.aggregate({
@@ -174,7 +188,8 @@ async function loadMemberFinanceSummary(
     }),
   ])
 
-  const ledgerTotals = sumLedgerDeductions(snapshots, staffId)
+  const verifiedLoanRepayments = getReconciledPayrollRepayments(approvedLoans)
+  const ledgerTotals = sumLedgerDeductions(snapshots, staffId, verifiedLoanRepayments)
 
   const workflowLoanCollected = approvedLoans.reduce((sum, loan) => sum + loan.amount, 0)
   const workflowLoanOutstanding = approvedLoans.reduce(
@@ -226,7 +241,10 @@ async function loadMemberFinanceSummary(
     commodityPaid,
     commodityOutstanding: Math.max(commodityCollected - commodityPaid, 0),
     commodityRepaymentStartPeriod: ledgerTotals.commodityRepaymentStartPeriod,
-    ledgerPeriod: snapshots[snapshots.length - 1]?.period || null,
+    ledgerPeriod: [
+      ...snapshots.map(snapshot => snapshot.period),
+      ...verifiedLoanRepayments.keys(),
+    ].sort().pop() || null,
   }
 }
 

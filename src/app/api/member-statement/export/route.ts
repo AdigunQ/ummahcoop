@@ -251,7 +251,7 @@ async function buildStatementResponse() {
     ])
   } else {
     for (const loan of loans) {
-      const adminChargeRate = loan.interestRate || LOAN_REQUEST_POLICY.adminChargePercent
+      const adminChargeRate = loan.interestRate ?? LOAN_REQUEST_POLICY.adminChargePercent
       const adminCharge = (safeNumber(loan.amount) * safeNumber(adminChargeRate)) / 100
       const paid = loan.repayments.reduce((sum, repayment) => sum + safeNumber(repayment.amount), 0)
       lines.push([

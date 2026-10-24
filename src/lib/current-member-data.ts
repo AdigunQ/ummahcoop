@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getPayrollSettlementPeriod, getReconciledPayrollRepayments } from '@/lib/payroll-reconciliation'
 import { calculateMemberFees } from '@/lib/member-fees'
 import { getApprovedSavingsPlans } from '@/lib/contribution-plans'
 import {
@@ -156,11 +157,30 @@ export async function getCurrentMemberLiveDataset(periodInput?: string): Promise
   })
 
   const plans = await getApprovedSavingsPlans(period, storedMembers.map(member => member.id), latestMonth?.period)
+  const reconciledLoans = await prisma.loan.findMany({
+    where: {
+      userId: { in: storedMembers.map(member => member.id) },
+      status: 'COMPLETED',
+      applicationData: { path: ['payrollReconciliation', 'version'], equals: 1 },
+      user: { loans: { none: { status: 'APPROVED', balance: { gt: 0 } } } },
+    },
+    select: { userId: true, applicationData: true, repayments: { select: { amount: true, date: true } } },
+  })
+  const reconciledByStaffId = new Map(storedMembers.map(member => [
+    normalizeMemberDataStaffId(member.staffId),
+    reconciledLoans.filter(loan => loan.userId === member.id),
+  ]))
   const plansByStaffId = new Map(storedMembers.map(member => [normalizeMemberDataStaffId(member.staffId), plans.get(member.id)]))
   const effectiveBaseRows = baseRows.map(row => {
     const plan = plansByStaffId.get(normalizeMemberDataStaffId(row.staffId))
-    return plan ? { ...row, monthlySavings: plan.requestedThrift, specialSavings: plan.requestedSpecial,
+    const effectiveRow = plan ? { ...row, monthlySavings: plan.requestedThrift, specialSavings: plan.requestedSpecial,
       totalSavings: row.totalSavings - row.monthlySavings - row.specialSavings + plan.requestedThrift + plan.requestedSpecial } : row
+    if (latestMonth?.period === period) return effectiveRow
+    const loans = reconciledByStaffId.get(normalizeMemberDataStaffId(row.staffId)) || []
+    const repayments = getReconciledPayrollRepayments(loans)
+    if (repayments.has(period)) return { ...effectiveRow, loanAmount: repayments.get(period) as number }
+    const settledPeriod = loans.map(loan => getPayrollSettlementPeriod(loan.applicationData)).filter(Boolean).sort().pop()
+    return settledPeriod && period > settledPeriod ? { ...effectiveRow, loanAmount: 0 } : effectiveRow
   })
   const members = storedMembers.map(member => {
     const plan = plans.get(member.id)
