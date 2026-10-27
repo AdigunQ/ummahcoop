@@ -122,7 +122,7 @@ test('a saved joining row with both fees is preserved without charging either fe
 
 test('members after the existing voucher cutoff are not charged before their first period', async () => {
   reset()
-  members[0].createdAt = new Date('2026-09-16T00:00:00Z')
+  members[0].createdAt = new Date('2026-09-11T00:00:00Z')
   const { buildVoucherDataset } = await vouchers
   assert.equal((await buildVoucherDataset('2026-09')).rows.length, 0)
   assert.equal((await buildVoucherDataset('2026-10')).rows[0].memberFee, 1100)

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
-import { buildVoucherDataset, resolveVoucherPeriod } from '@/lib/vouchers'
+import { buildVoucherDataset, resolveVoucherPeriod, VOUCHER_CUTOFF_DAY } from '@/lib/vouchers'
 import { getCurrentMemberReportDataset } from '@/lib/current-member-data'
 import { canAccessWithPrivileges, PRIVILEGE_CODES } from '@/lib/access'
 
@@ -69,7 +69,7 @@ export default async function VouchersPage({ searchParams: searchParamsInput }: 
         description={
           <>
             Monthly salary deduction report generated from uploaded monthly data when available,
-            otherwise from live member records.
+            otherwise from live member records. Voucher cutoff: the {VOUCHER_CUTOFF_DAY}th of each month.
           </>
         }
       />

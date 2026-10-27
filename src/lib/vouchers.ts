@@ -8,7 +8,7 @@ import {
 } from '@/lib/member-fees'
 
 export const VOUCHER_TITLE = 'LIST OF NAIA MULTIPUPOSE COOPERATIVES MEMBERS'
-export const VOUCHER_CUTOFF_DAY = 15
+export const VOUCHER_CUTOFF_DAY = 10
 
 const MONTH_NAME_TO_INDEX: Record<string, number> = {
   jan: 1,
@@ -182,8 +182,7 @@ export function firstVoucherPeriodForCreatedAt(createdAt: Date): string {
   let monthIndex = createdAt.getUTCMonth() // 0-11
   const day = createdAt.getUTCDate()
 
-  // Rule: voucher prepared by the 15th. If registration is after 15th,
-  // first voucher is next month.
+  // Registrations after the monthly cutoff enter the next month's voucher.
   if (day > VOUCHER_CUTOFF_DAY) {
     monthIndex += 1
     if (monthIndex >= 12) {

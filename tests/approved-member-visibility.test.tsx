@@ -125,7 +125,7 @@ test('voucher exclusions remain visible without enabling payroll or charging fee
 
 test('late registrations are visible before their first payroll month without premature deductions', async () => {
   reset()
-  member({ createdAt: new Date('2026-10-16T00:00:00Z') })
+  member({ createdAt: new Date('2026-10-11T00:00:00Z') })
   const { getCurrentMemberLiveDataset } = await dataModule
   const october = await getCurrentMemberLiveDataset('2026-10')
   assert.equal(october.rows.length, 0)
@@ -137,12 +137,12 @@ test('late registrations are visible before their first payroll month without pr
   assert.equal((await getCurrentMemberLiveDataset('2026-12')).rows[0].memberFee, 100)
 })
 
-test('the 15th remains eligible while the 16th starts the next month', async () => {
+test('the 10th remains eligible while the 11th starts the next month', async () => {
   reset()
-  const approved = member({ createdAt: new Date('2026-10-15T23:59:59Z') })
+  const approved = member({ createdAt: new Date('2026-10-10T23:59:59Z') })
   const { getCurrentMemberLiveDataset } = await dataModule
   assert.equal((await getCurrentMemberLiveDataset('2026-10')).rows.length, 1)
-  approved.createdAt = new Date('2026-10-16T00:00:00Z')
+  approved.createdAt = new Date('2026-10-11T00:00:00Z')
   assert.equal((await getCurrentMemberLiveDataset('2026-10')).rows.length, 0)
 })
 
